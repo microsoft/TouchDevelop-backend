@@ -83,12 +83,11 @@ async function secondarySearchEntryAsync(obj: JsonBuilder, body: string): Promis
     }
 }
 
-export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSearchOptions = {}) : Promise<void>
-{
+export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSearchOptions = {}): Promise<void> {
     if (disableSearch) {
         options_.skipSearch = true;
     }
-    if (acsCallbackUrl == "" || ! tdliteAbuse.canHaveAbuseReport(obj["kind"])) {
+    if (!tdliteAbuse.canHaveAbuseReport(obj["kind"])) {
         options_.skipScan = true;
     }
     if (options_.skipScan && options_.skipSearch) {
@@ -101,7 +100,7 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
     await core.resolveAsync(store, fetchResult, core.adminRequest);
     let pub = fetchResult.items[0];
     let body = orEmpty(core.withDefault(pub["text"], obj["text"]));
-    
+
     if (body == "" && store.kind == "script") {
         let entry2 = await tdliteScripts.getScriptTextAsync(pub["id"]);
         if (entry2 != null) {
@@ -110,7 +109,7 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
     }
     
     // ## search
-    if ( ! options_.skipSearch) {
+    if (!options_.skipSearch) {
         let batch = tdliteIndex.createPubsUpdate();
         let entry = tdliteIndex.toPubEntry(pub, body, pubFeatures(pub), 0);
         entry.upsertPub(batch);
@@ -122,15 +121,20 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
         /* async */ batch.sendAsync();
     }
     // ## scan
-    if ( ! options_.skipScan) {
+    if (!options_.skipScan) {
         let text = body;
         for (let fldname of ["name", "description", "about", "grade", "school"]) {
             text = text + " " + orEmpty(pub[fldname]);
         }
-        /* async */ acs.validateTextAsync(pub["id"], text, acsCallbackUrl);
-        let picurl = orEmpty(pub["pictureurl"]);
-        if (picurl != "") {
+        
+        await tdliteAbuse.scanAndPostAsync(pub["id"], text);
+
+        if (acsCallbackUrl) { 
+            /* async */ acs.validateTextAsync(pub["id"], text, acsCallbackUrl);
+            let picurl = orEmpty(pub["pictureurl"]);
+            if (picurl != "") {
             /* async */ acs.validatePictureAsync(pub["id"], picurl, acsCallbackUrl);
+            }
         }
     }
 }
@@ -212,6 +216,14 @@ export async function initAsync() : Promise<void>
         }           
         await reindexEntriesAsync(store, lst.items, req);
     });
+    
+    core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
+        core.checkPermission(req, "operator");        
+        if (req.status != 200) return;
+        scanAndSearchAsync(req.rootPub, { skipSearch: true })
+        req.response = {}
+    });
+
 }
 
 async function reindexEntriesAsync(store: indexedStore.Store, json: JsonObject[], req: core.ApiRequest): Promise<void> {

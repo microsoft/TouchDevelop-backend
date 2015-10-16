@@ -54,6 +54,7 @@ export var rewriteVersion: number = 223;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
+var settingsCleanups: (() => void)[] = [];
 export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner"]
 
 export class IdObject
@@ -1524,6 +1525,11 @@ export async function updateSettingsAsync(name: string, update: td.Action1<JsonB
     await refreshSettingsAsync();
 }
 
+export function registerSettingsCleanup(f: () => void)
+{
+    settingsCleanups.push(f);
+}
+
 export async function refreshSettingsAsync(): Promise<void> {
     let now = new Date().getTime();
     if (now - lastSettingsCheck < 5000) return;
@@ -1551,6 +1557,10 @@ export async function refreshSettingsAsync(): Promise<void> {
 
     for (let t of settingsObjects.map(o => settingsContainer.getAsync(o).then(v => settingsCache[o] = (v || {})))) {
         await t;
+    }
+    
+    for (let f of settingsCleanups) {
+        f();
     }
 
     let entry2 = getSettings("settings") || { permissions: {} };

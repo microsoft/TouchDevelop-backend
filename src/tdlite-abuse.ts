@@ -24,6 +24,9 @@ var logger = core.logger;
 var httpCode = core.httpCode;
 var abuseReports: indexedStore.Store;
 
+var wordRecognizer: {};  
+var scannerRegexes: td.SMap<RegExp>;
+
 export class PubAbusereport
     extends td.JsonRecord
 {
@@ -86,6 +89,11 @@ export interface ICandeleteResponse {
 
 export async function initAsync() : Promise<void>
 {
+    core.registerSettingsCleanup(() => {
+        wordRecognizer = null;  
+        scannerRegexes = null;        
+    })
+    
     abuseReports = await indexedStore.createStoreAsync(core.pubsContainer, "abusereport");
     await core.setResolveAsync(abuseReports, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         let users = await core.followPubIdsAsync(fetchResult.items, "publicationuserid", "");
@@ -337,3 +345,133 @@ async function checkDeletePermissionAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
+function buildRecognizer(words:string[])
+{
+    let root = {}
+    
+    for (let word of words) {
+        word = word.toLowerCase().replace(/\&nbsp;/g, " ");
+        let ptr = root
+        for (let c of word) {
+            if (!ptr.hasOwnProperty(c)) {
+                ptr[c] = {}
+            }
+            ptr = ptr[c]
+        }
+        ptr["_match"] = 1
+    }
+    
+    return root
+}
+
+function scanCore(tree: {}, str: string) {
+    let hits: string[] = []
+    let issep = c => /^[^a-z0-9]$/.test(c);
+
+    str = " " + str.toLowerCase() + " ";
+
+    for (let i = 0; i < str.length; ++i) {
+        if (!issep(str[i])) continue;
+        let ptr = tree;
+        for (let j = 1; !!ptr; ++j) {
+            let c = str[i + j];            
+            if (!c) break;
+            if (ptr["_match"] && issep(c)) {
+                hits.push(str.substr(i + 1, j - 1))
+            }
+            ptr = ptr[c];
+        }
+    }
+    
+    return hits;
+}
+
+function initScanner() {
+    if (wordRecognizer) return;
+    let sett = core.getSettings("scanner")    
+    wordRecognizer = buildRecognizer(sett["words"] || [])
+    scannerRegexes = {}
+    let reg = sett["regexps"]
+    for (let rxname of Object.keys(reg)) {
+        scannerRegexes[rxname] = new RegExp("\\b" + reg[rxname] + "\\b");
+        // scannerRegexes[rxname] = "\\b" + reg[rxname] + "\\b";
+    }
+}
+
+function scanText(txt: string)
+{
+    let res = ""
+    
+    initScanner();
+    
+    let hits = scanCore(wordRecognizer, txt);
+    
+    if (hits.length > 0) {
+        res += "Word hits: " + hits.join(", ") + ". "
+    }
+    
+    for (let rxname of Object.keys(scannerRegexes)) {
+        let m = scannerRegexes[rxname].exec(txt)
+        if (m) {
+            res += rxname + ": " + m[0] + ". "
+        }
+    }
+    
+    return res;    
+}
+
+export async function scanAndPostAsync(pubid: string, body: string) {
+    let msg = scanText(body);
+    if (!msg) return;
+    
+    let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
+    if (uid != "") {
+        let req = core.buildApiRequest("/api/" + pubid + "/abuse")
+        await core.setReqUserIdAsync(req, uid);
+        req.rootPub = await core.pubsContainer.getAsync(pubid);
+        if (core.isGoodEntry(req.rootPub)) {
+            let jsb = {
+                text: "Scanner-flagged, mesasge: " + msg
+            };
+            req.body = jsb;
+            req.rootId = pubid;
+            await postAbusereportAsync(req);
+        }
+    }
+}
+
+function testscanner()
+{
+    let t0 = buildRecognizer(["foo", "b-rhello"]);
+    let numerr = 0
+    let tst = (s, e) => {
+        let r = scanCore(t0, s).join(",")
+        let err = ""
+        if (e != r) {
+            numerr++;
+            err = `ERROR, exp: '${e}'`
+        }
+        console.log(`${s} => '${r}' ${err}`)
+    }
+        
+    tst("hello","")
+    tst("hellofoo","")
+    tst("foohello", "")
+    tst("Foo", "foo")
+    tst("hello foo() bar", "foo")
+    tst("hello ()b-rhello() bar", "b-rhello")
+    tst("hello ()b-rhelloss() bar", "")
+    
+    
+    /*
+    let tt = require('fs').readFileSync("test.txt", "utf8") + " fo.bar@baz.com hello"
+    let r = new RegExp("\\b(\\s*\\(?0\\d{4}\\)?\\s*\\d{6}\\s*)|(\\s*\\(?0\\d{3}\\)?\\s*\\d{3}\\s*\\d{4}\\s*)\\b");    
+    console.log(tt.length)
+    console.log(!!r.exec(tt))
+    //console.log(r.exec(tt))
+    //let w = JSON.parse(require('fs').readFileSync("words.json", "utf8")).words
+    */
+}
+
+if (!module.parent)
+    testscanner();
