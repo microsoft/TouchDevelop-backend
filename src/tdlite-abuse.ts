@@ -44,6 +44,12 @@ export class PubAbusereport
     @td.json public publicationkind: string = "";
     @td.json public publicationuserid: string = "";
     @td.json public resolution: string = "";
+    
+    // admin-only
+    @td.json public usernumreports = 0;
+    @td.json public publicationnumabuses = 0;
+    @td.json public publicationusernumabuses = 0;
+    
     static createFromJson(o:JsonObject) { let r = new PubAbusereport(); r.fromJson(o); return r; }
 }
 
@@ -97,16 +103,24 @@ export async function initAsync() : Promise<void>
     abuseReports = await indexedStore.createStoreAsync(core.pubsContainer, "abusereport");
     await core.setResolveAsync(abuseReports, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         let users = await core.followPubIdsAsync(fetchResult.items, "publicationuserid", "");
+        let pubs = await core.followPubIdsAsync(fetchResult.items, "publicationid", "");
         let withUsers = await core.addUsernameEtcCoreAsync(fetchResult.items);
         let coll = (<PubAbusereport[]>[]);
         let x = 0;
         for (let jsb of withUsers) {
-            if (jsb["pub"]["userid"] == apiRequest.userid || 
-                core.callerIsFacilitatorOf(apiRequest, users[x]) || 
+            let isFacilitator = core.callerIsFacilitatorOf(apiRequest, users[x]) 
+            if (isFacilitator ||
+                jsb["pub"]["userid"] == apiRequest.userid || 
                 core.callerIsFacilitatorOf(apiRequest, jsb["*userid"])) {
                 let report = PubAbusereport.createFromJson(jsb["pub"]);
                 report.text = core.decrypt(report.text);
                 coll.push(report);
+                
+                if (isFacilitator) {
+                    report.publicationnumabuses = pubs[x] ? pubs[x]["numAbuses"] || 0 : 0
+                    report.publicationusernumabuses = users[x] ? users[x]["numAbusesByUser"] || 0 : 0
+                    report.usernumreports = jsb["*userid"] ? jsb["*userid"]["numReports"] || 0 : 0
+                }
             }
             x = x + 1;
         }
@@ -267,7 +281,16 @@ export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
                 entry["abuseStatus"] = "active";
             }
             entry["abuseStatusPosted"] = "active";
-        });
+            core.bareIncrement(entry, "numAbuses");
+        });        
+        await core.pubsContainer.updateAsync(report.publicationuserid, async(entry: JsonBuilder) => {
+            core.bareIncrement(entry, "numAbusesByUser");
+        });               
+        let tmp = await core.pubsContainer.updateAsync(report.userid, async(entry: JsonBuilder) => {
+            core.bareIncrement(entry, "numReports");
+        })
+        //let tmp2 = await core.pubsContainer.getAsync(report.userid);
+        //logger.info("userrep: " + tmp["id"] + ":" + tmp["__version"] + " - " + tmp2["__version"])
         await notifications.storeAsync(req, jsb, "");
         await core.returnOnePubAsync(abuseReports, td.clone(jsb), req);
     }
@@ -275,21 +298,16 @@ export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
 
 function getAuthor(pub: JsonObject) : string
 {
-    let author2: string;
     let author = pub["userid"];
     if (pub["kind"] == "user") {
         author = pub["id"];
     }
     return author;
-    return author2;
 }
 
 export function canHaveAbuseReport(baseKind: string) : boolean
 {
-    let canAbuse2: boolean;
-    let canAbuse = /^(art|comment|script|screenshot|channel|group|user)$/.test(baseKind);
-    return canAbuse;
-    return canAbuse2;
+    return /^(art|comment|script|screenshot|channel|group|user)$/.test(baseKind);    
 }
 
 async function deleteUserAsync(req8:core.ApiRequest)
@@ -406,7 +424,7 @@ function scanText(txt: string, candolinks: boolean) {
     let hits = scanCore(wordRecognizer, txt);
 
     if (hits.length > 0) {
-        res += "Word hits: " + hits.join(", ") + ". "
+        res += "Word hits: " + hits.join(", ") + ".\n"
     }
 
     if (candolinks) {
@@ -415,7 +433,7 @@ function scanText(txt: string, candolinks: boolean) {
         for (let rxname of Object.keys(scannerRegexes)) {
             let m = scannerRegexes[rxname].exec(txt)
             if (m) {
-                res += rxname + ": " + m[0] + ". "
+                res += rxname + ": " + m[0] + ".\n"
             }
         }
     }
@@ -434,7 +452,7 @@ export async function scanAndPostAsync(pubid: string, body: string, userjson: {}
         req.rootPub = await core.pubsContainer.getAsync(pubid);
         if (core.isGoodEntry(req.rootPub)) {
             let jsb = {
-                text: "Scanner-flagged, mesasge: " + msg
+                text: msg
             };
             req.body = jsb;
             req.rootId = pubid;

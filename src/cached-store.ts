@@ -122,6 +122,7 @@ export class Container
             jsb["__version"] = ver;
             await update(jsb);
             jsb["__version"] = ver;
+            last = jsb;
             let text2 = JSON.stringify(jsb);
             let result = await this.blob.createBlockBlobFromTextAsync(name, text2, {
                 etag: info.etag(),
