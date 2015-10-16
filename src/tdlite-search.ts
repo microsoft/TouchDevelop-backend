@@ -127,7 +127,9 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
             text = text + " " + orEmpty(pub[fldname]);
         }
         
-        await tdliteAbuse.scanAndPostAsync(pub["id"], text);
+        // TODO this was alrady fetched in "resolve" above...
+        let userjson = await core.getPubAsync(pub["userid"], "user");        
+        await tdliteAbuse.scanAndPostAsync(pub["id"], text, userjson);
 
         if (acsCallbackUrl) { 
             /* async */ acs.validateTextAsync(pub["id"], text, acsCallbackUrl);

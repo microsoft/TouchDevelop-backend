@@ -398,30 +398,33 @@ function initScanner() {
     }
 }
 
-function scanText(txt: string)
-{
+function scanText(txt: string, candolinks: boolean) {
     let res = ""
-    
+
     initScanner();
-    
+
     let hits = scanCore(wordRecognizer, txt);
-    
+
     if (hits.length > 0) {
         res += "Word hits: " + hits.join(", ") + ". "
     }
-    
-    for (let rxname of Object.keys(scannerRegexes)) {
-        let m = scannerRegexes[rxname].exec(txt)
-        if (m) {
-            res += rxname + ": " + m[0] + ". "
+
+    if (candolinks) {
+        logger.debug("skipping regexp scanning")
+    } else {
+        for (let rxname of Object.keys(scannerRegexes)) {
+            let m = scannerRegexes[rxname].exec(txt)
+            if (m) {
+                res += rxname + ": " + m[0] + ". "
+            }
         }
     }
-    
-    return res;    
+
+    return res;
 }
 
-export async function scanAndPostAsync(pubid: string, body: string) {
-    let msg = scanText(body);
+export async function scanAndPostAsync(pubid: string, body: string, userjson: {}) {
+    let msg = scanText(body, core.hasPermission(userjson, "external-links"));
     if (!msg) return;
     
     let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
