@@ -131,7 +131,6 @@ export async function initAsync() : Promise<void>
         await core.throttleAsync(req, "pub", 60);
         if (req.status != 200) return;
         if (!req.userid) {
-            await core.refreshSettingsAsync();
             let uid = orEmpty(core.serviceSettings.accounts["anonreport"]);
             if (!uid) {
                 req.status = httpCode._403Forbidden;

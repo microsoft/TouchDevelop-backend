@@ -13,6 +13,7 @@ import * as restify from "./restify"
 import * as parallel from "./parallel"
 
 import * as core from "./tdlite-core"
+import * as tdliteLogin from "./tdlite-login"
 
 var orEmpty = td.orEmpty;
 var logger = core.logger;
@@ -198,7 +199,7 @@ export async function performRoutingAsync(req: restify.Request, res: restify.Res
     let apiRequest = core.buildApiRequest(req.url());
     apiRequest.method = req.method();
     apiRequest.body = req.bodyAsJson();
-    await core.validateTokenAsync(apiRequest, req);
+    await tdliteLogin.validateTokenAsync(apiRequest, req);
     if (apiRequest.userid == "") {
         apiRequest.throttleIp = core.sha256(req.remoteIp());
     }

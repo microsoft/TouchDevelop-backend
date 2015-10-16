@@ -381,7 +381,6 @@ export async function initAsync() : Promise<void>
         }
         if (req4.status == 200) {
             let nick = orEmpty(req4.body["nickname"]).replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-            await core.refreshSettingsAsync();
             if (new RegExp(core.serviceSettings.blockedNicknameRx).test(nick)) {
                 core.checkPermission(req4, "official");
             }
@@ -510,7 +509,6 @@ async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSetting
     settings.userid = userJson["id"];
     settings.nickname = user.name;
     settings.aboutme = user.about;
-    await core.refreshSettingsAsync();
     let perms = {};
     for (let s of orEmpty(userJson["permissions"]).split(",")) {
         if (s != "") {

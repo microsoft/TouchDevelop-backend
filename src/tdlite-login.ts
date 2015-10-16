@@ -64,7 +64,6 @@ export interface ILoginSession {
 
 
 export async function initAsync(): Promise<void> {
-    core.validateTokenAsync = validateTokenAsync;
     initialApprovals = core.myChannel == "test";
     tokensTable = await core.tableClient.createTableIfNotExistsAsync("tokens");
 
@@ -681,9 +680,8 @@ function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
 
 
 
-async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
+export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
 {
-    await core.refreshSettingsAsync();
     if (req.isCached) {
         return;
     }

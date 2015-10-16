@@ -24,7 +24,6 @@ import * as tdliteDocs from "./tdlite-docs"
 export type ApiReqHandler = (req: ApiRequest) => Promise<void>;
 export type ResolutionCallback = (fetchResult: indexedStore.FetchResult, apiRequest: ApiRequest) => Promise<void>;
 
-export var validateTokenAsync : (req: ApiRequest, rreq: restify.Request) => Promise<void>;
 export var executeSearchAsync : (kind: string, q: string, req: ApiRequest) => Promise<void>;
 var somePubStore: indexedStore.Store;
 export var logger = td.createLogger("tdlite");

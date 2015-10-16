@@ -388,7 +388,6 @@ async function initAcsAsync() : Promise<void>
                             entry1["acsFlag"] = stat;
                             entry1["acsJobId"] = jobid;
                         });
-                        await core.refreshSettingsAsync();
                         let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
                         if (uid != "") {
                             await core.setReqUserIdAsync(req, uid);

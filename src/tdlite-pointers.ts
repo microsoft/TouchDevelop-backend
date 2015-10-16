@@ -354,7 +354,6 @@ async function clearPtrCacheAsync(id: string) : Promise<void>
             entry1["version"] = "outdated";
         });
         if ( ! /@\w+$/.test(id)) {
-            await core.refreshSettingsAsync();
             for (let lang of Object.keys(core.serviceSettings.langs)) {
                 await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id + "@" + lang, async (entry2: JsonBuilder) => {
                     entry2["version"] = "outdated";
@@ -421,7 +420,6 @@ async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: Json
                 if ( ! official && ! /^(users|usercontent|preview|)$/.test(doctype)) {
                     official = true;
                 }
-                await core.refreshSettingsAsync();
                 let pathConfig = core.serviceSettings.paths[doctype];
                 if (pathConfig != null) {
                     td.jsonCopyFrom(pubdata, pathConfig);

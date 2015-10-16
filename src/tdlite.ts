@@ -136,7 +136,8 @@ async function _initAsync() : Promise<void>
     await tdliteLogin.initAsync();
 
     // ## batch api here
-    server.post("/api", async (req2: restify.Request, res2: restify.Response) => {
+    server.post("/api", async(req2: restify.Request, res2: restify.Response) => {
+        await core.refreshSettingsAsync();
         await tdliteRouting.performRoutingAsync(req2, res2);
     });
     server.routeRegex("OPTS", ".*", async (req3: restify.Request, res3: restify.Response) => {
@@ -146,7 +147,8 @@ async function _initAsync() : Promise<void>
         res3.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, HEAD, OPTIONS");
         res3.sendStatus(200);
     });
-    server.all(async (req4: restify.Request, res4: restify.Response) => {
+    server.all(async(req4: restify.Request, res4: restify.Response) => {
+        await core.refreshSettingsAsync();
         if (td.startsWith(req4.url(), "/api/")) {
             await tdliteRouting.performRoutingAsync(req4, res4);
         }
