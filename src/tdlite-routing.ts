@@ -60,6 +60,7 @@ async function performBatchedRequestAsync(inpReq: JsonBuilder, req: core.ApiRequ
     resp = {};
     resp["code"] = apiRequest.status;
     if (apiRequest.status == 200) {
+        core.stripUnneeded(apiRequest.response);
         let etag = core.computeEtagOfJson(apiRequest.response);
         let s = inpReq["If-None-Match"];
         if (s != null && s == etag) {
@@ -245,6 +246,7 @@ function sendResponse(apiRequest: core.ApiRequest, req: restify.Request, res: re
         assert(false, "response unset");
     }
     else {
+        core.stripUnneeded(apiRequest.response);
         let etag = core.computeEtagOfJson(apiRequest.response);
         if (apiRequest.method == "GET" && orEmpty(req.header("If-None-Match")) == etag) {
             res.sendError(httpCode._304NotModified, "");

@@ -610,6 +610,44 @@ export function orZero(s: number) : number
     }
     return r;
 }
+ 
+export function stripUnneeded(obj: JsonBuilder) {
+    if (!obj.hasOwnProperty("kind")) return;
+
+    let k: string = obj["kind"];
+
+    delete obj["url"];
+    delete obj["userscore"];
+
+    if (k == "script") {
+        delete obj["iconurl"];
+        delete obj["capabilities"];
+        delete obj["flows"];
+        delete obj["haserrors"];
+        delete obj["runs"];
+        delete obj["installations"];
+        delete obj["art"];
+        delete obj["platforms"];
+    } else if (k == "user") {
+        delete obj["features"];
+        delete obj["activedays"];
+        delete obj["score"];
+    }
+
+    if (fullTD) return;
+
+    delete obj["userhaspicture"];
+    delete obj["userplatform"];
+
+    if (k == "script") {
+        delete obj["screenshotthumburl"];
+        delete obj["screenshoturl"];
+    } else if (k == "user") {
+        delete obj["haspicture"];
+        delete obj["time"];
+        delete obj["about"];
+    }
+}
 
 export function computeEtagOfJson(resp: JsonObject) : string
 {
@@ -624,6 +662,7 @@ export function buildListResponse(entities: indexedStore.FetchResult, req: ApiRe
 {
     let bld = td.clone(entities.toJson());
     bld["kind"] = "list";
+    bld["items"].forEach(stripUnneeded);
     let etags = td.toString(req.queryOptions["etagsmode"]);
     if (etags == null) {
     }
@@ -636,12 +675,12 @@ export function buildListResponse(entities: indexedStore.FetchResult, req: ApiRe
             result["ETag"] = computeEtagOfJson(elt);
             return result;
         });
-        bld["etags"] = td.arrayToJson(coll);
+        bld["etags"] = coll;
         if (etags == "etagsonly") {
             delete bld["items"];
         }
     }
-    req.response = td.clone(bld);
+    req.response = bld;
 }
 
 export function isGoodEntry(entry: JsonObject) : boolean
