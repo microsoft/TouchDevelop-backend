@@ -94,11 +94,12 @@ export class Container
     /**
      * Fetch named entry, run `update` on it, and store the results. Repeat in case of race.
      */
-    public async updateAsync(name: string, update: UpdateJson) : Promise<void>
+    public async updateAsync(name: string, update: UpdateJson): Promise<{}>
     {
         let blob = this.blob;
         let retries = 20;
         let sleepTime = 0.1;
+        let last = null;
         while (retries > 0) {
             let info = await blob.getBlobToTextAsync(name, {
                 timeoutIntervalInMs: blobTimeout
@@ -117,13 +118,9 @@ export class Container
                 console.log(info)
             }
             let ver = jsb["__version"];
+            ver = (ver || 0) + 1;
+            jsb["__version"] = ver;
             await update(jsb);
-            if (ver == null) {
-                ver = 1;
-            }
-            else {
-                ver = ver + 1;
-            }
             jsb["__version"] = ver;
             let text2 = JSON.stringify(jsb);
             let result = await this.blob.createBlockBlobFromTextAsync(name, text2, {
@@ -149,6 +146,7 @@ export class Container
         if (retries == 0) {
             assert(false, "atomic blob update failed, " + this.name + "/" + name);
         }
+        return last;
     }
 
     private async saveCacheAsync(name: string, val: string, ver: number) : Promise<void>
