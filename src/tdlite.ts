@@ -179,10 +179,7 @@ async function _initAsync() : Promise<void>
 
 async function initSubsystems() : Promise<void>
 {
-    core.pubsContainer = await cachedStore.createContainerAsync("pubs");
-    core.settingsContainer = await cachedStore.createContainerAsync("settings", {
-        inMemoryCacheSeconds: 5
-    });
+    core.pubsContainer = await cachedStore.createContainerAsync("pubs");    
     core.cachedApiContainer = await cachedStore.createContainerAsync("cachedapi", {
         inMemoryCacheSeconds: 5,
         redisCacheSeconds: 600,

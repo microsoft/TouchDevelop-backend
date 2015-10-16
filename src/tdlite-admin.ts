@@ -161,7 +161,7 @@ function initConfig() : void
             core.checkPermission(req, "root");
         }
         if (req.status == 200) {
-            let entry = await core.settingsContainer.getAsync(req.verb);
+            let entry = await core.getSettingsNoCacheAsync(req.verb);                
             if (entry == null) {
                 req.response = ({});
             }
@@ -172,16 +172,16 @@ function initConfig() : void
     });
     core.addRoute("POST", "config", "*", async (req1: core.ApiRequest) => {
         core.checkPermission(req1, "root");
-        if (req1.status == 200 && ! /^(compile|settings|promo|compiletag)$/.test(req1.verb)) {
+        if (req1.status == 200 && core.settingsObjects.indexOf(req1.verb) == -1) {
             req1.status = httpCode._404NotFound;
         }
         if (req1.status == 200) {
             await audit.logAsync(req1, "update-settings", {
                 subjectid: req1.verb,
-                oldvalue: await core.settingsContainer.getAsync(req1.verb),
+                oldvalue: await core.getSettingsNoCacheAsync(req1.verb),
                 newvalue: req1.body
             });
-            await core.settingsContainer.updateAsync(req1.verb, async (entry1: JsonBuilder) => {
+            await core.updateSettingsAsync(req1.verb, async (entry1: JsonBuilder) => {
                 core.copyJson(req1.body, entry1);
                 entry1["stamp"] = azureTable.createLogId();
             });

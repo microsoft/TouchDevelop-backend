@@ -73,7 +73,7 @@ export async function initAsync() : Promise<void>
         await core.addUsernameEtcAsync(fetchResult);
         let coll = (<PubRelease[]>[]);
         let labels = <IReleaseLabel[]>[];
-        let entry3 = await core.settingsContainer.getAsync("releases");
+        let entry3 = core.getSettings("releases");
         if (entry3 != null && entry3["ids"] != null) {
             let js = entry3["ids"];
             for (let k of Object.keys(js)) {
@@ -108,7 +108,7 @@ export async function initAsync() : Promise<void>
             rel1.branch = orEmpty(req1.body["branch"]);
             rel1.buildnumber = core.orZero(req1.body["buildnumber"]);
             if (looksLikeReleaseId(rel1.releaseid)) {
-                await core.settingsContainer.updateAsync("releaseversion", async (entry: JsonBuilder) => {
+                await core.updateSettingsAsync("releaseversion", async (entry: JsonBuilder) => {
                     let x = core.orZero(entry[core.releaseVersionPrefix]) + 1;
                     entry[core.releaseVersionPrefix] = x;
                     rel1.version = core.releaseVersionPrefix + "." + x + "." + rel1.buildnumber;
@@ -175,7 +175,7 @@ export async function initAsync() : Promise<void>
             lab.relid = rel3.id;
             lab.numpokes = 0;
             await audit.logAsync(req3, "lbl-" + lab.name);
-            await core.settingsContainer.updateAsync("releases", async (entry2: JsonBuilder) => {
+            await core.updateSettingsAsync("releases", async (entry2: JsonBuilder) => {
                 let jsb2 = entry2["ids"];
                 if (jsb2 == null) {
                     jsb2 = {};
@@ -249,7 +249,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         relid = rel;
     }
     else {
-        let entry = await core.settingsContainer.getAsync("releases");
+        let entry = core.getSettings("releases");
         let js = entry["ids"][rel];
         if (js == null) {
             let entry3 = await core.getPubAsync(rel, "release");
@@ -360,7 +360,7 @@ async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string,
 export async function pokeReleaseAsync(relLabel: string, delay: number) : Promise<void>
 {
     await td.sleepAsync(delay);
-    await core.settingsContainer.updateAsync("releases", async (entry: JsonBuilder) => {
+    await core.updateSettingsAsync("releases", async (entry: JsonBuilder) => {
         let jsb = entry["ids"][relLabel];
         jsb["numpokes"] = jsb["numpokes"] + 1;
     });

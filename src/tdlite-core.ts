@@ -47,10 +47,14 @@ export var tableClient: azureTable.Client;
 var throttleDisabled: boolean = false;
 export var tokenSecret:string;
 export var serviceSettings: ServiceSettings;
-export var settingsContainer: cachedStore.Container;
+var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 222;
+export var rewriteVersion: number = 223;
+
+var settingsCache = {};
+var lastSettingsVersion = "";
+export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion"]
 
 export class IdObject
     extends td.JsonRecord
@@ -1392,6 +1396,8 @@ export async function lateInitAsync()
 
 export async function initFinalAsync()
 {
+    settingsContainer = await cachedStore.createContainerAsync("settings");
+    
     currClientConfig = new ClientConfig();
     currClientConfig.searchApiKey = td.serverSetting("AZURE_SEARCH_CLIENT_KEY", false);
     currClientConfig.searchUrl = "https://" + td.serverSetting("AZURE_SEARCH_SERVICE_NAME", false) + ".search.windows.net";
@@ -1488,58 +1494,102 @@ export function isAlarming(perm: string) : boolean
     return ! hasPermission(jsb, perm);
 }
 
-export async function refreshSettingsAsync() : Promise<void>
+export function getSettings(name: string): JsonObject
 {
+    assert(settingsObjects.indexOf(name) >= 0)
+    if (settingsCache.hasOwnProperty(name))
+        return settingsCache[name];    
+}
+
+export async function getSettingsNoCacheAsync(name: string): Promise<JsonObject>
+{
+    return settingsContainer.getAsync(name);
+}
+
+async function bumpSettingsVersionAsync() {
+    let vr = td.createRandomId(12);    
+    await settingsContainer.updateAsync("version", async(v: {}) => {
+        v["version"] = vr;
+    });
+    return vr;
+}
+
+export async function updateSettingsAsync(name: string, update: td.Action1<JsonBuilder>)
+{
+    assert(settingsObjects.indexOf(name) >= 0)
+    await settingsContainer.updateAsync(name, update);
+    await bumpSettingsVersionAsync();
+    if (lastSettingsCheck > 0)
+        lastSettingsCheck = 0;
+    await refreshSettingsAsync();
+}
+
+export async function refreshSettingsAsync(): Promise<void> {
     let now = new Date().getTime();
-    if (now - lastSettingsCheck > 5000) {
-        while (lastSettingsCheck < 0) {
-            await td.sleepAsync(0.1);
-        }
-        now = new Date().getTime();
-        if (now - lastSettingsCheck > 5000) {
-            lastSettingsCheck = -1;
-            let entry2 = await settingsContainer.getAsync("settings");
-            if (entry2 == null) {
-                entry2 = ({ "permissions": {} });
-            }
-            let permMap = td.clone(entry2["permissions"]);
-            let numAdded = 1;
-            while (numAdded > 0) {
-                numAdded = 0;
-                for (let perm of Object.keys(permMap)) {
-                    let currperm = permMap[perm];
-                    for (let perm2 of Object.keys(permMap[perm])) {
-                        let otherperm = permMap[perm2];
-                        if (otherperm != null) {
-                            for (let perm3 of Object.keys(otherperm)) {
-                                if ( ! currperm.hasOwnProperty(perm3)) {
-                                    currperm[perm3] = 1;
-                                    numAdded = numAdded + 1;
-                                }
-                            }
+    if (now - lastSettingsCheck < 5000) return;
+
+    while (lastSettingsCheck < 0) {
+        await td.sleepAsync(0.1);
+    }
+
+    now = new Date().getTime();
+    if (now - lastSettingsCheck < 5000) return;
+
+    lastSettingsCheck = -1;
+
+    let ver = await settingsContainer.getAsync("version");
+    let verNum = "";
+    if (!ver) {
+        verNum = await bumpSettingsVersionAsync();
+    } else {
+        verNum = ver["version"];
+    }
+    if (verNum == lastSettingsVersion) {
+        lastSettingsCheck = Date.now();
+        return;
+    }
+
+    for (let t of settingsObjects.map(o => settingsContainer.getAsync(o).then(v => settingsCache[o] = (v || {})))) {
+        await t;
+    }
+
+    let entry2 = getSettings("settings") || { permissions: {} };
+    let permMap = td.clone(entry2["permissions"]);
+    let numAdded = 1;
+    while (numAdded > 0) {
+        numAdded = 0;
+        for (let perm of Object.keys(permMap)) {
+            let currperm = permMap[perm];
+            for (let perm2 of Object.keys(permMap[perm])) {
+                let otherperm = permMap[perm2];
+                if (otherperm != null) {
+                    for (let perm3 of Object.keys(otherperm)) {
+                        if (!currperm.hasOwnProperty(perm3)) {
+                            currperm[perm3] = 1;
+                            numAdded = numAdded + 1;
                         }
                     }
                 }
             }
-            let jsb = {
-              "paths": {},
-              "blockedNicknameRx": "official|touchdevelop",
-              "accounts": {},
-              "termsversion": "v1",
-              "emailFrom": "noreply@touchdevelop.com",
-              "tokenExpiration": 0,
-              "defaultLang": "en",
-              "langs": {},
-              "envrewrite": {},
-              "alarmingEmails": []
-            };
-            td.jsonCopyFrom(jsb, entry2);
-            serviceSettings = ServiceSettings.createFromJson(td.clone(jsb));
-            lastSettingsCheck = now;
-            settingsPermissions = td.clone(permMap);
-
         }
     }
+    let jsb = {
+        "paths": {},
+        "blockedNicknameRx": "official|touchdevelop",
+        "accounts": {},
+        "termsversion": "v1",
+        "emailFrom": "noreply@touchdevelop.com",
+        "tokenExpiration": 0,
+        "defaultLang": "en",
+        "langs": {},
+        "envrewrite": {},
+        "alarmingEmails": []
+    };
+    td.jsonCopyFrom(jsb, entry2);
+    serviceSettings = ServiceSettings.createFromJson(td.clone(jsb));
+    lastSettingsCheck = now;
+    lastSettingsVersion = verNum;
+    settingsPermissions = td.clone(permMap);
 }
 
 export async function deleteAsync(delEntry: JsonObject) : Promise<boolean>

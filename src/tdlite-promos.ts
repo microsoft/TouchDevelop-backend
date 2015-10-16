@@ -38,7 +38,7 @@ export async function initAsync() : Promise<void>
         if (req1.status != 200) {
             return;
         }
-        req1.response = await core.settingsContainer.getAsync("promo");
+        req1.response = core.getSettings("promo");
     });
     core.addRoute("GET", "*script", "promo", async (req2: core.ApiRequest) => {
         core.checkPermission(req2, "script-promo");

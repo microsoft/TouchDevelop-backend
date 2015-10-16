@@ -103,7 +103,7 @@ export async function initAsync()
     core.addRoute("POST", "admin", "mbedint", async (req9: core.ApiRequest) => {
         core.checkPermission(req9, "root");
         if (req9.status == 200) {
-            let ccfg = CompilerConfig.createFromJson((await core.settingsContainer.getAsync("compile"))[req9.argument]);
+            let ccfg = CompilerConfig.createFromJson(core.getSettings("compile")[req9.argument]);
             let jsb2 = td.clone(req9.body);
             let response2 = await mbedintRequestAsync(ccfg, jsb2);
             req9.response = response2.contentAsJson();
@@ -120,7 +120,7 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
         name = withDefault(compileReq.meta["name"], name);
     }
     name = name.replace(/[^a-zA-Z0-9]+/g, "-");
-    let cfg = await core.settingsContainer.getAsync("compile");
+    let cfg = core.getSettings("compile");
     let sha = core.sha256(JSON.stringify(compileReq.toJson()) + "/" + mbedVersion + "/" + cfg["__version"]).substr(0, 32);
     let info = await compileContainer.getBlobToTextAsync(sha + ".json");
     let compileResp = new CompileResp();
@@ -195,7 +195,7 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
                     // OK, looks like image ID
                 }
                 else {
-                    let tags = await core.settingsContainer.getAsync("compiletag");
+                    let tags = core.getSettings("compiletag");
                     if (tags == null) {
                         tags = ({});
                     }
