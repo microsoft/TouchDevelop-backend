@@ -127,11 +127,20 @@ export async function initAsync() : Promise<void>
             req1.response = ({});
         }
     });
-    core.addRoute("POST", "*pub", "abusereports", async (req2: core.ApiRequest) => {
-        await core.canPostAsync(req2, "abusereport");
-        if (req2.status == 200) {
-            await postAbusereportAsync(req2);
+    core.addRoute("POST", "*pub", "abusereports", async(req: core.ApiRequest) => {
+        await core.throttleAsync(req, "pub", 60);
+        if (req.status != 200) return;
+        if (!req.userid) {
+            await core.refreshSettingsAsync();
+            let uid = orEmpty(core.serviceSettings.accounts["anonreport"]);
+            if (!uid) {
+                req.status = httpCode._403Forbidden;
+            } else {
+                await core.setReqUserIdAsync(req, uid);
+            }    
         }
+        if (req.status != 200) return;        
+        await postAbusereportAsync(req);
     });
     core.addRoute("DELETE", "*user", "", async (req8: core.ApiRequest) => {
         await checkDeletePermissionAsync(req8);
