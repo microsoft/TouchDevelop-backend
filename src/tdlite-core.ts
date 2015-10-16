@@ -54,7 +54,7 @@ export var rewriteVersion: number = 223;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
-export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion"]
+export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner"]
 
 export class IdObject
     extends td.JsonRecord
