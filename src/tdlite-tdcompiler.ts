@@ -100,10 +100,11 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
 {
     let cfg = {};
     let clientConfig = tdliteReleases.clientConfigForRelease(rel);
+    clientConfig.doNothingText = "...";
     cfg["TDC_AUTH_KEY"] = td.serverSetting("TDC_AUTH_KEY", false);
     cfg["TDC_ACCESS_TOKEN"] = td.serverSetting("TDC_ACCESS_TOKEN", false);
     cfg["TDC_LITE_STORAGE"] = tdliteReleases.appContainerUrl().replace(/\/[^\/]+$/g, "");
-    cfg["TDC_API_ENDPOINT"] = clientConfig.rootUrl + "/api/";
+    cfg["TDC_API_ENDPOINT"] = clientConfig.rootUrl.replace(/(test|stage|live)/, "www") + "/api/";
     cfg["TD_RELEASE_ID"] = rel.releaseid;
     cfg["TD_CLIENT_CONFIG"] = JSON.stringify(clientConfig.toJson());
     let jsSrc = "";
@@ -133,11 +134,9 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
 
     let requestcfg = td.createRequest(td.serverSetting("TDC_ENDPOINT", false) + "setconfig");
     requestcfg.setMethod("post");
-    requestcfg.setContentAsJson(({"AppSettings":
-  [
-     {"Name":"TD_RESTART_INTERVAL","Value":"900"}
-  ]
-}));
+    requestcfg.setContentAsJson({
+        AppSettings: [{ Name: "TD_RESTART_INTERVAL", Value: "900" }]
+    });    
     let response2 = await requestcfg.sendAsync();
     logger.info("cloud deploy cfg: " + response2);
 

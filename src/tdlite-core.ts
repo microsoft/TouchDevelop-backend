@@ -235,6 +235,7 @@ export class ClientConfig
     @td.json public anonToken: string = "";
     @td.json public primaryCdnUrl: string = "";
     @td.json public altCdnUrls: string[];
+    @td.json public doNothingText: string;
     static createFromJson(o:JsonObject) { let r = new ClientConfig(); r.fromJson(o); return r; }
 }
 
