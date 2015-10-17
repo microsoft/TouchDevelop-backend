@@ -51,6 +51,7 @@ export class PubUser
     @td.json public subscribers: number = 0;
     @td.json public score: number = 0;
     @td.json public isadult: boolean = false;
+    @td.json public avatar: string = "";
     static createFromJson(o:JsonObject) { let r = new PubUser(); r.fromJson(o); return r; }
 }
 
@@ -84,6 +85,7 @@ export class PubUserSettings
     @td.json public permissions: string = "";
     @td.json public credit: number = 0;
     @td.json public userid: string = "";
+    @td.json public avatar: string = "";
     @td.json public previousemail: string = "";
     static createFromJson(o:JsonObject) { let r = new PubUserSettings(); r.fromJson(o); return r; }
 }
@@ -420,7 +422,7 @@ export async function initAsync() : Promise<void>
                 core.setFields(settings, req4.body, ["aboutme", "culture", "editorMode", "emailfrequency", "emailnewsletter2", 
                     "gender", "howfound", "location", "nickname", "notifications", "notifications2", "occupation", "picture", 
                     "picturelinkedtofacebook", "programmingknowledge", "realname", "school", "twitterhandle", "wallpaper", 
-                    "website", "yearofbirth"]);
+                    "website", "yearofbirth", "avatar"]);
                 for (let k of ["culture", "email", "previousemail", "gender", "location", "occupation", 
                                "programmingknowledge", "realname", "school"]) {
                     let val = settings[k];
@@ -434,6 +436,7 @@ export async function initAsync() : Promise<void>
                 sett.nickname = sett.nickname.substr(0, 25);
                 entry["pub"]["name"] = sett.nickname;
                 entry["pub"]["about"] = sett.aboutme;
+                entry["pub"]["avatar"] = sett.avatar;
                 req4.response = td.clone(settings);
             });
             await audit.logAsync(req4, logcat, {
@@ -491,7 +494,6 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
 
 async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSettings>
 {
-    let r: PubUserSettings;
     let settings = new PubUserSettings();
     let user = new PubUser();
     user.fromJson(userJson["pub"]);
@@ -509,6 +511,7 @@ async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSetting
     settings.userid = userJson["id"];
     settings.nickname = user.name;
     settings.aboutme = user.about;
+    settings.avatar = user.avatar || "";
     let perms = {};
     for (let s of orEmpty(userJson["permissions"]).split(",")) {
         if (s != "") {
@@ -522,7 +525,6 @@ async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSetting
     settings.permissions = "," + Object.keys(perms).join(",") + ",";
     settings.credit = core.orZero(userJson["credit"]);
     return settings;
-    return r;
 }
 
 export interface IRedirectAndCookie
