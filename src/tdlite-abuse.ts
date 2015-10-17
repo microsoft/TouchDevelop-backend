@@ -411,12 +411,11 @@ function initScanner() {
     scannerRegexes = {}
     let reg = sett["regexps"]
     for (let rxname of Object.keys(reg)) {
-        scannerRegexes[rxname] = new RegExp("\\b" + reg[rxname] + "\\b");
-        // scannerRegexes[rxname] = "\\b" + reg[rxname] + "\\b";
+        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b");        
     }
 }
 
-function scanText(txt: string, candolinks: boolean) {
+function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     let res = ""
 
     initScanner();
@@ -431,6 +430,7 @@ function scanText(txt: string, candolinks: boolean) {
         logger.debug("skipping regexp scanning")
     } else {
         for (let rxname of Object.keys(scannerRegexes)) {
+            if (rxname.endsWith("*") && !isdesc) continue;
             let m = scannerRegexes[rxname].exec(txt)
             if (m) {
                 res += rxname + ": " + m[0] + ".\n"
@@ -441,8 +441,9 @@ function scanText(txt: string, candolinks: boolean) {
     return res;
 }
 
-export async function scanAndPostAsync(pubid: string, body: string, userjson: {}) {
-    let msg = scanText(body, core.hasPermission(userjson, "external-links"));
+export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: {}) {
+    let msg = scanText(body, core.hasPermission(userjson, "external-links"), false);
+    msg += scanText(desc, core.hasPermission(userjson, "external-links"), true);
     if (!msg) return;
     
     let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);

@@ -122,16 +122,18 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
     }
     // ## scan
     if (!options_.skipScan) {
-        let text = body;
-        for (let fldname of ["name", "description", "about", "grade", "school"]) {
+        let text = body;        
+        for (let fldname of ["about", "grade", "school"]) {
             text = text + " " + orEmpty(pub[fldname]);
         }
+        let desc = orEmpty(pub["description"]) + " " + orEmpty(pub["name"]) 
         
         // TODO this was alrady fetched in "resolve" above...
         let userjson = await core.getPubAsync(pub["userid"], "user");        
-        await tdliteAbuse.scanAndPostAsync(pub["id"], text, userjson);
+        await tdliteAbuse.scanAndPostAsync(pub["id"], text, desc, userjson);
 
         if (acsCallbackUrl) { 
+            text = desc + " " + text;
             /* async */ acs.validateTextAsync(pub["id"], text, acsCallbackUrl);
             let picurl = orEmpty(pub["pictureurl"]);
             if (picurl != "") {
