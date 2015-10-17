@@ -304,7 +304,7 @@ function wrapAccessTokenCookie(cookie: string): string
     value += "HttpOnly; Path=/; "
     if (!/localhost:/.test(core.self))
         value += "Domain=" + core.self.replace(/\/$/g, "").replace(/.*\//g, "").replace(/:\d+$/, "") + "; "
-    value += "Expires=Fri, 31 Dec 9999 23:59:59 GMT";
+    value += "Expires=" + new Date(Date.now() + 365 * 24 * 3600 * 1000).toString();    
     return value;
 }
 
