@@ -1573,13 +1573,18 @@ export function registerSettingsCleanup(f: () => void)
 export async function refreshSettingsAsync(): Promise<void> {
     let now = new Date().getTime();
     if (now - lastSettingsCheck < 5000) return;
+    
+    if (lastSettingsCheck < 0)
+        logger.info("refersh settings race")
 
-    while (lastSettingsCheck < 0) {
+    while (lastSettingsCheck < 0) {        
         await td.sleepAsync(0.1);
     }
 
     now = new Date().getTime();
     if (now - lastSettingsCheck < 5000) return;
+    
+    logger.info("refershing settings")
 
     lastSettingsCheck = -1;
 

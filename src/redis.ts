@@ -333,6 +333,10 @@ export class Client
         while (true) {
             await td.sleepAsync(30 + td.randomRange(0, 10));
             let info = await this.infoAsync();
+            if (!info) {
+                logger.tick("Failure@redis")
+                continue;
+            }
             this.lastStatusReport = new Date();
             let load = info["used_cpu_avg_ms_per_sec"] / 10;
             logger.measure("load-perc@" + this.hostid, load);
@@ -362,9 +366,7 @@ export class Client
      */
     public async isStatusLateAsync() : Promise<boolean>
     {
-        let late: boolean;
         return (Date.now() - this.lastStatusReport.getTime()) > 60000;
-        return late;
     }
 
 }

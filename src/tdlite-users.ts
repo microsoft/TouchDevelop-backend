@@ -569,8 +569,8 @@ async function setPasswordAsync(req: core.ApiRequest, pass: string, prevPass: st
 
 async function sendPermissionNotificationAsync(req: core.ApiRequest, r: JsonBuilder) : Promise<void>
 {
+    await core.refreshSettingsAsync();
     if (core.isAlarming(r["permissions"])) {
-        await core.refreshSettingsAsync();
         if ( ! r.hasOwnProperty("settings")) {
             r["settings"] = ({});
         }
