@@ -96,12 +96,12 @@ export async function initAsync() : Promise<void>
         if (core.jsonArrayIndexOf(js, "hidden") >= 0) {
             js = (["hidden"]);
         }
-        else if (core.jsonArrayIndexOf(js, "preview") > 0) {
+        else if (core.jsonArrayIndexOf(js, "preview") >= 0) {
             js = (["preview"]);
         }
         let lang = core.serviceSettings.defaultLang;
         for (let l of langs) {
-            if (core.jsonArrayIndexOf(js, l) > 0) {
+            if (core.jsonArrayIndexOf(js, l) >= 0) {
                 lang = l;
             }
         }
