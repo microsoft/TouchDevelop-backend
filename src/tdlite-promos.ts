@@ -52,13 +52,17 @@ export async function initAsync() : Promise<void>
         if (req3.status != 200) {
             return;
         }
+        let langs = Object.keys(core.serviceSettings.langs)
         let promo = await getPromoAsync(req3);
         let oldPromoId = orEmpty(req3.rootPub["promoId"]);
         if (oldPromoId != "") {
-            await parallel.forJsonAsync(promo["tags"], async (json: JsonObject) => {
-                let entity = azureTable.createEntity(td.toString(json), oldPromoId);
-                let ok = await promosTable.tryDeleteEntityAsync(td.clone(entity));
-            });
+            for (let l of langs) {
+                let suff = l == core.serviceSettings.defaultLang ? "" : "@" + l
+                await parallel.forJsonAsync(promo["tags"], async(json: JsonObject) => {
+                    let entity = azureTable.createEntity(td.toString(json) + suff, oldPromoId);
+                    let ok = await promosTable.tryDeleteEntityAsync(td.clone(entity));
+                });
+            }    
         }
         let jsb2 = td.clone(promo);
         td.jsonCopyFrom(jsb2, req3.body);
@@ -89,14 +93,24 @@ export async function initAsync() : Promise<void>
             entry["promoId"] = newId;
         });
         let js = promo["tags"];
-        if (core.jsonArrayIndexOf(js, "hidden") > 0) {
+        if (core.jsonArrayIndexOf(js, "hidden") >= 0) {
             js = (["hidden"]);
         }
         else if (core.jsonArrayIndexOf(js, "preview") > 0) {
             js = (["preview"]);
         }
-        await parallel.forJsonAsync(js, async (json1: JsonObject) => {
-            let entity1 = azureTable.createEntity(td.toString(json1), newId);
+        let lang = core.serviceSettings.defaultLang;
+        for (let l of langs) {
+            if (core.jsonArrayIndexOf(js, l) > 0) {
+                lang = l;
+            }
+        }
+        let langSuff = lang == core.serviceSettings.defaultLang ? "" : "@" + lang; 
+        await parallel.forJsonAsync(js, async(json1: JsonObject) => {
+            let tag = td.toString(json1)
+            if (tag != lang)
+                tag += langSuff;
+            let entity1 = azureTable.createEntity(tag, newId);
             entity1["pub"] = req3.rootId;
             await promosTable.insertEntityAsync(td.clone(entity1), "or merge");
         });
