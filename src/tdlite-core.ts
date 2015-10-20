@@ -55,7 +55,7 @@ export var rewriteVersion: number = 223;
 var settingsCache = {};
 var lastSettingsVersion = "";
 var settingsCleanups: (() => void)[] = [];
-export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner"]
+export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations"]
 
 export class IdObject
     extends td.JsonRecord
@@ -1645,6 +1645,17 @@ export async function refreshSettingsAsync(): Promise<void> {
     lastSettingsCheck = now;
     lastSettingsVersion = verNum;
     settingsPermissions = td.clone(permMap);
+}
+
+export function translateMessage(msg: string, lang: string):string
+{
+    lang = lang || "";
+    lang = lang.replace(/^@/, "");    
+    if (!lang || lang == serviceSettings.defaultLang)
+        return msg;
+    var s = <td.SMap<string>>(settingsCache["translations"] || {});
+    if (!s[lang]) return msg;
+    return s[lang][msg] || msg;
 }
 
 export async function deleteAsync(delEntry: JsonObject) : Promise<boolean>

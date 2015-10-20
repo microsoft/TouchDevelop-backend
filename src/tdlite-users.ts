@@ -23,6 +23,7 @@ import * as tdliteData from "./tdlite-data"
 import * as audit from "./tdlite-audit"
 import * as search from "./tdlite-search"
 import * as tdliteGroups from "./tdlite-groups"
+import * as tdlitePointers from "./tdlite-pointers"
 
 var orFalse = core.orFalse;
 var withDefault = core.withDefault;
@@ -682,17 +683,18 @@ export async function applyCodeAsync(userjson: JsonObject, codeObj: JsonObject, 
 
 export async function handleEmailVerificationAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
+    let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
     let coll = (/^\/verify\/([a-z]+)\/([a-z]+)/.exec(req.url()) || []);
     let userJs = await core.getPubAsync(coll[1], "user");
     let msg = "";
     if (userJs == null) {
-        msg = "Cannot verify email - no such user.";
+        msg = core.translateMessage("Cannot verify email - no such user.", lang);
     }
     else if (orEmpty(userJs["emailcode"]) != coll[2]) {
-        msg = "Cannot verify email - invalid or expired code.";
+        msg = core.translateMessage("Cannot verify email - invalid or expired code.", lang);
     }
     else {
-        msg = "Thank you, your email was updated.";
+        msg = core.translateMessage("Thank you, your email was updated.", lang);
         await core.pubsContainer.updateAsync(userJs["id"], async (entry: JsonBuilder) => {
             let jsb = entry["settings"];
             jsb["emailverified"] = true;

@@ -471,6 +471,7 @@ async function loginCreateUserAsync(req: restify.Request, session: LoginSession,
 async function loginHandleCodeAsync(accessCode: string, res: restify.Response, req: restify.Request, session: LoginSession) : Promise<void>
 {
     let passId = core.normalizeAndHash(accessCode);
+    let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
     let msg = "";
     if (passId == "" || accessCode == "kid") {
     }
@@ -482,17 +483,17 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
         }
         let codeObj = await tdliteUsers.passcodesContainer.getAsync(passId);
         if (codeObj == null || codeObj["kind"] == "reserved") {
-            msg = "Whoops! The code doesn't seem right. Keep trying!";
+            msg = core.translateMessage("Whoops! The code doesn't seem right. Keep trying!", lang);
         }
         else {
             let kind = codeObj["kind"];
             if (kind == "userpointer") {
                 let userJson = await core.getPubAsync(codeObj["userid"], "user");
                 if (session.userid != "") {
-                    msg = "We need an activation code here, not user password.";
+                    msg = core.translateMessage("We need an activation code here, not user password.", lang);
                 }
                 else if (userJson == null) {
-                    msg = "The user account doesn't exist anymore.";
+                    msg = core.translateMessage("The user account doesn't exist anymore.", lang);
                 }
                 else {
                     logger.tick("Login@code");
@@ -507,7 +508,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                     res.redirect(303, url);
                 }
                 else if (codeObj["credit"] <= 0) {
-                    msg = "This code has already been used.";
+                    msg = core.translateMessage("This code has already been used.", lang);
                 }
                 else {
                     let userjson = await core.getPubAsync(session.userid, "user");
@@ -518,7 +519,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             else if (kind == "groupinvitation") {
                 let groupJson = await core.getPubAsync(codeObj["groupid"], "group");
                 if (session.userid != "") {
-                    msg = "We need an activation code here, not group code.";
+                    msg = core.translateMessage("We need an activation code here, not group code.", lang);
                 }
                 else if (groupJson == null) {
                     msg = "Group gone?";
@@ -527,7 +528,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                     session.ownerId = groupJson["pub"]["userid"];
                     let groupOwner = await core.getPubAsync(session.ownerId, "user");
                     if (core.orZero(groupOwner["credit"]) <= 0) {
-                        msg = "Group owner is out of activation credits.";
+                        msg = core.translateMessage("Group owner is out of activation credits.", lang);
                     }
                     else {
                         session.groupid = groupJson["id"];
@@ -537,7 +538,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
             }
             else {
-                msg = "This code cannot be entered here. Sorry.";
+                msg = core.translateMessage("This code cannot be entered here. Sorry.", lang);
             }
         }
     }
@@ -629,11 +630,10 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
         if ( ! res.finished()) {
             let agreeurl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state) + "&td_agree=" + encodeURIComponent(core.serviceSettings.termsversion);
             let disagreeurl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state) + "&td_agree=noway";
-            let lang21 = await tdlitePointers.handleLanguageAsync(req, res, true);
             params["MSG"] = msg;
             params["AGREEURL"] = agreeurl;
             params["DISAGREEURL"] = disagreeurl;
-            let ht = await getLoginHtmlAsync(inner, lang21)
+            let ht = await getLoginHtmlAsync(inner, lang)
             ht = ht.replace(/@([A-Z]+)@/g, (m, n) => params.hasOwnProperty(n) ? params[n] : m)
             res.html(ht);
         }
