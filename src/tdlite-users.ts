@@ -120,53 +120,63 @@ export async function initAsync() : Promise<void>
         }
     });
     // ### all
-    core.addRoute("POST", "*user", "permissions", async (req1: core.ApiRequest) => {
-        core.checkMgmtPermission(req1, "user-mgmt");
-        if (req1.status == 200) {
-            let perm = td.toString(req1.body["permissions"]);
+    core.addRoute("POST", "*user", "permissions", async (req: core.ApiRequest) => {
+        core.checkMgmtPermission(req, "user-mgmt");
+        if (req.status == 200) {
+            let perm = td.toString(req.body["permissions"]);
             if (perm != null) {
                 perm = core.normalizePermissions(perm);
-                core.checkPermission(req1, "root");
-                if (req1.status != 200) {
+                core.checkPermission(req, "root");
+                if (req.status != 200) {
                     return;
                 }
-                await audit.logAsync(req1, "set-perm", {
+                await audit.logAsync(req, "set-perm", {
                     data: perm
                 });
                 if (core.isAlarming(perm)) {
-                    await audit.logAsync(req1, "set-perm-high", {
+                    await audit.logAsync(req, "set-perm-high", {
                         data: perm
                     });
                 }
-                await search.updateAndUpsertAsync(core.pubsContainer, req1, async (entry1: JsonBuilder) => {
-                    entry1["permissions"] = perm;
-                    await sendPermissionNotificationAsync(req1, entry1);
+                await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
+                    entry["permissions"] = perm;
+                    await sendPermissionNotificationAsync(req, entry);
                 });
             }
-            let credit = td.toNumber(req1.body["credit"]);
+            let credit = td.toNumber(req.body["credit"]);
             if (credit != null) {
-                await audit.logAsync(req1, "set-credit", {
+                await audit.logAsync(req, "set-credit", {
                     data: credit.toString()
                 });
-                await search.updateAndUpsertAsync(core.pubsContainer, req1, async (entry2: JsonBuilder) => {
-                    entry2["credit"] = credit;
-                    entry2["totalcredit"] = credit;
+                await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
+                    entry["credit"] = credit;
+                    entry["totalcredit"] = credit;
                 });
             }
-            req1.response = ({});
+            let nopublish = td.toBoolean(req.body["nopublish"]);
+            if (nopublish != null) {
+                await audit.logAsync(req, "set-nopublish", {
+                    data: nopublish.toString()
+                });
+                await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
+                    entry["nopublish"] = nopublish;                    
+                });
+            }
+            req.response = ({});
         }
     });
-    core.addRoute("GET", "*user", "permissions", async (req2: core.ApiRequest) => {
-        core.checkMgmtPermission(req2, "user-mgmt");
-        if (req2.status == 200) {
+    core.addRoute("GET", "*user", "permissions", async (req: core.ApiRequest) => {
+        core.checkMgmtPermission(req, "user-mgmt");
+        if (req.status == 200) {
             let jsb = {};
             for (let s of ["permissions", "login"]) {
-                jsb[s] = orEmpty(req2.rootPub[s]);
+                jsb[s] = orEmpty(req.rootPub[s]);
             }
             for (let s1 of ["credit", "totalcredit", "lastlogin"]) {
-                jsb[s1] = core.orZero(req2.rootPub[s1]);
+                jsb[s1] = core.orZero(req.rootPub[s1]);
             }
-            req2.response = td.clone(jsb);
+            jsb["nopublish"] = core.orFalse(req.rootPub["nopublish"]);
+            req.response = jsb;
         }
     });
     // This is for test users for load testing nd doe **system accounts**

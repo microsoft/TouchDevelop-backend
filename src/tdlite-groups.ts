@@ -362,44 +362,46 @@ export async function initAsync() : Promise<void>
             }
         }
     });
-    core.addRoute("POST", "*user", "groups", async (req10: core.ApiRequest) => {
-        let entry22 = await core.getPubAsync(req10.argument, "group");
+    core.addRoute("POST", "*user", "groups", async (req: core.ApiRequest) => {
+        let entry22 = await core.getPubAsync(req.argument, "group");
         if (entry22 == null) {
-            req10.status = 404;
+            req.status = 404;
         }
         else {
             let gr = PubGroup.createFromJson(entry22["pub"]);
-            let askedToJoin = core.jsonArrayIndexOf(entry22["approvals"], req10.rootId) >= 0;
-            if (askedToJoin && gr.isclass && withDefault(gr.userid, "???") == req10.userid) {
+            let askedToJoin = core.jsonArrayIndexOf(entry22["approvals"], req.rootId) >= 0;
+            if (askedToJoin && gr.isclass && withDefault(gr.userid, "???") == req.userid) {
+                core.canPostAsync(req, "group");
+                if (req.status != 200) return;
                 // OK, this is an approval.
-                if (orFalse(req10.rootPub["awaiting"])) {
-                    await audit.logAsync(req10, "approve-user", {
-                        subjectid: req10.rootId,
+                if (orFalse(req.rootPub["awaiting"])) {
+                    await audit.logAsync(req, "approve-user", {
+                        subjectid: req.rootId,
                         publicationid: gr.id,
                         publicationkind: "group"
                     });
-                    await core.pubsContainer.updateAsync(req10.rootId, async (entry7: JsonBuilder) => {
+                    await core.pubsContainer.updateAsync(req.rootId, async (entry7: JsonBuilder) => {
                         delete entry7["awaiting"];
                     });
                 }
                 await core.pubsContainer.updateAsync(gr.id, async (entry8: JsonBuilder) => {
                     let approvals:string[] = entry8["approvals"];
-                    let idx = core.jsonArrayIndexOf(approvals, req10.rootId);
+                    let idx = core.jsonArrayIndexOf(approvals, req.rootId);
                     if (idx >= 0) {
                         approvals.splice(idx, 1);
                     }
                 });
-                await notifications.sendAsync(entry22, "groupapproved", req10.rootPub);
+                await notifications.sendAsync(entry22, "groupapproved", req.rootPub);
             }
             else {
-                core.meOnly(req10);
+                core.meOnly(req);
                 if (gr.isrestricted) {
-                    core.checkPermission(req10, "user-mgmt");
+                    core.checkPermission(req, "user-mgmt");
                 }
             }
-            if (req10.status == 200) {
-                await addUserToGroupAsync(req10.rootId, entry22, req10);
-                req10.response = ({});
+            if (req.status == 200) {
+                await addUserToGroupAsync(req.rootId, entry22, req);
+                req.response = ({});
             }
         }
     });

@@ -887,6 +887,10 @@ export async function canPostAsync(req: ApiRequest, kind: string) : Promise<void
     else {
         checkPermission(req, "post-" + kind);
         if (req.status == 200) {
+            if (req.userinfo.json["nopublish"]) {
+                req.status = httpCode._402PaymentRequired;
+                return;
+            }
             if (callerHasPermission(req, "post-raw") || callerHasPermission(req, "unlimited")) {
                 // no throttle
             }
@@ -1653,7 +1657,7 @@ export function translateMessage(msg: string, lang: string):string
     lang = lang.replace(/^@/, "");    
     if (!lang || lang == serviceSettings.defaultLang)
         return msg;
-    var s = <td.SMap<string>>(settingsCache["translations"] || {});
+    var s = settingsCache["translations"] || {};
     if (!s[lang]) return msg;
     return s[lang][msg] || msg;
 }
