@@ -174,19 +174,22 @@ export async function initAsync() : Promise<void>
             req8.response = ({ "msg": "have a nice life" });
         }
     });
-    core.addRoute("DELETE", "*pub", "", async (req3: core.ApiRequest) => {
-        if (canBeAdminDeleted(req3.rootPub)) {
-            await checkDeletePermissionAsync(req3);
-            if (req3.status == 200) {
-                await audit.logAsync(req3, "delete", {
-                    oldvalue: await audit.auditDeleteValueAsync(req3.rootPub)
+    core.addRoute("DELETE", "*pub", "", async (req: core.ApiRequest) => {
+        if (canBeAdminDeleted(req.rootPub)) {
+            await checkDeletePermissionAsync(req);
+            if (req.status == 200) {
+                await audit.logAsync(req, "delete", {
+                    oldvalue: await audit.auditDeleteValueAsync(req.rootPub)
                 });
-                await deletePubRecAsync(req3.rootPub);
-                req3.response = ({});
+                if (req.userid != req.rootPub["pub"]["userid"]) {
+                    notifications.sendAsync(req.rootPub, "deleted", null);
+                }
+                await deletePubRecAsync(req.rootPub);
+                req.response = ({});
             }
         }
         else {
-            req3.status = httpCode._405MethodNotAllowed;
+            req.status = httpCode._405MethodNotAllowed;
         }
     });
     core.addRoute("GET", "*pub", "candelete", async (req4: core.ApiRequest) => {

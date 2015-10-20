@@ -275,7 +275,7 @@ export async function sendAsync(about: JsonObject, notkind: string, suplemental:
         notification.supplementalname = suplemental["pub"]["name"];
     }
     let target = notification.userid;
-    let jsb2 = td.clone(notification.toJson());
+    let jsb2 = notification.toJson();
     jsb2["PartitionKey"] = target;
     jsb2["RowKey"] = notification.id;
     await notificationsTable.insertEntityAsync(td.clone(jsb2), "or merge");
