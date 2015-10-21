@@ -80,17 +80,27 @@ export async function initAsync()
             req2.response = JSON.parse((await tdDeployments.getBlobToTextAsync("000ch-" + ch)).text());
         }
     });
-    core.addRoute("POST", "admin", "copydeployment", async (req3: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "copydeployment", async(req3: core.ApiRequest) => {
+        if (!core.checkPermission(req3, "root")) return;
         await audit.logAsync(req3, "copydeployment", {
             data: req3.argument
         });
         await copyDeploymentAsync(req3, req3.argument);
     });
-    core.addRoute("POST", "admin", "restart", async (req4: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "restart", async(req4: core.ApiRequest) => {
+        if (!core.checkPermission(req4, "root")) return;        
         await audit.logAsync(req4, "copydeployment", {
             data: "restart"
         });
         await copyDeploymentAsync(req4, core.myChannel);
+    });
+    core.addRoute("POST", "admin", "flushredis", async(req4: core.ApiRequest) => {
+        if (!core.checkPermission(req4, "root")) return;
+        await audit.logAsync(req4, "copydeployment", {
+            data: "flushredis"
+        });
+        await core.redisClient.sendCommandAsync("flushall", []);
+        req4.response = {};        
     });
     core.addRoute("GET", "admin", "raw", async (req5: core.ApiRequest) => {
         core.checkPermission(req5, "root");

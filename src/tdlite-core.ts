@@ -698,7 +698,7 @@ export function isGoodPub(entry: JsonObject, kind: string) : boolean
     return b;
 }
 
-export function checkPermission(req: ApiRequest, perm: string) : void
+export function checkPermission(req: ApiRequest, perm: string) : boolean
 {
     if (req.userid == "") {
         req.status = httpCode._401Unauthorized;
@@ -706,6 +706,7 @@ export function checkPermission(req: ApiRequest, perm: string) : void
     else if ( ! hasPermission(req.userinfo.json, perm)) {
         req.status = httpCode._402PaymentRequired;
     }
+    return req.status == 200;
 }
 
 export async function throttleAsync(req: ApiRequest, kind: string, tokenCost_s_: number) : Promise<void>
