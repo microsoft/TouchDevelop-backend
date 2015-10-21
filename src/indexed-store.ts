@@ -194,6 +194,7 @@ export class Store
                 entry["deletetime"] = await cachedStore.nowSecondsAsync();
             }
             else {
+                logger.debug("trying to delete 'reserved' entry: " + delid)
                 delentry = {};
             }
         });

@@ -129,7 +129,7 @@ export function createQueue(maxRunning: number) : Queue
 /**
  * Applies the ``action`` action to the array element or field values.
  */
-export async function forJsonAsync(js: td.JsonObject[], action:td.JsonAction) : Promise< void >
+export async function forJsonAsync<T>(js: T[], action:td.Action1<T>) : Promise< void >
 {
     if (Array.isArray(js)) {
         await forAsync(js.length, async(x: number) => {

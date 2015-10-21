@@ -541,13 +541,13 @@ export function createEntity(PartitionKey: string, RowKey: string) : JsonBuilder
 /**
  * Creates a log id (in decreasing order)
  */
-export function createLogId() : string
+export function createLogId(tm?:number) : string
 {
-    let id: string;
-    let x = 20000000000000 - Date.now();
+    if (tm == null)
+        tm = Date.now();
+    let x = 20000000000000 - tm;
     logSeqNo += 1;
-    id = x + "." + logSeqNo + "." + instanceId;
-    return id;
+    return x + "." + logSeqNo + "." + instanceId;    
 }
 
 /**

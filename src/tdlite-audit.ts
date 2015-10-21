@@ -12,16 +12,19 @@ type JsonBuilder = td.JsonBuilder;
 import * as azureTable from "./azure-table"
 import * as azureBlobStorage from "./azure-blob-storage"
 import * as restify from "./restify"
+import * as parallel from "./parallel"
 import * as cachedStore from "./cached-store"
 import * as indexedStore from "./indexed-store"
 import * as core from "./tdlite-core"
 import * as tdliteScripts from "./tdlite-scripts"
 import * as tdliteLogin from "./tdlite-login"
 
+var auditLogMaxAgeDays = 365;
 
 var orEmpty = td.orEmpty;
 var auditStore: indexedStore.Store;
 var auditContainer: cachedStore.Container;
+var auditContainerLongTerm: cachedStore.Container;
 
 export class PubAuditLog
     extends core.IdObject
@@ -89,7 +92,42 @@ export async function logAsync(req: core.ApiRequest, type: string, options_0: IP
     let jsb = {};
     jsb["id"] = azureTable.createLogId();
     jsb["pub"] = msg.toJson();
+    core.logger.debug(`inserting audit entry: ${jsb["id"]} (${type})`)
+    if (type == "user-agree") {
+        await auditContainerLongTerm.justInsertAsync(jsb["id"], jsb);
+    }
     await auditStore.insertAsync(jsb);
+    await cleanLogAsync();
+}
+
+export function permute<T>(arr: T[])
+{
+    for (let i = 0; i < arr.length; ++i) {
+        let x = td.randomInt(arr.length);
+        let y = td.randomInt(arr.length);
+        let tmp = arr[x];
+        arr[x] = arr[y];
+        arr[y] = tmp;
+    }        
+}
+
+async function cleanLogAsync(): Promise<void>
+{
+    // only try this in 10% of cases
+    if (td.randomInt(10) == 0) return;    
+    let timestamp = Math.floor(Date.now()/1000 - auditLogMaxAgeDays * 24 * 3600)
+    let pastId = (10000000000 - timestamp) + ".xxxxxxxx";
+    let q = auditStore.getIndex("all").table.createQuery();
+    q = q.partitionKeyIs("all").and("RowKey", ">=", pastId).top(200);
+    let res = await q.fetchAllAsync();
+    permute(res);
+    res = res.slice(0, 50);    
+    parallel.forJsonAsync(res, async(ent) => {
+        //let ee = await auditStore.container.getAsync(ent["pub"])
+        let tm = 10000000000 - parseInt(ent["RowKey"].replace(/\..*/, ""))
+        core.logger.debug("delete audit entry: " + ent["pub"] + " @ " + new Date(tm*1000));
+        await auditStore.deleteAsync(ent["pub"]);
+    })
 }
 
 export async function initAsync() : Promise<void>
@@ -105,6 +143,11 @@ export async function initAsync() : Promise<void>
     auditStore = await indexedStore.createStoreAsync(auditContainer, "auditlog", {
         tableClient: auditTableClient
     });
+    
+    auditContainerLongTerm = await cachedStore.createContainerAsync("auditlong", {
+        blobService: auditBlobService
+    });
+    
     let store = auditStore;
     (<core.DecoratedStore><any>store).myResolve = async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         core.checkPermission(apiRequest, "audit");
@@ -133,6 +176,13 @@ export async function initAsync() : Promise<void>
     await auditIndexAsync("publicationid");
     await auditIndexAsync("subjectid");
     await auditIndexAsync("type");
+    core.addRoute("GET", "audit", "long", async (req: core.ApiRequest) => {
+        core.checkPermission(req, "audit");
+        if (req.status == 200) {
+            let r = await auditContainerLongTerm.getAsync(req.argument);
+            req.response = r || { "status": "four oh four" };
+        }
+    });
 }
 
 export async function auditDeleteValueAsync(js: JsonObject) : Promise<JsonObject>
@@ -164,4 +214,3 @@ async function auditIndexAsync(field: string) : Promise<void>
         }
     });
 }
-

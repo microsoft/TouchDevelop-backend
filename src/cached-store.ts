@@ -117,7 +117,7 @@ export class Container
                 logger.info("failed to parse: " + text + " err: " + info.error())
                 console.log(info)
             }
-            let ver = jsb["__version"];
+            let ver = td.toNumber(jsb["__version"]);
             ver = (ver || 0) + 1;
             jsb["__version"] = ver;
             await update(jsb);
@@ -132,9 +132,10 @@ export class Container
                 timeoutIntervalInMs: blobTimeout
             });
             if (result.succeded()) {
-                logger.debug("save OK: " + name);
+                logger.debug("save OK: " + name + " @ " + ver);
                 await this.saveCacheAsync(name, text2, ver);
-                logger.debug("cache OK: " + name);
+                //let str = await this.getFromCacheAsync(name);
+                //logger.debug("cache OK: " + name + ": " + str);
                 retries = -1;
             }
             else {

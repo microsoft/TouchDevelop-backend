@@ -313,20 +313,22 @@ export function canHaveAbuseReport(baseKind: string) : boolean
     return /^(art|comment|script|screenshot|channel|group|user)$/.test(baseKind);    
 }
 
-async function deleteUserAsync(req8:core.ApiRequest)
+async function deleteUserAsync(req:core.ApiRequest)
 {
-    await tdliteWorkspace.deleteAllHistoryAsync(req8.rootId, req8);
+    await tdliteWorkspace.deleteAllHistoryAsync(req.rootId, req);
 
     for (let pk of core.getPubKinds()) {
         // TODO We leave groups alone - rethink.
         if (pk.deleteWithAuthor)
-            await deleteAllByUserAsync(pk.store, req8.rootId, req8);
+            await deleteAllByUserAsync(pk.store, req.rootId, req);
     }
 
     // Bugs, releases, etc just stay
-    let delok = await core.deleteAsync(req8.rootPub);
-    await audit.logAsync(req8, "delete", {
-        oldvalue: req8.rootPub
+    
+    let delok = await core.deleteAsync(req.rootPub);
+    logger.debug("delete user: " + JSON.stringify(req.rootPub) + " - " + delok);
+    await audit.logAsync(req, "delete", {
+        oldvalue: req.rootPub
     });
 }
 
