@@ -112,6 +112,20 @@ export async function initAsync(options_: IOptions = {}) : Promise<void>
     logger.debug("started...");
 }
 
+export function skipTicks()
+{
+    assert(!logger, "skipTicks is exclusive with init");
+    var logMeasure = function(cat:string, id:string, val:number, meta:any) {
+          if (meta) meta.skipLog = true;
+    };
+    td.App.addTransport({
+      logTick: function(cat, id, meta) {
+          logMeasure(cat, id, 1, meta);
+      },
+      logMeasure: logMeasure,
+    });    
+}
+
 async function exampleAsync() : Promise<void>
 {
     // A libraty to allows to upload measurements and counters to https://www.librato.com/ using https://github.com/goodeggs/librato-node .

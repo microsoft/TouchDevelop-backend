@@ -84,6 +84,8 @@ async function _initAsync() : Promise<void>
             aggregate: true
         });
         /* async */ tdliteStatus.statusReportLoopAsync();
+    } else {
+        libratoNode.skipTicks();
     }
 
     await core.lateInitAsync();
@@ -224,6 +226,8 @@ async function main()
         console.log("loaded cfg")
     }
     await _initAsync();
+    // For new int re-deployment
+    // await core.redisClient.sendCommandAsync("flushall", []);
     restify.finishStartup();
 }
 
