@@ -1,0 +1,14 @@
+{
+  "name": "backup-script",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Backup script for Touch Develop backend",
+  "main": "backup.js",
+  "author": "Michal Moskal <michal.moskal@microsoft.com>",
+  "license": "MIT",
+  "dependencies": {
+    "async": "^1.4.2",
+    "azure-storage": "^0.6.0",
+    "azure-table-node": "^1.4.1"
+  }
+}
