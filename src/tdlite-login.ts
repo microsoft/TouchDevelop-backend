@@ -102,7 +102,7 @@ export async function initAsync(): Promise<void> {
     jsb["newadult"] = td.replaceAll(template_html, "@BODY@", tdliteHtml.newadult_html);
     jsb["agree"] = td.replaceAll(template_html, "@BODY@", tdliteHtml.agree_html);
     jsb["usercreated"] = td.replaceAll(template_html, "@BODY@", tdliteHtml.user_created_html);
-    jsb["providers"] = "";
+    jsb["providers"] = td.replaceAll(template_html, "@BODY@", tdliteHtml.providers_html);
     loginHtml = td.clone(jsb);
 
     serverAuth.init({
@@ -642,14 +642,12 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
 
 async function getLoginHtmlAsync(inner: string, lang: string) : Promise<string>
 {
-    let text2: string;
     let text = await tdlitePointers.simplePointerCacheAsync("signin/" + inner, lang);
     if (text.length < 100) {
         text = loginHtml[inner];
     }
     text = td.replaceAll(text, "@JS@", tdliteHtml.login_js);
     return text;
-    return text2;
 }
 
 

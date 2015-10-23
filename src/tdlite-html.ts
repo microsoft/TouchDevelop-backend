@@ -217,10 +217,10 @@ export var notFound_html: string =
 export var kidOrNot_html: string = 
 `<script>
 function onkid() {
-  window.location = seturl("&td_state=kid")
+  seturl("&td_state=kid")
 }
 function onteacher() {
-  window.location = seturl("&td_state=teacher")
+  seturl("&td_state=teacher")
 }
 </script>
 <div style='margin: 0 auto; width: 310px;  text-align: center;'>
@@ -235,6 +235,16 @@ export var agree_html: string =
 <h1 style='font-size:3em; font-weight:normal;'>Legal stuff</h1>
 <p>Agree to terms and conditions?</p>
 <a href="@AGREEURL@" class="provider">Agree</a><br/>
+</div>
+`;
+
+export var providers_html: string = 
+`<div style='margin: 0 auto; width: 310px;  text-align: center;'>
+<h1 style='font-size:3em; font-weight:normal;'>Choose login option</h1>
+<p>(this page should be overriden)</p>
+<a href="@azuread-url@" class="provider">Azure AD</a><br/>
+<a href="@liveid-url@" class="provider">Microsoft Account</a><br/>
+<a href="@facebook-url@" class="provider">Facebook</a><br/>
 </div>
 `;
 
