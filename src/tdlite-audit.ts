@@ -25,6 +25,7 @@ var orEmpty = td.orEmpty;
 var auditStore: indexedStore.Store;
 var auditContainer: cachedStore.Container;
 var auditContainerLongTerm: cachedStore.Container;
+var httpCode = core.httpCode;
 
 export class PubAuditLog
     extends core.IdObject
@@ -181,6 +182,23 @@ export async function initAsync() : Promise<void>
         if (req.status == 200) {
             let r = await auditContainerLongTerm.getAsync(req.argument);
             req.response = r || { "status": "four oh four" };
+        }
+    });
+    core.addRoute("GET", "audit", "scripttext", async (req: core.ApiRequest) => {
+        core.checkPermission(req, "audit");
+        if (req.status == 200) {
+            let r = await auditContainer.getAsync(req.argument);
+            if (!r) {
+                req.status = httpCode._404NotFound;
+                return;
+            }
+                
+            let ent = PubAuditLog.createFromJson(r["pub"]);
+            if (ent.type != "delete" || ent.publicationkind != "script") {
+                req.status = httpCode._422UnprocessableEntity;
+                return;
+            }
+            req.response = core.decrypt(ent.oldvalue["text"]);            
         }
     });
 }
