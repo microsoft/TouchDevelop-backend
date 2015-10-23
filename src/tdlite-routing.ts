@@ -95,6 +95,9 @@ async function performSingleRequestAsync(apiRequest: core.ApiRequest) : Promise<
             apiRequest.root = apiRequest.userid;
         }
     }
+    if (apiRequest.status == 200 && apiRequest.method == "POST" && typeof apiRequest.body != "object") {
+        apiRequest.status = httpCode._400BadRequest;        
+    }
     if (apiRequest.status == 200) {
         lookupRoute(apiRequest, apiRequest.root, apiRequest.verb);
         if (apiRequest.verb != "") {
