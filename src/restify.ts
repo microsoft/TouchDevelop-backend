@@ -15,6 +15,9 @@ var logger: td.AppLogger;
 var httpStatus = {
     _200OK: 200,
     _201Created: 201,
+    _202Accepted: 202,
+    _204NoContent: 204,
+    _206PartialContent: 206,
     _300MultipleChoices: 300,
     _301MovedPermanently: 301,
     _302MovedTemporarily: 302,
