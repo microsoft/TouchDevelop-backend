@@ -236,4 +236,4 @@ function logd(m) {
     else console.log(m, "nope")
 }
 
-_initAsync();
+/* async */ _initAsync();

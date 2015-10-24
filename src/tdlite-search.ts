@@ -48,7 +48,7 @@ async function fillUpPointerBodyAsync(res: JsonBuilder): Promise<void> {
     let scr = await core.getPubAsync(ptr["pub"]["scriptid"], "script");    
     if (!scr) return;
     let pscr = scr["pub"];
-    let txt = tdliteScripts.getScriptTextAsync(scr["id"])
+    let txt = await tdliteScripts.getScriptTextAsync(scr["id"])
     if (!txt || !txt["text"]) return;
     
     res["description"] = pscr["name"] + "\n" + res["description"];
@@ -224,7 +224,7 @@ export async function initAsync() : Promise<void>
     core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");        
         if (req.status != 200) return;
-        scanAndSearchAsync(req.rootPub, { skipSearch: true })
+        await scanAndSearchAsync(req.rootPub, { skipSearch: true })
         req.response = {}
     });
 

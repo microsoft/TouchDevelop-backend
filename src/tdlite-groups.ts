@@ -371,7 +371,7 @@ export async function initAsync() : Promise<void>
             let gr = PubGroup.createFromJson(entry22["pub"]);
             let askedToJoin = core.jsonArrayIndexOf(entry22["approvals"], req.rootId) >= 0;
             if (askedToJoin && gr.isclass && withDefault(gr.userid, "???") == req.userid) {
-                core.canPostAsync(req, "group");
+                await core.canPostAsync(req, "group");
                 if (req.status != 200) return;
                 // OK, this is an approval.
                 if (orFalse(req.rootPub["awaiting"])) {

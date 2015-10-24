@@ -1448,13 +1448,13 @@ export async function initFinalAsync()
     currClientConfig.rootUrl = td.serverSetting("SELF", false).replace(/\/$/g, "");
     currClientConfig.apiUrl = currClientConfig.rootUrl + "/api";
     // this is no longer set from here - it's blobcontainer in installedheaders response
-    // currClientConfig.workspaceUrl = (await workspaceContainer[0].blobContainerAsync()).url() + "/";
+    // currClientConfig.workspaceUrl = (workspaceContainer[0].blobContainer())).url() + "/";
     currClientConfig.liteVersion = releaseVersionPrefix + ".r" + rewriteVersion;
     currClientConfig.shareUrl = currClientConfig.rootUrl;
-    currClientConfig.cdnUrl = (await pubsContainer.blobContainerAsync()).url().replace(/\/pubs$/g, "");
+    currClientConfig.cdnUrl = pubsContainer.blobContainer().url().replace(/\/pubs$/g, "");
     currClientConfig.primaryCdnUrl = withDefault(td.serverSetting("CDN_URL", true), currClientConfig.cdnUrl);
     currClientConfig.altCdnUrls = (<string[]>[]);
-    currClientConfig.altCdnUrls.push((await pubsContainer.blobContainerAsync()).url().replace(/\/pubs$/g, ""));
+    currClientConfig.altCdnUrls.push(pubsContainer.blobContainer().url().replace(/\/pubs$/g, ""));
     currClientConfig.altCdnUrls.push(currClientConfig.primaryCdnUrl);
     currClientConfig.anonToken = basicCreds;
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
@@ -1600,14 +1600,12 @@ export async function refreshSettingsAsync(): Promise<void> {
         lastSettingsCheck = Date.now();
         return;
     }
-
-    for (let t of settingsObjects.map(o => settingsContainer.getAsync(o).then(v => {
-        //logger.debug("settings: " + o + " -> " + v); 
-        settingsCache[o] = v || null
-    }))) {
-        await t;
-    }
     
+    let tmp = await settingsContainer.getManyAsync(settingsObjects);
+    settingsObjects.forEach((o, i) => {        
+        settingsCache[o] = tmp[i] || null 
+    })
+
     for (let f of settingsCleanups) {
         f();
     }
@@ -1743,7 +1741,7 @@ export function timeoutAsync<T>(ms: number, p: Promise<T>): Promise<T>
 
 export function retryWithTimeoutAsync<T>(times: number, ms: number, f: () => Promise<T>): Promise<T>
 {
-    return retryAsync(times, () => timeoutAsync(ms, f()))   
+    return retryAsync(times, () => /* async */ timeoutAsync(ms, f()))   
 }
 
 export async function retryAsync<T>(times:number, f: () => Promise<T>):Promise<T>

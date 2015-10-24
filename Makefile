@@ -1,6 +1,7 @@
 N=tdlite
 
 all:
+	node scripts/asynclint.js src/*.ts
 	node node_modules/typescript/bin/tsc
 	#node c:/dev/typescript/built/local/tsc
 

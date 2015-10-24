@@ -250,7 +250,7 @@ async function importListAsync(req: core.ApiRequest) {
                 resp[e["id"]] = 409;
                 return;
             }
-            let suppl = await core.retryWithTimeoutAsync(1, 15000, () => downloadSupplementalAsync(e, resp));
+            let suppl = await core.retryWithTimeoutAsync(1, 15000, () => /* async */ downloadSupplementalAsync(e, resp));
             if (suppl) {
                 let apiRequest = await importOneAnythingAsync(suppl);
                 resp[e["id"]] = apiRequest.status;

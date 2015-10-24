@@ -189,7 +189,7 @@ export async function initAsync(options_: IOptions = {}) : Promise<void>
               r.setHeader("X-ApiKey", opt['api key']);
               r.setMethod("POST");
               r.setContentAsJson(msg);
-              r.sendAsync().then(function(r){
+              /* async */ r.sendAsync().then(function(r){
                   logger.warning("TD retry, " + (r ? r.statusCode() : "X"));
               }, function(e){
                   logger.warning("TD retry, " + e.message);

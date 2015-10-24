@@ -326,7 +326,7 @@ export class Client
         return redis;
     }
 
-    async statusReportLoopAsync() : Promise<void>
+    public async statusReportLoopAsync() : Promise<void>
     {
         this.lastStatusReport = new Date();
 

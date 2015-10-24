@@ -304,7 +304,7 @@ export class Container
         let result: BlobInfo;
         let opts = prepOptions(options);
         await new Promise(resume => {
-            td.httpRequestStreamAsync(url)
+            /* async */ td.httpRequestStreamAsync(url)
               .then(urlResp => {
                   if (!opts.contentType) opts.contentType = urlResp.headers['content-type'];
                   var ws = this.svc.handle.createWriteStreamToBlockBlob(

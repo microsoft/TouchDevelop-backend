@@ -390,11 +390,9 @@ export class Container
         }
     }
 
-    public async blobContainerAsync() : Promise<azureBlobStorage.Container>
+    public blobContainer() : azureBlobStorage.Container
     {
-        let blobCont: azureBlobStorage.Container;
-        blobCont = this.blob;
-        return blobCont;
+        return this.blob;
     }
 
     /**

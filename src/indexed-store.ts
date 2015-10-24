@@ -121,7 +121,7 @@ export class Store
         return id;
     }
 
-    async fetchJsonObjectsAsync(ids: string[]) : Promise<FetchResult>
+    public async fetchJsonObjectsAsync(ids: string[]) : Promise<FetchResult>
     {
         let fetchResult: FetchResult;
         let entries = await this.container.getManyAsync(ids);

@@ -27,7 +27,7 @@ export class Queue
             let action2 = q.toRun[0];
             q.toRun.splice(0, 1);
             q.numRunning += 1;
-            process.nextTick(() => q.runAndPokeAsync(action2));
+            process.nextTick(() => /* async */ q.runAndPokeAsync(action2));
         }
     }
 

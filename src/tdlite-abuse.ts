@@ -182,7 +182,7 @@ export async function initAsync() : Promise<void>
                     oldvalue: await audit.auditDeleteValueAsync(req.rootPub)
                 });
                 if (req.userid != req.rootPub["pub"]["userid"]) {
-                    notifications.sendAsync(req.rootPub, "deleted", null);
+                    await notifications.sendAsync(req.rootPub, "deleted", null);
                 }
                 await deletePubRecAsync(req.rootPub);
                 req.response = ({});

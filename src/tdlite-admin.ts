@@ -115,7 +115,8 @@ export async function initAsync()
     core.addRoute("GET", "admin", "rawblob", async (req6: core.ApiRequest) => {
         core.checkPermission(req6, "root");
         if (req6.status == 200) {
-            let info = await (await core.pubsContainer.blobContainerAsync()).getBlobToTextAsync(req6.argument);
+            let container = core.pubsContainer.blobContainer();
+            let info = await container.getBlobToTextAsync(req6.argument);
             if (info.succeded()) {
                 req6.response = info.text();
             }

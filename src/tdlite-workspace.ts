@@ -248,7 +248,7 @@ async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<
             }
             let entities = await installSlotsTable.createQuery().partitionKeyIs(req.rootId).fetchAllAsync();
             let res:IPubHeaders = <any>{};
-            res.blobcontainer = (await workspaceForUser(req.userid).blobContainerAsync()).url() + "/";
+            res.blobcontainer = workspaceForUser(req.userid).blobContainer().url() + "/";
             res.time = await core.nowSecondsAsync();
             res.random = crypto.randomBytes(16).toString("base64");
             res.headers = [];
@@ -356,8 +356,8 @@ async function deleteHistoryAsync(req: core.ApiRequest, guid: string) : Promise<
     let scriptGuid = req.rootId + "." + guid;
     let resQuery = historyTable.createQuery().partitionKeyIs(scriptGuid);
     await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async (json: JsonObject) => {
-        await historyTable.deleteEntityAsync(json);
-        await (await wsContainer.blobContainerAsync()).deleteBlobAsync(json["historyid"]);
+        await historyTable.deleteEntityAsync(json);         
+        await wsContainer.blobContainer().deleteBlobAsync(json["historyid"]);
     });
 }
 

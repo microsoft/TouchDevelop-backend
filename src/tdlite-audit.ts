@@ -123,7 +123,7 @@ async function cleanLogAsync(): Promise<void>
     let res = await q.fetchAllAsync();
     permute(res);
     res = res.slice(0, 50);    
-    parallel.forJsonAsync(res, async(ent) => {
+    await parallel.forJsonAsync(res, async(ent) => {
         //let ee = await auditStore.container.getAsync(ent["pub"])
         let tm = 10000000000 - parseInt(ent["RowKey"].replace(/\..*/, ""))
         core.logger.debug("delete audit entry: " + ent["pub"] + " @ " + new Date(tm*1000));
