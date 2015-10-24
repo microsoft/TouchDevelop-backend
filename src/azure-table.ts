@@ -258,6 +258,7 @@ export class TableQuery
     public continuation: string[];
     public query: any;
     public forceEtags: boolean;
+    private hadWhere = false;
 
     public initQuery(table: Table) : void
     {
@@ -283,6 +284,9 @@ export class TableQuery
 
     private exprCore(op: string, field: string, comparison: string, argument: string) : TableQuery
     {
+        if (this.hadWhere && op == "where") op = "and";
+        if (op == "where") this.hadWhere = true;
+        if (comparison == "=") comparison = "==";
         this.query = this.query[op](field, comparison, argument);
         return this
     }
