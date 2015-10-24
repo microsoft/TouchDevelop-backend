@@ -53,14 +53,25 @@ export class Queue
 /**
  * Runs the ``action`` for the elements of a collection in parralel
  */
-export async function forAsync(count: number, action:td.NumberAction) : Promise< void >
+export async function forAsync(count: number, action:td.NumberAction, maxTasks = 0) : Promise< void >
 {
-    let coll = [];
-    for (let i = 0; i < count; i++) {
-        coll.push(action(i));
-    }
-    for (let task2 of coll) {
-        await task2;
+    if (maxTasks > 0) {
+        let q = createQueue(maxTasks);
+        for (let i = 0; i < count; i++) {
+            let tmp = i;
+            q.schedule(async () => {
+                await action(tmp);
+            })
+        }
+        await q.waitForEmptyAsync();
+    } else {
+        let coll = [];
+        for (let i = 0; i < count; i++) {
+            coll.push(action(i));
+        }
+        for (let task2 of coll) {
+            await task2;
+        }
     }
 }
 
@@ -129,19 +140,19 @@ export function createQueue(maxRunning: number) : Queue
 /**
  * Applies the ``action`` action to the array element or field values.
  */
-export async function forJsonAsync<T>(js: T[], action:td.Action1<T>) : Promise< void >
+export async function forJsonAsync<T>(js: T[], action:td.Action1<T>, maxTasks = 0) : Promise< void >
 {
     if (Array.isArray(js)) {
         await forAsync(js.length, async(x: number) => {
             let jsi = js[x];
             await action(jsi);
-        });
+        }, maxTasks);
     } else {
         let keys = Object.keys(js);
         await forAsync(keys.length, async(x1: number) => {
             let jsf = js[keys[x1]];
             await action(jsf);
-        });
+        }, maxTasks);
     }
 }
 
