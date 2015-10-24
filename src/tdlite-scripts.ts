@@ -256,8 +256,7 @@ async function canSeeRootpubScriptAsync(req: core.ApiRequest) : Promise<boolean>
     return seeIt2;
 }
 
-async function insertScriptAsync(jsb: JsonBuilder, pubScript: PubScript, scriptText_: string, isImport: boolean) : Promise<void>
-{
+async function insertScriptAsync(jsb: JsonBuilder, pubScript: PubScript, scriptText_: string, isImport: boolean): Promise<void> {
     pubScript.scripthash = core.sha256(scriptText_).substr(0, 32);
     jsb["pub"] = pubScript.toJson();
     // 
@@ -275,30 +274,26 @@ async function insertScriptAsync(jsb: JsonBuilder, pubScript: PubScript, scriptT
     bodyBuilder["text"] = scriptText_;
     core.progress("publish - about to just insert");
     await scriptText.justInsertAsync(pubScript.id, bodyBuilder);
-    // 
-    let upslot = await core.getPubAsync(updateKey, "updateslot");
-    if (upslot == null) {
-        let jsb2 = {};
-        jsb2["pub"] = ({ positivereviews: 0 });
-        jsb2["id"] = updateKey;
-        jsb2["id0"] = updateEntry.pub;
-        jsb2["scriptId"] = updateEntry.pub;
-        jsb2["scriptTime"] = updateEntry.time;
-        core.progress("publish - about to update");
-        await updateSlots.insertAsync(jsb2);
-    }
-    jsb["text"] = scriptText_;
-    if ( ! pubScript.ishidden) {
-        core.progress("publish - about to update insert");
-        await updateSlotTable.insertEntityAsync(updateEntry.toJson(), "or merge");
-        core.progress("publish - about to update insert2");
-        await core.pubsContainer.updateAsync(updateKey, async (entry: JsonBuilder) => {
-            if ( ! entry.hasOwnProperty("id0")) {
-                entry["id0"] = withDefault(entry["scriptId"], updateEntry.pub);
-            }
+    //
+    core.progress("publish - about to update insert2");
+    await core.pubsContainer.updateAsync(updateKey, async(entry: JsonBuilder) => {
+        if (!entry.hasOwnProperty("id0")) {
+            entry["id0"] = withDefault(entry["scriptId"], updateEntry.pub);
+        }
+        entry["id"] = updateKey;
+        if (!entry["pub"])
+            entry["pub"] = { positivereviews: 0 };
+        let utime = core.orZero(entry["scriptTime"]);
+        if ((utime == 0 || (!pubScript.ishidden && utime < updateEntry.time))) {
             entry["scriptId"] = updateEntry.pub;
             entry["scriptTime"] = updateEntry.time;
-        });
+        }
+    });
+
+    jsb["text"] = scriptText_;
+    if (!pubScript.ishidden) {
+        core.progress("publish - about to update insert");
+        await updateSlotTable.insertEntityAsync(updateEntry.toJson(), "or merge");
     }
     await search.scanAndSearchAsync(jsb, {
         skipSearch: pubScript.ishidden,
@@ -313,9 +308,9 @@ async function importScriptAsync(req: core.ApiRequest, body: JsonObject) : Promi
     pubScript.screenshotthumburl = "";
     pubScript.iconurl = "";
     pubScript.screenshoturl = "";
-    pubScript.capabilities = (<string[]>[]);
-    pubScript.flows = (<string[]>[]);
-    pubScript.toptagids = (<string[]>[]);
+    pubScript.capabilities = [];
+    pubScript.flows = [];
+    pubScript.toptagids = [];
     pubScript.updateid = "";
     pubScript.updatetime = 0;
     pubScript.baseid = orEmpty(pubScript.baseid);

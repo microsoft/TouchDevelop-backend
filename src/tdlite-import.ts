@@ -81,6 +81,12 @@ export async function initAsync() : Promise<void>
             }
         }
     });
+    core.addRoute("POST", "import", "pubs", async (req2: core.ApiRequest) => {
+        await importPubsAsync(req2);
+    });
+    core.addRoute("POST", "import", "*", async (req2: core.ApiRequest) => {
+        await importListAsync(req2);
+    });
     core.addRoute("GET", "importsync", "", async (req5: core.ApiRequest) => {
         let key = req5.queryOptions["key"];
         if (key != null && key == td.serverSetting("LOGIN_SECRET", false)) {
@@ -177,33 +183,139 @@ async function importOneAnythingAsync(js: JsonObject) : Promise<core.ApiRequest>
     return apiRequest;
 }
 
-async function importDownloadPublicationAsync(id: string, resp: JsonBuilder, coll2: JsonObject[]) : Promise<void>
-{
+var tdbaseUrl = "https://www.touchdevelop.com/api/"
+var allowedLists = [
+    "new-scripts",
+    "comments",
+    "art",
+    "screenshots",
+    "groups",
+    "reviews",
+    "users",
+    "tags",
+]
+
+async function importPubsAsync(req: core.ApiRequest) {
+    if (!core.checkPermission(req, "root"))
+        return;
+
+    let coll: {}[] = [];
+    let resp = {};
+    for (let pub of req.argument.split(/[,\s]+/).filter(e => !!e)) {
+        await importDownloadPublicationAsync(pub, resp, coll);
+    }
+    for (let suppl of coll) {
+        let apiRequest = await importOneAnythingAsync(suppl);
+        resp[suppl["id"]] = apiRequest.status;
+    }
+
+    req.response = {
+        continuation: "",
+        publications: resp,
+    };
+}
+
+async function importListAsync(req: core.ApiRequest) {
+    if (!core.checkPermission(req, "root"))
+        return;
+
+    let list = req.verb;
+
+    if (allowedLists.indexOf(list) < 0) {
+        req.status = httpCode._404NotFound;
+        return;
+    }
+
+    let count = core.orZero(req.queryOptions["count"]);
+    let max = 100;
+    //if (/scripts/.test(list)) max = 50;    
+    count = td.clamp(20, max, count)
+
+    let continuation = orEmpty(req.queryOptions["continuation"]);
+    if (continuation)
+        continuation = "&continuation=" + encodeURIComponent(continuation);
+    let url = `${tdbaseUrl}${list}?count=${count}${continuation}`;
+    let js = await td.downloadJsonAsync(url);
+
+    if (!js) {
+        logger.warning("bad response from TD: " + url)
+        req.status = httpCode._424FailedDependency;
+        return;
+    }
+
+    let resp = {};
+    await parallel.forJsonAsync(js["items"], async(e) => {
+        try {
+            if (e["kind"] == "script" && await core.getPubAsync(e["id"], "script")) {
+                resp[e["id"]] = 409;
+                return;
+            }
+            let suppl = await core.retryWithTimeoutAsync(1, 15000, () => downloadSupplementalAsync(e, resp));
+            if (suppl) {
+                let apiRequest = await importOneAnythingAsync(suppl);
+                resp[e["id"]] = apiRequest.status;
+            }
+        } catch (ee) {
+            if (/TIMEDOUT/.test(ee.message))
+                resp[e["id"]] = 500;
+            else throw ee;
+        }
+    }, 20);
+
+    req.response = {
+        continuation: js["continuation"],
+        publications: resp,
+    };
+}
+
+async function downloadSupplementalAsync(js: JsonObject, resp: JsonBuilder): Promise<JsonObject> {
+    let id = js["id"];
+    let url = tdbaseUrl + id;
+    if (js["kind"] == "script") {
+        let jsb = td.clone(js);
+        jsb["baseid"] = "";
+        if (js["rootid"] != id) {
+            let js3 = await td.downloadJsonAsync(url + "/base");
+            if (js3)
+                jsb["baseid"] = js3["id"];
+        }
+        let s2 = "";
+        if (jsb["time"] < 1420099200) {            
+            let tmp = await td.downloadJsonAsync("https://tdlite.blob.core.windows.net/scripttext/" + id)
+            if (tmp) {
+                
+                s2 = orEmpty(tmp["text"]);
+            } else {
+                logger.debug("missed on tdlite: " + id)
+            }
+        }
+        if (!s2)
+            s2 = await td.downloadTextAsync(url + "/text?original=true");
+        jsb["text"] = s2;        
+        return jsb;
+    }
+    else if (/^(runbucket|run|webapp)$/.test(js["kind"])) {
+        return <{}>null;
+    }
+    else {
+        return js;
+    }
+}
+
+async function importDownloadPublicationAsync(id: string, resp: JsonBuilder, coll2: JsonObject[]): Promise<void> {
     let existingEntry = await core.pubsContainer.getAsync(id);
-    if ( ! core.isGoodEntry(existingEntry)) {
-        let url = "https://www.touchdevelop.com/api/" + id;
+    if (!core.isGoodEntry(existingEntry)) {
+        let url = tdbaseUrl + id;
         let js = await td.downloadJsonAsync(url);
         if (js == null) {
-            resp[id] = 404;
-        }
-        else if (js["kind"] == "script") {
-            let jsb = td.clone(js);
-            if (js["rootid"] != id) {
-                let js3 = await td.downloadJsonAsync(url + "/base");
-                jsb["baseid"] = js3["id"];
-            }
-            else {
-                jsb["baseid"] = "";
-            }
-            let s2 = await td.downloadTextAsync(url + "/text?original=true&ids=true");
-            jsb["text"] = s2;
-            coll2.push(td.clone(jsb));
-        }
-        else if (/^(runbucket|run|webapp)$/.test(js["kind"])) {
+            resp[id] = httpCode._404NotFound;
         }
         else {
-            coll2.push(js);
+            let js2 = await downloadSupplementalAsync(js, resp);
+            if (js2) coll2.push(js2);
         }
+    } else {
+        resp[id] = httpCode._409Conflict;
     }
 }
 

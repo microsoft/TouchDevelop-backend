@@ -1305,12 +1305,10 @@ export function callerHasPermission(req: ApiRequest, perm: string) : boolean
 
 export function encryptJson(js: JsonObject, keyid: string) : JsonObject
 {
-    let js2: JsonObject;
     if (js != null) {
         js = encrypt(JSON.stringify(js), keyid);
     }
     return js;
-    return js2;
 }
 
 
@@ -1420,7 +1418,7 @@ export async function initAsync()
     tokenSecret = td.serverSetting("TOKEN_SECRET", false);
     throttleDisabled = orEmpty(td.serverSetting("DISABLE_THROTTLE", true)) == "true";
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
-    fullTD = false;
+    fullTD = td.serverSetting("FULL_TD", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
 
     let creds = orEmpty(td.serverSetting("BASIC_CREDS", true));
@@ -1474,7 +1472,6 @@ export async function initFinalAsync()
 
 export function removeDerivedProperties(body: JsonObject) : JsonObject
 {
-    let body2: JsonObject;
     let jsb2 = td.clone(body);
     for (let fld of ["username", "url"]) {
         jsb2[fld] = "";
@@ -1482,9 +1479,7 @@ export function removeDerivedProperties(body: JsonObject) : JsonObject
     for (let fld2 of ["userscore", "positivereviews", "comments", "subscribers"]) {
         jsb2[fld2] = 0;
     }
-    body = td.clone(jsb2);
-    body2 = body;
-    return body2;
+    return jsb2;
 }
 
 export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<JsonBuilder[]>
@@ -1739,5 +1734,51 @@ export async function getCloudRelidAsync(includeVer: boolean) : Promise<string>
     }
     return ver;
 }
+
+export function timeoutAsync<T>(ms: number, p: Promise<T>): Promise<T>
+{
+    // defined in bluebird
+    return (<any>p).timeout(ms, "TIMEDOUT");
+}
+
+export function retryWithTimeoutAsync<T>(times: number, ms: number, f: () => Promise<T>): Promise<T>
+{
+    return retryAsync(times, () => timeoutAsync(ms, f()))   
+}
+
+export async function retryAsync<T>(times:number, f: () => Promise<T>):Promise<T>
+{
+    let res = null;
+    let isErr = false;
+    
+    while (times-- > 1) {
+        await f().then(v => {
+            isErr = false;
+            res = v;
+        }, e => {
+            isErr = true;
+            res = e;
+        });
+        if (!isErr) return res;
+    }
+    
+    // last try
+    res = await f();
+    return res;
+}
+
+export async function joinAsync<T>(arr: Promise<T>[]): Promise<T[]>
+{
+    let r: T[] = [];
+    for (let p of arr)
+        r.push(await p);
+    return r;
+}
+
+export function mapAsync<T,S>(arr: T[], f:(v:T)=>Promise<S>): Promise<S[]>
+{
+    return joinAsync(arr.map(f));
+}
+
 
 

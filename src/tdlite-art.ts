@@ -120,6 +120,8 @@ export async function initAsync() : Promise<void>
         await core.anyListAsync(arts, req2, "filehash", req2.verb);
     });
     
+    core.addRoute("POST", "art", "rethumb", rethumbArtsAsync);
+    
     core.addRoute("POST", "art", "reindex", async (req2: core.ApiRequest) => {
         core.checkPermission(req2, "operator");
         if (req2.status == 200) {
@@ -396,37 +398,58 @@ async function postArt_likeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promi
                 req.status = httpCode._424FailedDependency;
             }
             else if (jsb["isImage"]) {
-                let url = artContainer.url() + "/" + filename;
-                await parallel.forAsync(thumbContainers.length, async (i: number) => {
-                    let thumbContainer = thumbContainers[i];
-                    let tempThumbUrl = await kraken.optimizePictureUrlAsync(url, {
-                        width: thumbContainer.size,
-                        height: thumbContainer.size,
-                        resizeStrategy: "auto",
-                        lossy: true,
-                        quality: 60
-                    });
-                    if (tempThumbUrl != null) {
-                        let result2 = await thumbContainer.container.createBlockBlobFromUrlAsync(filename, tempThumbUrl, {
-                            forceNew: true,
-                            contentType: contentType,
-                            cacheControl: "public, max-age=900",
-                            timeoutIntervalInMs: 3000
-                        });
-                        if ( ! result2.succeded()) {
-                            req.status = httpCode._424FailedDependency;
-                        }
-                    }
-                    else {
-                        req.status = httpCode._400BadRequest;
-                    }
-                });
+                await rethumbOneAsync(req, filename, contentType);
             }
         }
     }
 }
 
+async function rethumbOneAsync(req: core.ApiRequest, filename: string, contentType: string) {
+    let url = artContainer.url() + "/" + filename;
+    await parallel.forAsync(thumbContainers.length, async(i: number) => {
+        let thumbContainer = thumbContainers[i];
+        let tempThumbUrl = await kraken.optimizePictureUrlAsync(url, {
+            width: thumbContainer.size,
+            height: thumbContainer.size,
+            resizeStrategy: "auto",
+            lossy: true,
+            quality: 60
+        });
+        if (tempThumbUrl != null) {
+            let result2 = await thumbContainer.container.createBlockBlobFromUrlAsync(filename, tempThumbUrl, {
+                forceNew: false,
+                contentType: contentType,
+                cacheControl: "public, max-age=900",
+                timeoutIntervalInMs: 3000
+            });
+            if (!result2.succeded()) {
+                req.status = httpCode._424FailedDependency;
+            }
+        }
+        else {
+            req.status = httpCode._400BadRequest;
+        }
+    });
+}
 
+async function rethumbArtsAsync(req: core.ApiRequest)
+{
+    if (!core.checkPermission(req, "operator"))
+        return;    
+    let fr = await arts.fetchFromIdListAsync(req.argument.split(/,/).filter(e => !!e), {});    
+    await resolveArtAsync(fr, req);
+    let msgs = []
+    await parallel.forJsonAsync(fr.items, async(pub) => {
+        let art = PubArt.createFromJson(pub);
+        if (art.arttype == "picture") {
+            msgs.push(`rethumb: ${art.id} -> ${JSON.stringify(pub) }`)
+            await rethumbOneAsync(req, art.id, art.contenttype);
+        }
+    }, 5);
+    req.response = {
+        msgs: msgs
+    }
+}
 
 async function redownloadScreenshotAsync(js: JsonObject) : Promise<void>
 {
@@ -441,22 +464,22 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
     let pubArt = new PubArt();
     pubArt.fromJson(core.removeDerivedProperties(body));
     let contentType = "";
-    let r = orEmpty(pubArt.pictureurl);
-    if (r != "") {
-        let wreq = td.createRequest(r);
+    let urlToDownload = orEmpty(pubArt.pictureurl);
+    if (urlToDownload != "") {
+        let wreq = td.createRequest(urlToDownload);
         wreq.setMethod("head");
         let response = await wreq.sendAsync();
         if (response.statusCode() == 200) {
             contentType = response.header("content-type");
         }
         else {
-            logger.error("cannot HEAD art resource: " + r);
+            logger.error("cannot HEAD art resource: " + urlToDownload);
             req.status = 404;
         }
     }
     else if (orEmpty(pubArt.wavurl) != "") {
         contentType = "audio/wav";
-        r = pubArt.wavurl;
+        urlToDownload = pubArt.wavurl;
     }
     else {
         logger.error("bad art import: " + JSON.stringify(body));
@@ -470,7 +493,7 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
         fixArtProps(contentType, jsb);
         // 
         let fn = pubArt.id;
-        let result3 = await core.copyUrlToBlobAsync(artContainer, fn, r);
+        let result3 = await core.copyUrlToBlobAsync(artContainer, fn, urlToDownload);
         if (result3 == null) {
             logger.error("cannot download art blob: " + JSON.stringify(pubArt.toJson()));
             req.status = 500;
@@ -480,12 +503,12 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
             req.status = 500;
         }
         else if (jsb["isImage"]) {
-            let result4 = await core.copyUrlToBlobAsync(thumbContainers[0].container, fn, withDefault(pubArt.thumburl, r));
-            let result5 = await core.copyUrlToBlobAsync(thumbContainers[1].container, fn, withDefault(pubArt.mediumthumburl, r));
+            let result4 = await core.copyUrlToBlobAsync(thumbContainers[0].container, fn, withDefault(pubArt.thumburl, urlToDownload));
+            let result5 = await core.copyUrlToBlobAsync(thumbContainers[1].container, fn, withDefault(pubArt.mediumthumburl, urlToDownload));
             if (result5 == null || result4 == null) {
                 logger.error("cannot download art blob thumb: " + JSON.stringify(pubArt.toJson()));
-                req.status = 404;
-            }
+                req.status = httpCode._206PartialContent;
+            }   
             else if ( ! result4.succeded() || ! result5.succeded()) {
                 logger.error("cannot create art blob thumb: " + JSON.stringify(pubArt.toJson()));
                 req.status = 500;
@@ -504,7 +527,7 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
             }
         }
         // 
-        if (req.status == 200) {
+        if (req.status == 200 || req.status == httpCode._206PartialContent) {
             await arts.insertAsync(jsb);
             await upsertArtAsync(jsb);
             logger.debug("insert OK " + pubArt.id);
