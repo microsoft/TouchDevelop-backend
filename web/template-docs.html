@@ -1,8 +1,8 @@
----
-layout: docs
-title: "Touch Develop - @title@"
-description: "@description@"
-image: "@image@"
----
+{% extends "_layouts/docs.html" %}
+{% set title = "Touch Develop - @title@" %}
+{% set description = "@description@" %}
+{% set image = "@image@" %}
 
+{% block innerbody %}
 @body@
+{% endblock %}

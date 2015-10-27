@@ -82,6 +82,5 @@ div.listing A:hover
 <script src="https://az31353.vo.msecnd.net/c04/zjrd.js" type="text/javascript"></script>
 <script src="https://az31353.vo.msecnd.net/c04/bzmz.js" type="text/javascript"></script>
 
-{% if page.headinclude %}
-  {% include {{page.headinclude}} %}
-{% endif %}
+{% block headAdd %}
+{% endblock %}

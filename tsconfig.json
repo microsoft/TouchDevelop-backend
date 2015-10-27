@@ -16,6 +16,7 @@
         "src/test-service.ts",
         "src/tdlite.ts",
         "src/storutil.ts",
+        "src/templater.ts",
         "src/remote.ts"        
     ],
     "exclude": [

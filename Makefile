@@ -13,3 +13,6 @@ conv:
 	rm -f out.ts
 	$(MAKE) all
 
+docs: all
+	PORT=4000 node built/templater.js
+	

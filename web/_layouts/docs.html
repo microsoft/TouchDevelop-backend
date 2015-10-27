@@ -1,7 +1,6 @@
----
-layout: default
----
+{% extends "_layouts/default.html" %}
 
+{% block body %}
 <div class="container">
 
 <div class="modal fade" id="subscribeModal">
@@ -51,7 +50,8 @@ layout: default
     </div>
 
     <div id="contentBody" class="col-xs-12 col-sm-8 col-md-9 col-lg-9" dir="auto">
-      {{ content }}
+      {% block innerbody %}
+      {% endblock %}
       <div style="margin-top:2.5em;"></div>
       <hr />
     </div>
@@ -65,3 +65,5 @@ layout: default
 
 
 </div> <!-- /.container -->
+
+{% endblock %}
