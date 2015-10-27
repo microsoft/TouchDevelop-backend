@@ -25,6 +25,18 @@ npm install
 make
 ```
 
+## Web stuff
+
+First install Ruby 2.2+. Then:
+
+
+```
+cd web
+gem install bundler
+bundler install
+bundle exec jekyll serve
+```
+
 ## LICENSE
 
 The MIT License (MIT)

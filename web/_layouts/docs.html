@@ -1,0 +1,67 @@
+---
+layout: default
+---
+
+<div class="container">
+
+<div class="modal fade" id="subscribeModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h3 class="modal-title">Subscribe to the blog</h3>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+            <div class="col-xs-4">
+                <a class="btn btn-default btn-sm btn-block" href="/blog/rss">RSS FEED</a>
+            </div>
+            <div class="col-xs-4">
+                <a class="btn btn-default btn-sm btn-block" href="https://www.twitter.com/TouchDevelop">TWITTER</a>
+            </div>
+            <div class="col-xs-4">
+                <a class="btn btn-default btn-sm btn-block" href="https://www.facebook.com/TouchDevelop">FACEBOOK</a>
+            </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <p class="text-muted">read our <a href="/privacy">privacy policy</a></p>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
+<div class="row">
+    <div class="col-xs-12 col-sm-4 col-md-3 col-lg-3">
+        <h3>STAY IN TOUCH</h3>
+        <p>and receive our newsletter to get the latest news and tips.</p>
+        <button id="subscribe" class="btn btn-success btn-sm btn-block" data-toggle="modal" data-target="#subscribeModal">SUBSCRIBE NOW</button>
+        <hr />
+        <div class="bs-sidebar hidden-print" role="complementary">
+          <form class="bs-search" role="search">
+            <div id="translateBtnGroup" class="form-group">
+                <button id="translateBtn" class="btn btn-default">translate</button>
+            </div>
+            <input type="search" dir="auto" class="form-control" id="searchInput" placeholder="search docs..." />
+          </form>
+
+          @topiclist@
+
+        </div>
+    </div>
+
+    <div id="contentBody" class="col-xs-12 col-sm-8 col-md-9 col-lg-9" dir="auto">
+      {{ content }}
+      <div style="margin-top:2.5em;"></div>
+      <hr />
+    </div>
+</div> <!-- /.row -->
+
+<div class="row hidden-print">
+    <div class="col-xs-12 col-sm-offset-4 col-sm-8 col-md-offset-3 col-md-9 col-lg-offset-3 col-lg-9">
+        <a class="btn btn-info" href="https://www.touchdevelop.com/app/#pub:@id@">edit this topic</a>
+    </div>
+</div>
+
+
+</div> <!-- /.container -->

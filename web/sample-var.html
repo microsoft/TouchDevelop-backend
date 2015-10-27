@@ -1,0 +1,109 @@
+---
+layout: docs
+title: "Touch Develop docs: Var"
+description: Some description
+---
+<style>
+@font-face { font-family: "TD Symbols"; src:url(data:application/x-font-woff;base64,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);}
+@page { margin: 1in; }
+.md-tutorial { font-size: 1.0em; line-height: 1.4em; }
+@media print { .md-tutorial a:link:after, .md-tutorial a:visited:after  { content:" (" attr(href) ") "; } }
+.parse-error, .decl { margin-bottom: 1em; }
+.parse-error, .error { color: #d00; }
+.hint { color: #444; }
+.errorNumber { color: #aaa; }
+.kw, .keyword { font-weight: bold; color: black; }
+.kbm { display:inline-block;} .kbm svg { height: 1em; vertical-align: middle; margin-left: 0.2em; }
+.kbm svg > path.biton { fill:#000; } .kbm svg > path.bitoff { fill:#ccc; }
+.code-highlight { border: 1px dashed gray; font-weight:bold; }
+.comment { color:#444; font-style:italic; }
+.greyed { color:#444; } .greyer { color: #555; }
+.api-kind { border: 1px dotted #BBB; padding: 0.4em; clear: both; font-size: 1.2em; margin-bottom: 0.6em; }
+.md-snippet { border: 1px dotted #bbb; padding: 0.4em 0; clear: both; line-height: 1.3em; page-break-inside:avoid; }
+.md-snippet .signature { padding:0em 0.2em 0em 0.2em; }
+.md-snippet .name { font-weight: bold;}
+.md-img { margin:0.5em; clear:both; width:100%; text-align:center; position:relative; }
+.md-img-inner { position:relative; display:inline-block; width:100%; }
+.md-img .caption { font-size:0.8em; }
+.md-img img { max-height: 100%; max-width: 100%; }
+.md-box { page-break-inside: avoid; }
+.md-box-header, .md-box-header-print { font-weight: bold; font-size: 1.2em; }
+.md-box, .md-box-landscape, .md-box-portrait { margin-left: 2em;  margin-bottom:0.5em; border: 1px solid #555; border-left-width: 0.5em; padding: 1em; }
+.md-box-avatar { margin-bottom:0.5em; } .md-box-avatar-img { width:4em; display:inline-block; vertical-align:top;} .phone .md-box-avatar-img { width:3em; } .md-box-avatar-body { position:relative; padding:0em 0.5em 0em 0.5em; color:#000; background:#eeeeee; margin-left:1.5em; display:inline-block; width: calc(100% - 7em); } .phone .md-box-avatar-body { width: calc(100% - 6em); } .md-box-avatar-body:after { top: 1.1em; left: -1.5em; bottom: auto; border-width: 0px 1.5em 0.7em 0; border-color: transparent #eeeeee; content: ''; position: absolute; border-style: solid; display: block; width: 0; }
+@media print { .md-box-screen { display:none; } }
+.md-box-card { border: solid 1px black; background: inherit; margin-left:inherit; min-height:4em;}
+a { color:black; }
+a.md-api-entry-link, .api-kind a { text-decoration: none; }
+.api-desc { color: black; font-size: 0.8em; }
+.signature { font-size: 1.3em; }
+.md-api-entry { color: black; border: 1px dotted #BBB; padding: 0.6em 1em 0.5em 1em; margin: 0.5em 0; }
+.md-api-header { font-size: 1.4em; margin-bottom: 1em; }
+.md-api-header .signature { margin-bottom: 0.4em; }
+.md-api-header .sig-parameter { display:inline-block; margin-left: 4em; }
+.md-para { margin-top: 1em; margin-bottom: 1em; }
+.block .md-para { margin: 0; }
+span.stringLiteral { word-break: break-all; } div.stringLiteral { white-space:pre-wrap; }
+.picLiteral { height:1em; vertical-align: bottom;}
+.md-warning { background-color:lightyellow; border-left:solid 0.25em red; padding:0.5em; margin-left:2em;}
+div.md-video-link { position: relative; } div.md-video-link > img { width: calc(100 % - 1em); } div.md-video-link > svg { position: absolute;left:0em; bottom: 0em; width:25%; } @media print { div.md-video-link > svg { display:none; }  }
+@media print { a.md-external-link:link:after, a.md-external-link:visited:after { content: ' (' attr(href) ') '; font-size: 80%; } }
+svg.video-play { width: calc(100% - 1em); background-size:cover; background-repeat:no-repeat;}
+.nopara .md-para { margin:0; }
+.symbol { font-family: "TD Symbols", inherit; }
+.placeholder { font-size: 0.7em; padding: 0.2em; border: 1px dotted gray; }
+.md-comment, .md-comment h1, .md-comment h2, .md-comment h3, .md-comment h4 { display: inline-block; margin:0; }
+code { font-size: 1.0em; font-family: Calibri, "Helvetica Neue", HelveticaNeue, Helvetica, Arial, "TD Symbols", sans-serif; border: 1px dotted #bbb; padding: 0em 0.2em 0.1em 0.2em; white-space:nowrap; }
+code.md-ui { border: 2px solid #777; padding-left:0.2em; padding-right:0.2em; white-space:nowrap; }
+.block { margin-left: 1em; }
+.stmt { border-left: 0.2em solid #aaa; margin-top: 0.2em; }
+.line { margin-left: 0.4em; }
+.tutorial-step { font-size: 1.7em; }
+.tutorial-step .md-comment { font-size: 0.6em; }
+.decl > .stmt { border: none; }
+.print-big { font-size: 1.5em; }
+a.md-bigbutton {}
+@media print { #MicrosoftTranslatorWidget { display: none; } .body, .inner, .primary-content__inner, .md-tutorial { margin:0; padding:0; } }
+body { font-family: Calibri, "Helvetica Neue", HelveticaNeue, Helvetica, Arial, "TD Symbols", sans-serif; }
+@page { size: auto; margin: 1cm 1cm 1cm 1cm; }</style>
+
+<h1>var</h1>
+<div class="md-tutorial" dir="auto">
+<div class="md-para"></div>
+<div class="md-para">A <strong>local variable</strong> is a symbol that represents a value. One can read or write to a local variable.</div><h2>declaration</h2>
+<div class="md-para">A new local variable is defined by using the assignment <code class="notranslate" translate="no" dir="ltr">:=</code> operator. In the editor, you can either tap on <code class="notranslate" translate="no" dir="ltr"><a class="md-code-link" href="https://www.touchdevelop.com/docs/var">var</a></code> or the <code class="notranslate" translate="no" dir="ltr">extract to var</code> intellibutton. The keyword <code class="notranslate" translate="no" dir="ltr"><a class="md-code-link" href="https://www.touchdevelop.com/docs/var">var</a></code> is automatically added.</div>
+<div class="notranslate" translate="no" dir="ltr">
+<div class="md-snippet">
+<div class="block">
+<div class="stmt stmt-exprStmt stmt-exprStmt">
+<div class="line"><span class="keyword">var </span> <span class="calcToken">x</span><span class="calcToken"> := </span><span class="calcToken">0</span></div></div></div></div></div><h2>reading</h2>
+<div class="md-para">Simply use the variable in your code to use its value.</div>
+<div class="notranslate" translate="no" dir="ltr">
+<div class="md-snippet">
+<div class="block">
+<div class="stmt stmt-exprStmt stmt-exprStmt">
+<div class="line"><span class="calcToken">x</span><span class="calcToken">&#8202;→&nbsp;post to wall</span></div></div></div></div></div><h2>update</h2>
+<div class="md-para">Use the assignment <code class="notranslate" translate="no" dir="ltr">:=</code> operator to save a new value in the variable.</div>
+<div class="notranslate" translate="no" dir="ltr">
+<div class="md-snippet">
+<div class="block">
+<div class="stmt stmt-exprStmt stmt-exprStmt">
+<div class="line"><span class="calcToken">x</span><span class="calcToken"> := </span><span class="calcToken">2</span></div></div></div></div></div><h2>scope</h2>
+<div class="md-para">A local variable exists within its definition scope. If the variable is defined in an action, it is available in that entire action. This is the case for <code class="notranslate" translate="no" dir="ltr">x</code> in this example.</div>
+<div class="md-para">However, if a variable is defined within a nested block of code, like a <a class="" href="https://www.touchdevelop.com/docs/if">if</a>, then it only exits within that block.</div>
+<div class="notranslate" translate="no" dir="ltr">
+<div class="md-snippet">
+<div class="block">
+<div class="stmt stmt-if stmt-if">
+<div class="line"><span class="keyword">if</span> <span class="calcToken"><span class="kw">false</span></span> <span class="keyword">then</span></div>
+<div class="block">
+<div class="stmt stmt-other stmt-comment">
+<div class="line"><span class="comment"> `y` only exists within the `else` block</span></div></div>
+<div class="stmt stmt-exprStmt stmt-exprStmt">
+<div class="line"><span class="keyword">var </span> <span class="calcToken">y</span><span class="calcToken"> := </span><span class="calcToken">1</span></div></div></div>
+<div class="line"><span class="keyword">else</span></div>
+<div class="block">
+<div class="stmt stmt-other stmt-comment">
+<div class="line"><span class="comment"> `y` does not exist here</span></div></div></div>
+<div class="line"><span class="keyword">end </span> <span class="greyed"> if </span></div></div></div></div></div></div>
+
+
