@@ -232,7 +232,7 @@ async function postArtAsync(req: core.ApiRequest) : Promise<void>
     jsb["pub"] = pubArt.toJson();
     logger.tick("PubArt");
     jsb["kind"] = "art";
-    await postArt_likeAsync(req, jsb);
+    await postArtLikeAsync(req, jsb);
     if (jsb.hasOwnProperty("existing")) {
         await core.returnOnePubAsync(arts, td.clone(jsb["existing"]), req);
         return;
@@ -331,7 +331,7 @@ async function postScreenshotAsync(req: core.ApiRequest) : Promise<void>
         screenshot.publicationname = orEmpty(req.rootPub["pub"]["name"]);
         let jsb = {};
         jsb["pub"] = screenshot.toJson();
-        await postArt_likeAsync(req, jsb);
+        await postArtLikeAsync(req, jsb);
         if (req.status == 200) {
             await screenshots.insertAsync(jsb);
             await updateScreenshotCountersAsync(screenshot);
@@ -342,7 +342,7 @@ async function postScreenshotAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
-async function postArt_likeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promise<void>
+async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promise<void>
 {
     let contentType = orEmpty(req.body["contentType"]);
     fixArtProps(contentType, jsb);
@@ -665,3 +665,8 @@ async function awaitUpgradeTasksAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
+export async function getArtAsync(id: string)
+{
+    let r = td.createRequest(artContainer.url() + "/" + id)
+    return r.sendAsync();    
+}

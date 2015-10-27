@@ -41,6 +41,7 @@ export class PubPointer
     @td.json public path: string = "";
     @td.json public scriptid: string = "";
     @td.json public artid: string = "";
+    @td.json public htmlartid: string = "";
     @td.json public redirect: string = "";
     @td.json public description: string = "";
     @td.json public comments: number = 0;
@@ -88,6 +89,8 @@ export async function initAsync() : Promise<void>
             let ptr1 = new PubPointer();
             ptr1.path = orEmpty(body["path"]).replace(/^\/+/g, "");
             ptr1.id = pathToPtr(ptr1.path);
+            if (!!orEmpty(body["htmlartid"]) && !core.checkPermission(req, "post-raw"))
+                return;
             let matches = (/^usercontent\/([a-z]+)$/.exec(ptr1.path) || []);
             if (matches[1] == null) {
                 if (td.startsWith(ptr1.path, "users/" + req.userid + "/")) {
@@ -206,7 +209,7 @@ async function setPointerPropsAsync(ptr: JsonBuilder, body: JsonObject) : Promis
             pub[k] = empty[k];
         }
     }
-    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer"]);
+    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid"]);
     pub["parentpath"] = "";
     pub["scriptname"] = "";
     pub["scriptdescription"] = "";
@@ -264,18 +267,20 @@ async function setPointerPropsAsync(ptr: JsonBuilder, body: JsonObject) : Promis
     }
 }
 
-async function updatePointerAsync(req: core.ApiRequest) : Promise<void>
-{
+async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     if (req.userid == req.rootPub["pub"]["userid"]) {
     }
     else {
         core.checkPermission(req, "root-ptr");
-        if (req.status == 200 && ! hasPtrPermission(req, req.rootId)) {
+        if (req.status == 200 && !hasPtrPermission(req, req.rootId)) {
             req.status = httpCode._402PaymentRequired;
         }
     }
     if (req.status == 200) {
-        let bld = await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
+        if (!!orEmpty(req.body["htmlartid"]) && !core.checkPermission(req, "post-raw"))
+            return;
+
+        let bld = await search.updateAndUpsertAsync(core.pubsContainer, req, async(entry: JsonBuilder) => {
             await setPointerPropsAsync(entry, req.body);
         });
         await audit.logAsync(req, "update-ptr", {
@@ -285,6 +290,24 @@ async function updatePointerAsync(req: core.ApiRequest) : Promise<void>
         await clearPtrCacheAsync(req.rootId);
         await core.returnOnePubAsync(pointers, td.clone(bld), req);
     }
+}
+
+async function getHtmlArtAsync(templid: string) {
+    let artjs = await core.getPubAsync(templid, "art");
+    if (artjs == null) {
+        return "Template art missing";
+    }
+    else if (orEmpty(artjs["contentType"]) == "text/html") {
+        let resp = await tdliteArt.getArtAsync(templid);
+        let textObj = resp.content();
+        if (!textObj) {
+            return "Art text not found.";
+        }
+        else {
+            return textObj;
+        }
+    }
+
 }
 
 async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
@@ -300,6 +323,9 @@ async function getTemplateTextAsync(templatename: string, lang: string) : Promis
     }
     if (entry3 == null) {
         return "Template pointer leads to nowhere";
+    }
+    else if (entry3["pub"]["htmlartid"]) {
+        return await getHtmlArtAsync(entry3["pub"]["htmlartid"]);
     }
     else {
         let templid = entry3["pub"]["scriptid"];
@@ -376,78 +402,79 @@ function fixupTDHtml(html: string): string
     return html; 
 }
 
-async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: JsonBuilder) : Promise<void>
-{
+async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: JsonBuilder): Promise<void> {
     pubdata["done"] = false;
     pubdata["templatename"] = "";
     pubdata["msg"] = "";
-    
-    let scriptjs = await core.getPubAsync(scriptid, "script");
-    if (scriptjs != null) {
-        let editor = orEmpty(scriptjs["pub"]["editor"]);
-        let raw = orEmpty(scriptjs["pub"]["raw"]);
 
-        if (raw == "html") {
-            let entry = await tdliteScripts.getScriptTextAsync(scriptjs["id"]);
-            v["text"] = entry["text"];
-            pubdata["done"] = true;
-        }
-        else if (editor == "") {
-            td.jsonCopyFrom(pubdata, scriptjs["pub"]);
-            pubdata["scriptId"] = scriptjs["id"];
-            let userid = scriptjs["pub"]["userid"];
-            let userjs = await core.getPubAsync(userid, "user");
-            let username = "User " + userid;
-            let allowlinks = "";
-            if (core.hasPermission(userjs, "external-links")) {
-                allowlinks = "-official";
-            }
-            let resp2 = await tdliteTdCompiler.queryCloudCompilerAsync("q/" + scriptjs["id"] + "/raw-docs" + allowlinks);
-            if (resp2 != null) {
-                let official = core.hasPermission(userjs, "root-ptr");
-                if (userjs != null) {
-                    username = withDefault(userjs["pub"]["name"], username);
-                }
-                pubdata["username"] = username;
-                pubdata["userid"] = userid;
-                pubdata["body"] = fixupTDHtml(resp2["body"]);
-                let desc = pubdata["description"];
-                pubdata["hashdescription"] = desc;
-                pubdata["description"] = desc.replace(/#\w+/g, "");
-                pubdata["doctype"] = "Documentation";
-                pubdata["time"] = scriptjs["pub"]["time"];
-                let doctype = withDefault((/ptr-([a-z]+)-/.exec(pubdata["ptrid"]) || [])[1], "");
-                if ( ! official && ! /^(users|usercontent|preview|)$/.test(doctype)) {
-                    official = true;
-                }
-                let pathConfig = core.serviceSettings.paths[doctype];
-                if (pathConfig != null) {
-                    td.jsonCopyFrom(pubdata, pathConfig);
-                }
-                if (official) {
-                    let s = orEmpty((/#(page\w*)/.exec(desc) || [])[1]).toLowerCase();
-                    if (s == "") {
-                        pubdata["templatename"] = "templates/official-s";
-                    }
-                    else {
-                        pubdata["templatename"] = "templates/" + s + "-s";
-                    }
-                }
-                else {
-                    pubdata["templatename"] = "templates/users-s";
-                }
-            }
-            else {
-                pubdata["msg"] = "Rendering failed";
-            }
+    let scriptjs = await core.getPubAsync(scriptid, "script");
+    if (!scriptjs) {
+        pubdata["msg"] = "Pointed script not found";
+        return
+    }
+
+    let editor = orEmpty(scriptjs["pub"]["editor"]);
+    let raw = orEmpty(scriptjs["pub"]["raw"]);
+
+    if (raw == "html") {
+        let entry = await tdliteScripts.getScriptTextAsync(scriptjs["id"]);
+        v["text"] = entry["text"];
+        pubdata["done"] = true;
+        return;
+    }
+
+    if (editor != "") {
+        pubdata["msg"] = "Unsupported doc script editor";
+        return;
+    }
+
+    td.jsonCopyFrom(pubdata, scriptjs["pub"]);
+    pubdata["scriptId"] = scriptjs["id"];
+    let userid = scriptjs["pub"]["userid"];
+    let userjs = await core.getPubAsync(userid, "user");
+    let username = "User " + userid;
+    let allowlinks = "";
+    if (core.hasPermission(userjs, "external-links")) {
+        allowlinks = "-official";
+    }
+    let resp2 = await tdliteTdCompiler.queryCloudCompilerAsync("q/" + scriptjs["id"] + "/raw-docs" + allowlinks);
+    if (!resp2) {
+        pubdata["msg"] = "Rendering failed";
+        return;
+    }
+
+    let official = core.hasPermission(userjs, "root-ptr");
+    if (userjs != null) {
+        username = withDefault(userjs["pub"]["name"], username);
+    }
+    pubdata["username"] = username;
+    pubdata["userid"] = userid;
+    pubdata["body"] = fixupTDHtml(resp2["body"]);
+    let desc = pubdata["description"];
+    pubdata["hashdescription"] = desc;
+    pubdata["description"] = desc.replace(/#\w+/g, "");
+    pubdata["doctype"] = "Documentation";
+    pubdata["time"] = scriptjs["pub"]["time"];
+    let doctype = withDefault((/ptr-([a-z]+)-/.exec(pubdata["ptrid"]) || [])[1], "");
+    if (!official && ! /^(users|usercontent|preview|)$/.test(doctype)) {
+        official = true;
+    }
+    let pathConfig = core.serviceSettings.paths[doctype];
+    if (pathConfig != null) {
+        td.jsonCopyFrom(pubdata, pathConfig);
+    }
+    if (official) {
+        let s = orEmpty((/#(page\w*)/.exec(desc) || [])[1]).toLowerCase();
+        if (s == "") {
+            pubdata["templatename"] = "templates/official-s";
         }
         else {
-            pubdata["msg"] = "Unsupported doc script editor";
+            pubdata["templatename"] = "templates/" + s + "-s";
         }
     }
     else {
-        pubdata["msg"] = "Pointed script not found";
-    }        
+        pubdata["templatename"] = "templates/users-s";
+    }
 }
 
 
@@ -602,42 +629,41 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         }
         else {
             let ptr = PubPointer.createFromJson(existing["pub"]);
-            if (! ptr.redirect) {
-                if (! ptr.artid) {
-                    let scriptid = ptr.scriptid;
-                    await renderScriptAsync(ptr.scriptid, v, pubdata);
-                    msg = pubdata["msg"];
-                    if (pubdata["done"]) {
-                        return;
-                    }
-                    let path = ptr.parentpath;
-                    let breadcrumb = ptr.breadcrumbtitle;
-                    let sep = "&nbsp;&nbsp;»&nbsp; ";
-                    for (let i = 0; i < 5; i++) {
-                        let parJson = await core.getPubAsync(pathToPtr(path), "pointer");
-                        if (parJson == null) {
-                            break;
-                        }
-                        let parptr = PubPointer.createFromJson(parJson["pub"]);
-                        breadcrumb = "<a href=\"" + core.htmlQuote("/" + parptr.path) + "\">" + parptr.breadcrumbtitle + "</a>" + sep + breadcrumb;
-                        path = parptr.parentpath;
-                    }
-                    breadcrumb = "<a href=\"/home\">Home</a>" + sep + breadcrumb;
-                    pubdata["breadcrumb"] = breadcrumb;
-                }
-                else {
-                    let cont = orEmpty(ptr.artcontainer);
-                    cont = "";
-                    if (!tdliteArt.hasThumbContainer(cont)) {
-                        cont = "pub";
-                    }
-                    v["redirect"] = core.currClientConfig.primaryCdnUrl + "/" + cont + "/" + ptr.artid;
-                    return;
-                }
-            }
-            else {
+            if (ptr.redirect) {
                 v["redirect"] = ptr.redirect;
                 return;
+            } else if (ptr.artid) {
+                let cont = orEmpty(ptr.artcontainer);
+                cont = "";
+                if (!tdliteArt.hasThumbContainer(cont)) {
+                    cont = "pub";
+                }
+                v["redirect"] = core.currClientConfig.primaryCdnUrl + "/" + cont + "/" + ptr.artid;
+                return;
+            } else if (ptr.htmlartid) {
+                v["text"] = await getHtmlArtAsync(ptr.htmlartid);
+                return;
+            } else {
+                let scriptid = ptr.scriptid;
+                await renderScriptAsync(ptr.scriptid, v, pubdata);
+                msg = pubdata["msg"];
+                if (pubdata["done"]) {
+                    return;
+                }
+                let path = ptr.parentpath;
+                let breadcrumb = ptr.breadcrumbtitle;
+                let sep = "&nbsp;&nbsp;»&nbsp; ";
+                for (let i = 0; i < 5; i++) {
+                    let parJson = await core.getPubAsync(pathToPtr(path), "pointer");
+                    if (parJson == null) {
+                        break;
+                    }
+                    let parptr = PubPointer.createFromJson(parJson["pub"]);
+                    breadcrumb = "<a href=\"" + core.htmlQuote("/" + parptr.path) + "\">" + parptr.breadcrumbtitle + "</a>" + sep + breadcrumb;
+                    path = parptr.parentpath;
+                }
+                breadcrumb = "<a href=\"/home\">Home</a>" + sep + breadcrumb;
+                pubdata["breadcrumb"] = breadcrumb;
             }
         }
 
@@ -789,7 +815,6 @@ export async function handleLanguageAsync(req: restify.Request, res: restify.Res
 
 export async function simplePointerCacheAsync(urlPath: string, lang: string) : Promise<string>
 {
-    let text: string;
     let versionMarker = "simple3";
     urlPath = urlPath + templateSuffix;
     let id = pathToPtr(urlPath);
@@ -806,6 +831,5 @@ export async function simplePointerCacheAsync(urlPath: string, lang: string) : P
         });
     }
     return orEmpty(entry2["text"]);
-    return text;
 }
 
