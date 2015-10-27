@@ -12,25 +12,52 @@ import * as restify from './restify';
 
 var nunjucks = require("nunjucks");
 
-async function main()
+function getFiles()
 {
-	nunjucks.configure("web", { 
+	let res = []
+	function loop(path:string) {
+		for (let fn of fs.readdirSync(path)) {
+			let fp = path + "/" + fn
+			let st = fs.statSync(fp)
+			if (st.isDirectory()) loop(fp)
+			else if (st.isFile()) res.push(fp.replace(/^web/, ""))
+		}
+	}	
+	loop("web")
+	return res
+}
+
+async function main() {
+	nunjucks.configure("web", {
 		autoescape: true,
 		noCache: true
 	})
-	
+
 	let s = restify.server()
+	s.get("/", async(req, res) => {
+		let hrefs = ""
+		let lst = getFiles()
+		lst.sort()
+		for (let fn of lst) {
+			hrefs += `<a style="font-size:20px;line-height:1.5em" href="${fn}">${fn}</a><br>\n`
+		}
+		res.html(hrefs)
+	})
 	s.routeRegex("GET", "/.*", async(req, res) => {
 		let fn = req.url().replace(/\?.*/, "");
-		if (/^(\/[\w][\w\.\-]+)+$/.test(fn)) {			
-			let tmp = nunjucks.render(fn, { somevar: 1 })
-			res.html(tmp)						
+		if (/^(\/[\w][\w\.\-]+)+$/.test(fn)) {
+			if (fs.existsSync("web" + fn)) {
+				let tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
+				res.html(tmp)
+			} else {
+				res.sendError(404, "No such file");
+			}
 		} else {
 			res.sendError(400, "");
 		}
 	})
-	
-	await restify.startAsync(); 	
+
+	await restify.startAsync();
 }
 
 main();
