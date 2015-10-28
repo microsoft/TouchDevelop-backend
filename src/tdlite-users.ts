@@ -34,7 +34,7 @@ var httpCode = core.httpCode;
 
 export var users: indexedStore.Store;
 export var passcodesContainer: cachedStore.Container;
-var emailKeyid: string = "";
+var emailKeyid: string = "EMAIL";
 var settingsOptionsJson = tdliteData.settingsOptionsJson;
 var useSendgrid: boolean = false;
 
@@ -119,6 +119,24 @@ export async function initAsync() : Promise<void>
             await core.anyListAsync(users, req, "secondaryid", req.verb);
         }
     });
+    
+    if (core.encrypt("foobar", emailKeyid) == "foobar") {
+        await users.createIndexAsync("email", entry => orEmpty(entry["settings"] ? entry["settings"]["email"] : ""));
+        await users.createIndexAsync("previousemail", entry => orEmpty(entry["settings"] ? entry["settings"]["previousemail"] : ""));
+        core.addRoute("GET", "useremail", "*", async(req: core.ApiRequest) => {
+            core.checkPermission(req, "user-mgmt");
+            if (req.status == 200) {
+                await core.anyListAsync(users, req, "email", req.verb);
+            }
+        });
+        core.addRoute("GET", "userpreviousemail", "*", async(req: core.ApiRequest) => {
+            core.checkPermission(req, "user-mgmt");
+            if (req.status == 200) {
+                await core.anyListAsync(users, req, "previousemail", req.verb);
+            }
+        });
+    }
+    
     // ### all
     core.addRoute("POST", "*user", "permissions", async (req: core.ApiRequest) => {
         core.checkMgmtPermission(req, "user-mgmt");
@@ -377,7 +395,6 @@ export async function initAsync() : Promise<void>
         }
     });
 
-    emailKeyid = "EMAIL";
     core.addRoute("POST", "*user", "settings", async (req4: core.ApiRequest) => {
         let logcat = "admin-settings";
         let updateOwn = false;
@@ -399,7 +416,7 @@ export async function initAsync() : Promise<void>
             }
         }
         if (req4.status == 200) {
-            let bld = await search.updateAndUpsertAsync(core.pubsContainer, req4, async (entry: JsonBuilder) => {
+            let bld = await users.reindexAsync(req4.rootId, async(entry: JsonBuilder) => {
                 let sett = await buildSettingsAsync(td.clone(entry));
                 let newEmail = td.toString(req4.body["email"]);
                 if (newEmail != null) {
@@ -429,27 +446,16 @@ export async function initAsync() : Promise<void>
                         entry["emailcode"] = "";
                     }
                 }
-                let settings = td.clone(sett.toJson());
+                
+                let settings = sett.toJson();                
                 core.setFields(settings, req4.body, ["aboutme", "culture", "editorMode", "emailfrequency", "emailnewsletter2", 
                     "gender", "howfound", "location", "nickname", "notifications", "notifications2", "occupation", "picture", 
                     "picturelinkedtofacebook", "programmingknowledge", "realname", "school", "twitterhandle", "wallpaper", 
                     "website", "yearofbirth", "avatar"]);
-                for (let k of ["culture", "email", "previousemail", "gender", "location", "occupation", 
-                               "programmingknowledge", "realname", "school"]) {
-                    let val = settings[k];
-                    if (orEmpty(val) != "") {
-                        settings[k] = core.encrypt(val, emailKeyid);
-                    }
-                }
-                let value = td.clone(settings);
-                entry["settings"] = value;
-                sett = PubUserSettings.createFromJson(value);
-                sett.nickname = sett.nickname.substr(0, 25);
-                entry["pub"]["name"] = sett.nickname;
-                entry["pub"]["about"] = sett.aboutme;
-                entry["pub"]["avatar"] = sett.avatar;
-                req4.response = td.clone(settings);
+                applyUserSettings(entry, settings);
+                req4.response = settings;
             });
+            await search.scanAndSearchAsync(bld);            
             await audit.logAsync(req4, logcat, {
                 oldvalue: req4.rootPub,
                 newvalue: td.clone(bld)
@@ -482,6 +488,23 @@ export async function initAsync() : Promise<void>
     });
 }
 
+export function applyUserSettings(userjson: {}, settings: {}) {
+    for (let k of ["culture", "email", "previousemail", "gender", "location", "occupation",
+        "programmingknowledge", "realname", "school"]) {
+        let val = settings[k];
+        if (orEmpty(val) != "") {
+            settings[k] = core.encrypt(val, emailKeyid);
+        }
+    }
+    let value = td.clone(settings);
+    userjson["settings"] = value;
+    let sett = PubUserSettings.createFromJson(value);
+    sett.nickname = sett.nickname.substr(0, 25);
+    userjson["pub"]["name"] = sett.nickname;
+    userjson["pub"]["about"] = sett.aboutme;
+    userjson["pub"]["avatar"] = sett.avatar;
+}
+
 export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRequest) : void
 {
     let coll = (<PubUser[]>[]);
@@ -503,7 +526,7 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
 }
 
 
-async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSettings>
+export async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSettings>
 {
     let settings = new PubUserSettings();
     let user = new PubUser();
@@ -713,4 +736,3 @@ export async function handleEmailVerificationAsync(req: restify.Request, res: re
     }
     res.sendText(msg, "text/plain");
 }
-
