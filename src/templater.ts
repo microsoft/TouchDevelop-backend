@@ -171,7 +171,7 @@ async function serveAsync() {
 	let s = restify.server()
 	s.get("/", async(req, res) => {
 		let hrefs = ""
-		let lst = getFiles()
+		let lst = getFiles().filter(f => !/^\/(_layouts|_includes|static)\//.test(f))
 		lst.sort()
 		for (let fn of lst) {
 			hrefs += `<a style="font-size:20px;line-height:1.5em" href="${fn}">${fn}</a><br>\n`

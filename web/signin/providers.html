@@ -1,0 +1,121 @@
+{% extends "_layouts/signin.html" %}
+{% set title = "Touch Develop - Sign in" %}
+
+{% block innerbody %}
+<style type="text/css">
+
+div.SignInContent
+{
+	margin-left: 48px;
+	margin-right: auto;
+	border: 0px none;
+	position: relative;
+	width: 340px;
+}
+
+div.Header
+{
+	padding:10px 10px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-bottom: 10px;
+}
+
+div.LeftArea
+{
+}
+
+div.Divider
+{
+	width: 20px;
+	height: 100%;
+	position: absolute;
+	top: 10px;
+	left: 350px;
+}
+
+div.DividerLine
+{
+	width: 1px; 
+	height: 45%;
+	background: #BBBBBB;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.IdentityProvider
+{
+	width: 280px;
+	height: 50px;
+	border: none 0px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-bottom: 5px;
+	position: relative;
+	cursor: pointer;
+	font-size: 1em;
+	white-space: normal;
+    background-color: White;
+    display: block;
+    text-align: center;
+    position: relative;
+}
+
+.IdentityProvider:hover {
+  background-color: #eee;
+}
+
+img.IdentityProviderImage 
+{ 
+	vertical-align: middle;
+	position: relative;
+}
+div.agree {
+  width: 320px;
+  padding:10px 10px;
+  color: #999;
+  font-size: 0.8em;
+  line-height: 1.4em;
+  margin-left: 48px;
+}
+</style>
+
+<div id="main">
+                
+    <div class="agree">
+        By signing in to TouchDevelop you agree to the
+        <a href="/legal">Cloud Services Agreement</a>
+        with Microsoft Research. Please read our statement on
+        <a href="/privacy">Privacy and Cookies</a>.
+    </div>
+
+    <div id="SignInContent" class="SignInContent">
+        <div id="LeftArea" class="LeftArea">
+            <div id="LeftAreaText" class="Header" style="display: block;"><b>sign in with...</b></div>   
+            <div id="IdentityProvidersList">
+                <a name="Windows Live™ ID" href="@liveid-url@" class="IdentityProvider">
+                  <img class="IdentityProviderImage" src="/static/images/login-microsoft.png" alt="Windows Live™ ID" border="0">
+                </a>
+                <a name="Office 365" href="@azuread-url@" class="IdentityProvider">
+                  <img class="IdentityProviderImage" src="/static/images/login-office365.png" alt="Office 365" border="0">
+                </a>
+                <a name="Facebook" href="@facebook-url@" class="IdentityProvider">
+                   <img class="IdentityProviderImage" src="/static/images/login-facebook.png" alt="Facebook" border="0">
+                </a>
+                <a name="Google" href="@google-url@" class="IdentityProvider">
+                   <img class="IdentityProviderImage" src="/static/images/login-google.png" alt="Google" border="0">
+                </a>
+                <a name="Yahoo!" href="@yahoo-url@" class="IdentityProvider">
+                  <img class="IdentityProviderImage" src="/static/images/login-yahoo.png" alt="Yahoo!" border="0">
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="agree">
+        TouchDevelop client apps use cloud services to synchronize your scripts across all your devices.
+    </div>
+</div>
+
+{% endblock %}
+

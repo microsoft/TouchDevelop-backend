@@ -1,0 +1,30 @@
+{% extends "_layouts/default.html" %}
+{% set title = "Touch Develop - Signed out" %}
+
+{% block body %}
+<div class="container" id="alltext" style="display:none">
+
+<h1>You are now signed out from Touch Develop</h1>
+
+<p>Make sure you log out of Facebook, Office 365, Microsoft or Google if you're
+on a shared computer.</p>
+
+<p>You can still create scripts and <a href="/">explore Touch Develop</a>, or
+<a href="/app/#signin">sign in again</a> to save scripts to all your
+devices.</p>
+
+
+</div> <!-- /.container -->
+
+<script>
+if (localStorage.access_token) {
+    // this means we're not really signed-out; don't show the confusing message to the user
+    document.location.href = "/";
+} else {
+    document.getElementById("alltext").style.display = "block";
+}
+</script>
+
+{% endblock %}
+
+

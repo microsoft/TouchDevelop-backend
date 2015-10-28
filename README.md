@@ -27,15 +27,7 @@ make
 
 ## Web stuff
 
-First install Ruby 2.2+. Then:
-
-
-```
-cd web
-gem install bundler
-bundler install
-bundle exec jekyll serve
-```
+`make docs` will start a server at http://localhost:4000
 
 ## LICENSE
 
