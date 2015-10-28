@@ -18,6 +18,7 @@ import * as search from "./tdlite-search"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteIndex from "./tdlite-index"
 import * as tdliteSearch from "./tdlite-search"
+import * as tdliteData from "./tdlite-data"
 
 var orFalse = core.orFalse;
 var withDefault = core.withDefault;
@@ -30,7 +31,6 @@ var artContainer: azureBlobStorage.Container;
 var thumbContainers: ThumbContainer[] = [];
 var aacContainer: azureBlobStorage.Container;
 var screenshots: indexedStore.Store;
-var artContentTypes: JsonObject;
 
 export class PubArt
     extends core.Publication
@@ -77,20 +77,6 @@ export async function initAsync() : Promise<void>
     await addThumbContainerAsync(512, "thumb1");
     await addThumbContainerAsync(1024, "thumb2");
 
-    artContentTypes = { 
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/svg+xml": "svg",
-      "audio/wav": "wav",
-      "text/css": "css",
-      "application/javascript": "js",
-      "text/plain": "txt",
-      "application/pdf": "pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-      "video/mp4": "mp4",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
-    };
     arts = await indexedStore.createStoreAsync(core.pubsContainer, "art");
     core.registerPubKind({
         store: arts,
@@ -252,7 +238,7 @@ async function postArtAsync(req: core.ApiRequest) : Promise<void>
 function getArtExtension(contentType: string) : string
 {
     let ext: string;
-    ext = orEmpty(artContentTypes[orEmpty(contentType)]);
+    ext = orEmpty(tdliteData.artContentTypes[orEmpty(contentType)]);
     return ext;
 }
 

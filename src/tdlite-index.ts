@@ -17,19 +17,6 @@ var artIndex: azureSearch.Index;
 var docsIndex: azureSearch.Index;
 var pubsIndex: azureSearch.Index;
 
-var documentMimetypes: td.SMap<string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "audio/wav": "wav",
-    "text/css": "css",
-    "application/javascript": "js",
-    "text/plain": "txt",
-    "application/pdf": "pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
-};
-
 export class ArtEntry
     extends td.JsonRecord
 {
