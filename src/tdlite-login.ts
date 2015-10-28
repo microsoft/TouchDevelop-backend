@@ -337,80 +337,80 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     let profileId = "id/" + provider + "/" + core.encryptId(providerUserId, "SOCIAL0");
     logger.debug("profileid: " + profile.id + " enc " + profileId);
     let modernId = profileId;
-    let entry2 = await tdliteUsers.passcodesContainer.getAsync(profileId);
+    let upointer = await tdliteUsers.passcodesContainer.getAsync(profileId);
     // ## Legacy profiles
     if (false) {
-        if (entry2 == null) {
+        if (upointer == null) {
             let legacyId = "id/" + provider + "/" + core.sha256(providerUserId);
             let entry = await tdliteUsers.passcodesContainer.getAsync(legacyId);
             if (core.isGoodPub(entry, "userpointer") && await core.getPubAsync(entry["userid"], "user") != null) {
-                entry2 = entry;
+                upointer = entry;
                 profileId = legacyId;
             }
         }
-        if (entry2 == null) {
+        if (upointer == null) {
             let legacyId1 = "id/" + provider + "/" + td.replaceAll(providerUserId, ":", "/");
             let entry1 = await tdliteUsers.passcodesContainer.getAsync(legacyId1);
             if (core.isGoodPub(entry1, "userpointer") && await core.getPubAsync(entry1["userid"], "user") != null) {
-                entry2 = entry1;
+                upointer = entry1;
                 profileId = legacyId1;
             }
         }
         // If we have a legacy pointer, update it
-        if (modernId != profileId && entry2 != null) {
+        if (modernId != profileId && upointer != null) {
             await tdliteUsers.passcodesContainer.updateAsync(modernId, async (entry3: JsonBuilder) => {
-                td.jsonCopyFrom(entry3, entry2);
+                td.jsonCopyFrom(entry3, upointer);
             });
         }
     }
 
-    let jsb = (<JsonBuilder>null);
-    if (core.isGoodPub(entry2, "userpointer")) {
-        let entry31 = await core.getPubAsync(entry2["userid"], "user");
+    let userjs = (<JsonBuilder>null);
+    if (core.isGoodPub(upointer, "userpointer")) {
+        let entry31 = await core.getPubAsync(upointer["userid"], "user");
         if (entry31 != null) {
-            jsb = td.clone(entry31);
-            if (orEmpty(jsb["login"]) != profileId) {
-                await core.pubsContainer.updateAsync(jsb["id"], async (entry4: JsonBuilder) => {
+            userjs = td.clone(entry31);
+            if (orEmpty(userjs["login"]) != profileId) {
+                await core.pubsContainer.updateAsync(userjs["id"], async (entry4: JsonBuilder) => {
                     entry4["login"] = profileId;
                 });
-                jsb["login"] = profileId;
+                userjs["login"] = profileId;
             }
         }
     }
     let clientOAuth = serverAuth.ClientOauth.createFromJson(oauthReq._client_oauth);
-    if (jsb == null) {
+    if (userjs == null) {
         let email = profile.email;
-        let username = profile.name.replace(/\s.*/g, "");
-        if (provider == "google") {
-            // New Google accounts blocked for now.
+        let username = core.fullTD ? profile.name : profile.name.replace(/\s.*/g, "");
+        if (core.jsonArrayIndexOf(core.serviceSettings.blockedAuth, provider) >= 0) {
+            // New accounts blocked for now.
             return "/";
         }
         logger.tick("PubUser@federated");
         let perms = ""
         if (core.fullTD)
             perms = "user";
-        jsb = await tdliteUsers.createNewUserAsync(username, email, profileId, perms, profile.name, false);
+        userjs = await tdliteUsers.createNewUserAsync(username, email, profileId, perms, profile.name, false);
     }
     else {
         logger.tick("Login@federated");
-        let uidOverride = withDefault(clientOAuth.u, jsb["id"]);
-        if (uidOverride != jsb["id"]) {
-            logger.info("login with override: " + jsb["id"] + "->" + uidOverride);
-            if (core.hasPermission(td.clone(jsb), "signin-" + uidOverride)) {
+        let uidOverride = withDefault(clientOAuth.u, userjs["id"]);
+        if (uidOverride != userjs["id"]) {
+            logger.info("login with override: " + userjs["id"] + "->" + uidOverride);
+            if (core.hasPermission(td.clone(userjs), "signin-" + uidOverride)) {
                 let entry41 = await core.getPubAsync(uidOverride, "user");
                 if (entry41 != null) {
-                    logger.debug("login with override OK: " + jsb["id"] + "->" + uidOverride);
-                    jsb = td.clone(entry41);
+                    logger.debug("login with override OK: " + userjs["id"] + "->" + uidOverride);
+                    userjs = td.clone(entry41);
                 }
             }
         }
     }
-    let user = jsb["id"];
+    let user = userjs["id"];
     let tok = await generateTokenAsync(user, profileId, clientOAuth.client_id);
     
-    if (core.fullTD && jsb["termsversion"] != core.serviceSettings.termsversion) {
+    if (core.fullTD && userjs["termsversion"] != core.serviceSettings.termsversion) {
         // in full TD we display 'agree' text on sign-in screen
-        jsb = await core.pubsContainer.updateAsync(user, async (v) => {
+        userjs = await core.pubsContainer.updateAsync(user, async (v) => {
             v["termsversion"] = core.serviceSettings.termsversion;
         })
     }
@@ -421,8 +421,8 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     }
     await core.refreshSettingsAsync();
     let session = new LoginSession();
-    session.termsOk = orEmpty(jsb["termsversion"]) == core.serviceSettings.termsversion;
-    session.codeOk = orEmpty(jsb["permissions"]) != "";
+    session.termsOk = orEmpty(userjs["termsversion"]) == core.serviceSettings.termsversion;
+    session.codeOk = orEmpty(userjs["permissions"]) != "";
     if ( ! session.termsOk || ! session.codeOk) {
         session.state = cachedStore.freshShortId(16);
         session.userid = user;

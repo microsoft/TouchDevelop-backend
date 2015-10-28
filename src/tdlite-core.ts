@@ -109,6 +109,7 @@ export class ServiceSettings
     @td.json public defaultLang: string = "";
     @td.json public langs: JsonObject;
     @td.json public envrewrite: JsonObject;
+    @td.json public blockedAuth: string[];
     static createFromJson(o:JsonObject) { let r = new ServiceSettings(); r.fromJson(o); return r; }
 }
 
@@ -1640,10 +1641,11 @@ export async function refreshSettingsAsync(): Promise<void> {
         "defaultLang": "en",
         "langs": {},
         "envrewrite": {},
-        "alarmingEmails": []
+        "alarmingEmails": [],
+        "blockedAuth": [],
     };
     td.jsonCopyFrom(jsb, entry2);
-    serviceSettings = ServiceSettings.createFromJson(td.clone(jsb));
+    serviceSettings = ServiceSettings.createFromJson(td.clone(jsb));    
     lastSettingsCheck = now;
     lastSettingsVersion = verNum;
     settingsPermissions = td.clone(permMap);
