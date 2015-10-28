@@ -333,13 +333,13 @@ function artlistitem(now, art) {
     var when = describetime(now, art.time)
     var userurl = art.userurl
     var thumburl = art.thumburl
-    var backgroundcss = "background-image:url(https://www.touchdevelop.com/Images/artbackground.png);background-repeat:repeat;"
+    var backgroundcss = "background-image:url(/static/images/checker.png);background-repeat:repeat;"
     var arttitle
     if (thumburl) {
         arttitle = "art picture"
     }
     else {
-        thumburl = "/Images/play.png"
+        thumburl = "/static/images/play.png"
         backgroundcss = ""
         arttitle = "art sound"
     }
