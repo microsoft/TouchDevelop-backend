@@ -651,8 +651,7 @@ async function awaitUpgradeTasksAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
-export async function getArtAsync(id: string)
+export function getBlobUrl(artjs: {})
 {
-    let r = td.createRequest(artContainer.url() + "/" + id)
-    return r.sendAsync();    
+    return artContainer.url() + "/" + artjs["filename"];
 }

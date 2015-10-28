@@ -39,7 +39,7 @@ function getFiles()
 }
 
 function tdliteKey() {
-    var mm = /^(http.*)(\?access_token=.*)/.exec(process.env['TD_UPLOAD_KEY'])
+    var mm = /^(http.*)\?access_token=(.*)/.exec(process.env['TD_UPLOAD_KEY'])
     if (!mm) {
         console.log("invalid or missing $TD_UPLOAD_KEY")
         process.exit(1)
@@ -51,7 +51,9 @@ function tdliteKey() {
 function mkReq(path: string)
 {
 	let k = tdliteKey();
-	return td.createRequest(k.liteUrl + "api/" + path + k.key.replace(/\?/, /\?/.test(path) ? "&" : "?"))	
+	let r = td.createRequest(k.liteUrl + "api/" + path)
+	r.setHeader("X-TD-Access-Token", k.key);
+	return r;
 }
 
 function error(msg: string)
@@ -61,13 +63,13 @@ function error(msg: string)
 }
 
 function replContent(str: string, waitFor: Promise<string>[]) {
-	return str.replace(/[\.\/]*\.\/(static\/[\w\.\-]+)/, (m, x) => {
+	return str.replace(/[\.\/]*(\/static\/[\w\.\-\/]+)/g, (m, x) => {
 		let repl = uploadPromises[x];
 		if (!repl) {
 			error("file not uploaded? " + x)
 		}
 		if (waitFor) waitFor.push(repl)
-		else (<any>repl).value();
+		else return (<any>repl).value();
 		return "";
 	})
 }
@@ -80,9 +82,14 @@ async function uploadArtAsync(fn:string):Promise<string>
 	if (!contentType) {
 		error("content type not understood: " + fn)
 		return ""
-	}	
+	}
 	
 	let buf = fs.readFileSync("web" + fn)
+	
+	if (/\.html/.test(fn)) {
+		let tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
+		buf = new Buffer(tmp, "utf8")
+	}
 	
 	if (/^text/.test(contentType)) {
 		let str = buf.toString("utf8");
@@ -100,9 +107,10 @@ async function uploadArtAsync(fn:string):Promise<string>
 	let r = await mkReq("arthash/" + sha).sendAsync()
 	let it = r.contentAsJson()["items"][0]
 	if (it) {
-		console.log(`already present: ${fn} at ${it.id}`)
-		uploadCache[sha] = it.id
-		return it.id
+		let id0 = it.bloburl
+		console.log(`already present: ${fn} at ${id0}`)
+		uploadCache[sha] = id0
+		return id0
 	}
 	
 	let ext = fn.replace(/.*\./, "").toLowerCase()
@@ -122,7 +130,7 @@ async function uploadArtAsync(fn:string):Promise<string>
 		return ""
 	}
 	
-	let id = resp.contentAsJson()["id"] 
+	let id = resp.contentAsJson()["bloburl"] 
 	console.log(`upload: ${fn} -> ${id}`)
 	uploadCache[sha] = id
 	return id
@@ -132,7 +140,19 @@ async function uploadFileAsync(fn: string)
 {
 	let task = /* async */ uploadArtAsync(fn);
 	uploadPromises[fn] = task;
-	let artid = await task;	
+	let bloburl = await task;
+	if (!/\/static\//.test(fn)) {
+		let m = /\/pub\/([a-z]+)/.exec(bloburl)
+		let id = m[1]
+		let req = mkReq("pointers")
+		req.setMethod("post")
+		req.setContentAsJson({
+			path: fn.replace(/\.html$/, ""),			
+			htmlartid: id
+		})
+		let resp = await req.sendAsync();
+		console.log(fn + ": " + resp.toString())
+	}
 }
 
 async function uploadAsync() {
@@ -148,11 +168,6 @@ async function uploadAsync() {
 }
 
 async function serveAsync() {
-	nunjucks.configure("web", {
-		autoescape: true,
-		noCache: true
-	})
-
 	let s = restify.server()
 	s.get("/", async(req, res) => {
 		let hrefs = ""
@@ -186,6 +201,12 @@ async function serveAsync() {
 }
 
 async function main() {
+	nunjucks.configure("web", {
+		autoescape: true,
+		noCache: true
+	})
+
+
 	let cmd = process.argv[2];
 	if (cmd == "serve")
 		await serveAsync();

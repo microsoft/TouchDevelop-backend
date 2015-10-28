@@ -65,9 +65,9 @@ export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
     }
     else {
         let url = td.serverSetting("TDC_ENDPOINT", false).replace(/-tdevmgmt-.*/g, "") + api + "?access_token=" + td.serverSetting("TDC_AUTH_KEY", false);
-        let request = td.createRequest(url);
-        logger.debug("cloud compiler: " + api);
+        let request = td.createRequest(url);        
         let response = await request.sendAsync();
+        logger.debug(`cloud compiler: ${api} -> ${response.statusCode()}`);
         if (response.statusCode() == 200) {
             if (td.startsWith(response.header("content-type"), "application/json")) {
                 resp = response.contentAsJson();

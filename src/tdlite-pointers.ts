@@ -297,8 +297,9 @@ async function getHtmlArtAsync(templid: string) {
     if (artjs == null) {
         return "Template art missing";
     }
-    else if (orEmpty(artjs["contentType"]) == "text/html") {
-        let resp = await tdliteArt.getArtAsync(templid);
+    else if (orEmpty(artjs["contentType"]) == "text/plain") {
+        let url = tdliteArt.getBlobUrl(artjs)
+        let resp = await td.createRequest(url).sendAsync();
         let textObj = resp.content();
         if (!textObj) {
             return "Art text not found.";
