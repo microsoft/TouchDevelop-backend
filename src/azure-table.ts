@@ -455,6 +455,11 @@ export class Client
         }
         return table;
     }
+    
+    public getTable(name: string): Table
+    {
+        return new Table(name, this);        
+    }
 }
 
 /**

@@ -236,7 +236,7 @@ export class Store
         return index;
     }
 
-    public async reindexAsync(pubid: string, update:td.Action1<JsonBuilder>) : Promise<void>
+    public async reindexAsync(pubid: string, update: td.Action1<JsonBuilder>, force = false): Promise<{}>
     {
         let before = null;
         let after = null;
@@ -251,18 +251,20 @@ export class Store
             let index = this.indices[x];
             let beforeKey = orEmpty(index.key(before));
             let afterKey = orEmpty(index.key(after));
-            if (beforeKey != afterKey) {
-                if (beforeKey != "") {
+            if (beforeKey != afterKey || force) {
+                if (beforeKey) {
                     let entity = azureTable.createEntity(beforeKey, id2);
                     let ok = await index.table.tryDeleteEntityAsync(td.clone(entity));
                 }
-                if (afterKey != null) {
+                if (afterKey) {
                     let entity1 = azureTable.createEntity(afterKey, id2);
                     entity1["pub"] = pubid;
                     await index.table.insertEntityAsync(entity1, "or replace");
                 }
             }
         });
+        
+        return after;
     }
 }
 

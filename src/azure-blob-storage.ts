@@ -74,6 +74,11 @@ export class BlobService
         log("container created");
         return container;
     }
+    
+    public getContainer(name: string)
+    {
+        return new Container(this, name, null)
+    }
 
     /**
      * Specifies the service properties. See http://msdn.microsoft.com/en-us/library/azure/hh452235.aspx
