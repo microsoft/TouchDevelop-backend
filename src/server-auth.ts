@@ -270,10 +270,10 @@ export interface IInitOptions {
 }
 
 export interface IUserInfo {
-    id?: string;
+    id: string;
     name?: string;
     email?: string;
-    redirectPrefix?: string;
+    redirectPrefix: string;
     state?: string;
     userData?: string;
 }
