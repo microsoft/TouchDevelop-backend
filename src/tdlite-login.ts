@@ -28,6 +28,8 @@ export type StringTransformer = (text: string) => Promise<string>;
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
 
+var kidsDisabled = true;
+
 var logger = core.logger;
 var httpCode = core.httpCode;
 var loginHtml: JsonObject;
@@ -62,6 +64,11 @@ export interface ILoginSession {
     codeOk: boolean;
 }
 
+function redirectToProviders(req: restify.Request) {
+    let query = req.url().replace(/^[^\?]*/g, "");
+    let url = req.serverUrl() + "/oauth/providers" + query;
+    req.response.redirect(303, url);
+}
 
 export async function initAsync(): Promise<void> {
     initialApprovals = core.myChannel == "test";
@@ -175,9 +182,7 @@ export async function initAsync(): Promise<void> {
         if (!res.finished()) {
             let accessCode = orEmpty(req.query()["td_state"]);
             if (accessCode == "teacher") {
-                let query = req.url().replace(/^[^\?]*/g, "");
-                let url = req.serverUrl() + "/oauth/providers" + query;
-                res.redirect(303, url);
+                redirectToProviders(req);
             }
             else if (accessCode == core.tokenSecret && session.userid != "") {
                 // **this is to be used during initial setup of a new cloud deployment**
@@ -326,7 +331,6 @@ async function getRedirectUrlAsync(user2: string, req: restify.Request) : Promis
 
 async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) : Promise<string>
 {
-    let url: string;
     let coll = (/([^:]*):(.*)/.exec(profile.id) || []);
     let provider = coll[1];
     let providerUserId = coll[2];
@@ -382,7 +386,10 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
             return "/";
         }
         logger.tick("PubUser@federated");
-        jsb = await tdliteUsers.createNewUserAsync(username, email, profileId, "", profile.name, false);
+        let perms = ""
+        if (core.fullTD)
+            perms = "user";
+        jsb = await tdliteUsers.createNewUserAsync(username, email, profileId, perms, profile.name, false);
     }
     else {
         logger.tick("Login@federated");
@@ -400,6 +407,13 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     }
     let user = jsb["id"];
     let tok = await generateTokenAsync(user, profileId, clientOAuth.client_id);
+    
+    if (core.fullTD && jsb["termsversion"] != core.serviceSettings.termsversion) {
+        // in full TD we display 'agree' text on sign-in screen
+        jsb = await core.pubsContainer.updateAsync(user, async (v) => {
+            v["termsversion"] = core.serviceSettings.termsversion;
+        })
+    }
 
     let redirectUrl = td.replaceAll(profile.redirectPrefix, "TOKEN", encodeURIComponent(tok.url)) + "&id=" + user;
     if (tok.cookie != "") {
@@ -417,7 +431,6 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         redirectUrl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state);
     }
     return redirectUrl;
-    return url;
 }
 
 async function loginCreateUserAsync(req: restify.Request, session: LoginSession, res: restify.Response) : Promise<void>
@@ -610,7 +623,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             if ( ! session.termsOk) {
                 inner = "agree";
             }
-            else if (!session.nickname && tdlitePointers.templateSuffix) {
+            else if (!core.fullTD && !session.nickname && tdlitePointers.templateSuffix) {
                 inner = "newadult";
                 params["EXAMPLES"] = "";
                 params["SESSION"] = session.state;
@@ -627,7 +640,12 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 res.redirect(303, session.redirectUri);
             }
         }
-        if ( ! res.finished()) {
+        if (!res.finished()) {
+            if (kidsDisabled && inner == "kidornot") {
+                redirectToProviders(req);
+                return;
+            }
+            
             let agreeurl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state) + "&td_agree=" + encodeURIComponent(core.serviceSettings.termsversion);
             let disagreeurl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state) + "&td_agree=noway";
             params["MSG"] = msg;

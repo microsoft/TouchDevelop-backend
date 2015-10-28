@@ -183,7 +183,8 @@ export class Middleware
 
 export class Request
 {
-    public handle:any;
+    public handle: any;
+    public response: Response;
 
     /**
      * 
@@ -650,6 +651,7 @@ function restifyHandlerFactory(handler:RequestHandler) {
       treq.handle = req;
       var tres = new Response();
       tres.handle = res;
+      treq.response = tres;
 
       var d = domain.create()
       d.on("error", e => {
