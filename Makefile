@@ -14,5 +14,5 @@ conv:
 	$(MAKE) all
 
 docs: all
-	PORT=4000 node built/templater.js
+	PORT=4000 node built/templater.js serve
 	

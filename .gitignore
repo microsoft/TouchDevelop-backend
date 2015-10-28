@@ -6,3 +6,5 @@ remote-*
 storage-*
 
 web/_site/
+templater.sh
+web/_temp
