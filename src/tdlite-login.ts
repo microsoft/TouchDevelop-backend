@@ -71,6 +71,8 @@ export class LoginSession
         let profile = this.federatedUserInfo;
     
         let username = core.fullTD ? profile.name : profile.name.replace(/\s.*/g, "");
+        
+        if (this.nickname) username = this.nickname;
 
         logger.tick("PubUser@federated");
         let perms = ""
@@ -661,18 +663,11 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             if (!session.nickname && username) {
                 session.nickname = username;
                 await session.saveAsync();
-                let lastx = {};                
-                await core.pubsContainer.updateAsync(session.userid, async(entry1: JsonBuilder) => {
-                    entry1["settings"].nickname = username;
-                    entry1["pub"].name = username;                    
-                    lastx = entry1;
-                });                
-                await search.scanAndSearchAsync(lastx);
             }
             if ( ! session.termsOk) {
                 inner = "agree";
             }
-            else if (!core.fullTD && !session.nickname && tdlitePointers.templateSuffix) {
+            else if (!core.fullTD && !session.userCreated() && !session.nickname && tdlitePointers.templateSuffix) {
                 inner = "newadult";
                 params["EXAMPLES"] = "";
                 params["SESSION"] = session.state;

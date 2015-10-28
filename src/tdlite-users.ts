@@ -621,32 +621,31 @@ async function importUserAsync(req: core.ApiRequest, body: JsonObject) : Promise
 
 export async function createNewUserAsync(username: string, email: string, profileId: string, perms: string, realname: string, awaiting: boolean) : Promise<JsonBuilder>
 {
-    let r: JsonBuilder;
-    r = {};
+    let userjs = {};
     let pubUser = new PubUser();
     pubUser.name = username;
     let settings = new PubUserSettings();
     settings.email = core.encrypt(email, emailKeyid);
     settings.realname = core.encrypt(realname, emailKeyid);
     settings.emailverified = orEmpty(settings.email) != "";
-    r["pub"] = pubUser.toJson();
-    r["settings"] = settings.toJson();
-    r["login"] = profileId;
-    r["permissions"] = perms;
-    r["secondaryid"] = cachedStore.freshShortId(12);
+    userjs["pub"] = pubUser.toJson();
+    userjs["settings"] = settings.toJson();
+    userjs["login"] = profileId;
+    userjs["permissions"] = perms;
+    userjs["secondaryid"] = cachedStore.freshShortId(12);
     if (awaiting) {
-        r["awaiting"] = awaiting;
+        userjs["awaiting"] = awaiting;
     }
-    let dictionary = core.setBuilderIfMissing(r, "groups");
-    let dictionary2 = core.setBuilderIfMissing(r, "owngroups");
-    await core.generateIdAsync(r, 8);
-    await users.insertAsync(r);
+    let dictionary = core.setBuilderIfMissing(userjs, "groups");
+    let dictionary2 = core.setBuilderIfMissing(userjs, "owngroups");
+    await core.generateIdAsync(userjs, 8);
+    await users.insertAsync(userjs);
     await passcodesContainer.updateAsync(profileId, async (entry: JsonBuilder) => {
         entry["kind"] = "userpointer";
-        entry["userid"] = r["id"];
+        entry["userid"] = userjs["id"];
     });
-    await sendPermissionNotificationAsync(core.emptyRequest, r);
-    return r;
+    await sendPermissionNotificationAsync(core.emptyRequest, userjs);
+    return userjs;
 }
 
 
