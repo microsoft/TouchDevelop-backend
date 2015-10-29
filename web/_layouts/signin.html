@@ -3,9 +3,41 @@
 {% block body %}
 <div class="container">
 
+<style>
+  .accountoption {
+    text-align: right;
+  }
+  .form-group label {
+    width: 18em;
+    font-size: 1.5em;
+  }  
+  .form-group input {
+    width: 20em;
+    margin-right: 2em;
+    display: inline-block;
+  }
+  button.create {
+    width: 25.4em;
+  }
+  h3 {
+    margin: 1.5em 0;
+  }
+  .bg-danger:not(:empty) {
+    padding: 15px;
+    margin: 2em 0;
+  }
+  .btn-lg {
+    min-width: 8em;
+  }
+</style>
+
+<script>
+//@JS@
+</script>
+	
 <div class="row">
 
-    <div id="contentBody" class="col-xs-12 col-sm-8 col-md-6 col-lg-6" dir="auto">
+    <div id="contentBody" class="col-xs-12" dir="auto">
       {% block innerbody %}
       {% endblock %}
       <div style="margin-top:2.5em;"></div>

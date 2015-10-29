@@ -22,6 +22,7 @@ import * as tdliteHtml from "./tdlite-html"
 import * as tdliteUsers from "./tdlite-users"
 import * as tdlitePointers from "./tdlite-pointers"
 import * as tdliteGroups from "./tdlite-groups"
+import * as tdliteLegacy from "./tdlite-legacy"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -48,6 +49,9 @@ export class LoginSession
     @td.json public termsOk: boolean = false;
     @td.json public codeOk: boolean = false;    
     @td.json public nickname: string = "";
+    
+    @td.json public askLegacy = false;
+    @td.json public legacyCodes: {}; // code -> userid; there may be multiple accounts attached to an email    
 
     @td.json public profileId: string;
     @td.json public oauthClientId: string;
@@ -482,16 +486,22 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         }
     }
 
+    session.state = cachedStore.freshShortId(16);
+    session.userid = userjs["id"];
+    
     if (core.fullTD) {
         session.termsOk = true;
-        session.codeOk = true;
+        session.codeOk = true;        
+        session.legacyCodes = null;
+        if (!session.userCreated())
+            session.askLegacy = true;
     } else {
         session.termsOk = orEmpty(userjs["termsversion"]) == core.serviceSettings.termsversion;
         session.codeOk = orEmpty(userjs["permissions"]) != "";
+        session.legacyCodes = {};
+        
     }
 
-    session.state = cachedStore.freshShortId(16);
-    session.userid = userjs["id"];
     await session.saveAsync();
     return "/oauth/dialog?td_session=" + encodeURIComponent(session.state);
 }
@@ -621,6 +631,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
     if ( ! res.finished()) {
         await core.refreshSettingsAsync();
         let params = {};
+        params["LANG"] = lang;
         let inner = "kidornot";
         if (accessCode == "kid") {
             inner = "kidcode";
@@ -664,7 +675,9 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 session.nickname = username;
                 await session.saveAsync();
             }
-            if ( ! session.termsOk) {
+            
+            
+            if (!session.termsOk) {
                 inner = "agree";
             }
             else if (!core.fullTD && !session.userCreated() && !session.nickname && tdlitePointers.templateSuffix) {
@@ -677,12 +690,18 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                     params["EXAMPLES"] = ["Ms" + nm, "Mr" + nm, nm + td.randomRange(10, 99)].join(", ");
                 }
             }
-            else if ( ! session.codeOk) {
+            else if (!session.codeOk) {
                 inner = "activate";
             }
             else {
-                await session.createUserIfNeededAsync(req);
-                await session.accessTokenRedirectAsync(req);
+                await tdliteLegacy.handleLegacyAsync(req, session, params);                
+                if (session.askLegacy) {
+                    if (session.legacyCodes) inner = "emailcode";
+                    else inner = "legacy";
+                } else {
+                    await session.createUserIfNeededAsync(req);
+                    await session.accessTokenRedirectAsync(req);
+                }
             }
         }
         
@@ -698,7 +717,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             params["AGREEURL"] = agreeurl;
             params["DISAGREEURL"] = disagreeurl;
             let ht = await getLoginHtmlAsync(inner, lang)
-            ht = ht.replace(/@([A-Z]+)@/g, (m, n) => params.hasOwnProperty(n) ? params[n] : m)
+            ht = ht.replace(/@(\w+)@/g, (m, n) => params.hasOwnProperty(n) ? params[n] : m)
             res.html(ht);
         }
     }
@@ -739,6 +758,7 @@ function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
         cookie: cook
     }
 }
+
 
 export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
 {

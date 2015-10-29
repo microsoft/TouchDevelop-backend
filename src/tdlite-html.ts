@@ -5,9 +5,12 @@
 import * as td from './td';
 
 
+// This needs to start with a new line, because the source may have //@JS@
 export var login_js: string = 
-`function seturl(p) {
-  var url = window.location.href.replace(/#.*/, "").replace(/\\&td_(username|password|state)=[^?&]*/g, "")
+`
+
+function seturl(p) {
+  var url = window.location.href.replace(/#.*/, "").replace(/\\&(fld_[^=&]+|td_(username|password|state))=[^?&]*/g, "")
   window.location.href = url + p
 }
 
@@ -32,6 +35,15 @@ function checkready(f)
     } else {
         f();
     }
+}
+
+function sendFld(n) {
+  var inp = document.getElementById(n)
+  var v = "yes";
+  if (inp) {
+      v = inp.value;         
+  }
+  seturl("&fld_" + n + "=" + encodeURIComponent(v))
 }
 `;
 

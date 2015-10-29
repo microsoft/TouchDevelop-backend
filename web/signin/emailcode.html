@@ -1,0 +1,29 @@
+{% extends "_layouts/signin.html" %}
+{% set title = "Touch Develop - Sign in" %}
+
+{% block innerbody %}
+
+  	<main role="main">
+        <h1>Waiting for email code</h1>
+        <p class='bg-danger'>@LEGACYMSG@</p>
+        
+        <h3>Please enter the code</h3>
+        <div class='form-group'>
+            <label for=code>
+              Existing account email:              
+            </label>
+            <input type="email" id="legacyemailcode" placeholder='01234567890123456' class="form-control"/>
+            <button class='btn btn-lg btn-success' onclick='sendFld("legacyemailcode")'>Verify</button>
+        </div>
+        <div class='form-group'>          
+            <label>
+            Can't get it?            
+            </label>
+            <button class='btn btn-lg btn-success ' onclick='sendFld("legacyrestart")'>Try different email</button>            
+            <span style='display:inline-block;margin:1em;'>or</span>
+            <button class='btn btn-lg btn-warning ' onclick='sendFld("legacyskip")'>Create new account</button>
+        </div>
+    </main>
+
+{% endblock %}
+

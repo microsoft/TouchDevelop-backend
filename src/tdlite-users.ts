@@ -672,6 +672,22 @@ export async function createNewUserAsync(username: string, email: string, profil
 }
 
 
+export async function setProfileIdAsync(uid: string, profileId: string) {
+    let final = await core.pubsContainer.updateAsync(uid, async(v) => {
+        if (!v["login"])
+            v["login"] = profileId;
+    })
+
+    if (final["login"] != profileId) return false;
+
+    await passcodesContainer.updateAsync(profileId, async(entry: JsonBuilder) => {
+        entry["kind"] = "userpointer";
+        entry["userid"] = uid;
+    });
+
+    return true;
+}
+
 export async function applyCodeAsync(userjson: JsonObject, codeObj: JsonObject, passId: string, auditReq: core.ApiRequest) : Promise<void>
 {
     let userid = userjson["id"];

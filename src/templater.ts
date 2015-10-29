@@ -144,6 +144,17 @@ async function uploadFileAsync(fn: string)
 	if (!/\/static\//.test(fn)) {
 		let m = /\/pub\/([a-z]+)/.exec(bloburl)
 		let id = m[1]
+		let path = fn.replace(/\.html$/, "")
+		let rdreq = mkReq("ptr" + path.replace(/[^a-zA-Z0-9@]/g, "-"))
+		let curr = await rdreq.sendAsync();
+		
+		if (curr.statusCode() == 200) {
+			if (curr.contentAsJson()["htmlartid"] == id) {
+				console.log(`${fn}: already set to ${id}`)
+				return
+			}
+		}
+		
 		let req = mkReq("pointers")
 		req.setMethod("post")
 		req.setContentAsJson({
@@ -151,7 +162,7 @@ async function uploadFileAsync(fn: string)
 			htmlartid: id
 		})
 		let resp = await req.sendAsync();
-		console.log(fn + ": " + resp.toString())
+		console.log(`${fn}: ${id} -> ${resp.statusCode()}`)		
 	}
 }
 
