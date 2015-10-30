@@ -230,7 +230,9 @@ export async function initAsync() : Promise<void>
         let numhidden = 0
         for (let e of lst.items) {
             if (e["pub"] && e["pub"]["ishidden"])
-            numhidden++;    
+                numhidden++;
+            else if (/^code/.test(e["login"]))
+                numhidden++;
         }
         req.response = {
             continuation: lst.continuation,
