@@ -696,7 +696,7 @@ export class AppLogger {
     {
         var prev = AppLogger.findContext()
         var ctx:any = { 
-            id: prev ? prev.id + "." + ++prev.numCh : createRandomId(8),
+            id: prev && prev.root ? prev.root.id + "." + ++prev.root.numCh : createRandomId(8),
             prev: prev,
             created: perfNow(), 
             numCh: 0, 
@@ -712,7 +712,7 @@ export class AppLogger {
 
 export function createLogger(n:string)
 {
-    return new AppLogger(n);
+    return new AppLogger(orEmpty(process.env["TD_LOGGER_PREFIX"]) + n);
 }
 
 export function httpRequestStreamAsync(url_:string, method:string = "GET", body:string = undefined, contentType:any = null) : Promise<http.IncomingMessage>
