@@ -347,7 +347,7 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
             sizeLimit = 8 * 1024 * 1024;
         }
         else if (arttype == "video") {
-            sizeLimit = 8 * 1024 * 1024;
+            sizeLimit = 40 * 1024 * 1024;
         }
         if (buf == null) {
             req.status = httpCode._400BadRequest;
