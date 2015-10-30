@@ -487,6 +487,18 @@ export async function initAsync() : Promise<void>
             req.response = ({});
         }
     });
+
+    core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "root")) return;
+        let login = req.rootPub["login"]
+        await passcodesContainer.updateAsync(login, async(v) => {
+            v["userid"] = "";
+        })
+        await core.pubsContainer.updateAsync(req.rootId, async(v) => {
+            delete v["login"];
+        })
+        req.response = {};
+    });
 }
 
 export function applyUserSettings(userjson: {}, settings: {}) {

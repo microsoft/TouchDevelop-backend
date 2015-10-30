@@ -44,6 +44,7 @@ interface LegacySettings {
     Website: string;
     YearOfBirth: number;
     FacebookId: string;
+    Nickname: string;
 }
 
 var legacyTable: azureTable.Client;
@@ -254,7 +255,7 @@ export async function importWorkspaceAsync(userjson: {}) {
     await core.pokeSubChannelAsync("installed:" + userid);    
 }
 
-var normalFields = ["AboutMe", "Culture", "Email", "Gender", "HowFound", "Location", "Occupation",
+var normalFields = ["Nickname", "AboutMe", "Culture", "Email", "Gender", "HowFound", "Location", "Occupation",
                     "ProgrammingKnowledge", "RealName", "TwitterHandle", "Website"]
 
 export async function importSettingsAsync(jsb: {}) {
@@ -276,6 +277,7 @@ export async function importSettingsAsync(jsb: {}) {
         if (legacy.YearOfBirth) s.yearofbirth = legacy.YearOfBirth;
         if (legacy.FacebookId)
             loginid = "fb:" + legacy.FacebookId;
+        
     } else {
         code = 404;
     }
@@ -380,8 +382,11 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
             return;
         }
         
+        // refresh settings
+        await importSettingsAsync(u);
+        u = await core.getPubAsync(legId, "user");        
+        
         if (!u["settings"] || !u["settings"]["email"]) {
-            // TODO should try to re-import settings
             err("No email associated with that user ID. Please go to www.touchdevelop.com and set your email first.")
             return;
         }
