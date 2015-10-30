@@ -12,6 +12,7 @@ var asArray = td.asArray;
 
 import * as parallel from "./parallel"
 import * as core from "./tdlite-core"
+import * as search from "./tdlite-search"
 import * as cron from "./cron"
 
 export type StringTransformer = (text: string) => Promise<string>;
@@ -175,14 +176,20 @@ async function importFromPubloggerAsync(req: core.ApiRequest) : Promise<void>
     // do reviews after everything else; otherwise import may fail 
     let normal = coll2.filter(e => e["kind"] != "review")
     let reviews = coll2.filter(e => e["kind"] == "review")
-    await parallel.forJsonAsync(normal, async(v) => {
+    
+    let searchable = ["script", "art", "comment", "user", "channel", "group", "pointer"]
+    let importFromTdAsync = async(v: {}) => {
         let apiRequest = await importOneAnythingAsync(v);
-        resp[v["id"]] = apiRequest.status;        
-    })
-    await parallel.forJsonAsync(reviews, async(v) => {
-        let apiRequest = await importOneAnythingAsync(v);
-        resp[v["id"]] = apiRequest.status;        
-    })
+        if (apiRequest.status == 200 && searchable.indexOf(v["kind"]) >= 0) {
+            let pub = await core.getPubAsync(v["id"], v["kind"]);
+            if (v)
+                await search.scanAndSearchAsync(v, { skipScan: true })
+        }
+        resp[v["id"]] = apiRequest.status;
+    };
+
+    await parallel.forJsonAsync(normal, importFromTdAsync);
+    await parallel.forJsonAsync(reviews, importFromTdAsync);
     await core.pubsContainer.updateAsync(cfgname, async (entry1: JsonBuilder) => {
         let r = core.orZero(entry1["start"]);
         entry1["start"] = Math.max(r, lastTime);
