@@ -221,6 +221,25 @@ export async function initAsync() : Promise<void>
         await reindexEntriesAsync(store, lst.items, req);
     });
     
+        
+    core.addRoute("GET", "admin", "countpubs", async(req) => {        
+        if (!core.checkPermission(req, "root")) return;
+        let store = indexedStore.storeByKind(req.argument);
+        
+        let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
+        let numhidden = 0
+        for (let e of lst.items) {
+            if (e["pub"] && e["pub"]["ishidden"])
+            numhidden++;    
+        }
+        req.response = {
+            continuation: lst.continuation,
+            itemCount: lst.items.length,            
+            hiddenItemCount: numhidden,
+        }           
+    })
+
+    
     core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");        
         if (req.status != 200) return;
