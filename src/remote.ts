@@ -134,24 +134,41 @@ async function logAsync()
     } 
 }
 
-async function getconfigAsync()
+async function getconfigCoreAsync()
 {
     var resp = await mkReq("/getconfig").sendAsync();
     var x = {}
     for (let s of resp.contentAsJson()["AppSettings"]) {
         x[s.Name] = s.Value;
     }
+    return x    
+}
+
+async function getconfigAsync()
+{
+    var x = await getconfigCoreAsync();
     console.log(JSON.stringify(x, null, 2))
 }
 
-async function setconfigAsync(args:string[])
-{
+async function setconfigAsync(args: string[]) {
     if (!args[0]) {
-        console.log("need JSON filename")
+        console.log("need JSON filename or VAR=val")
         return
     }
+
+    var m = /^(\w+)=(.*)$/.exec(args[0])
+    var js = {}
+
+    if (m) {
+        js = await getconfigCoreAsync();
+        if (m[2] == "null")
+            delete js[m[1]];
+        else
+            js[m[1]] = m[2];
+    } else {
+        js = JSON.parse(fs.readFileSync(args[0], "utf8"))
+    }
     
-    var js = JSON.parse(fs.readFileSync(args[0], "utf8"))        
     var req = await mkReq("/setconfig");
     var rr = { AppSettings: [] }
     for (let k of Object.keys(js)) {
@@ -161,6 +178,7 @@ async function setconfigAsync(args:string[])
     req.setMethod("post");
     var r = await req.sendAsync();
     console.log(r.statusCode())
+    await getconfigAsync();
 }
 
 async function restartAsync()
@@ -183,13 +201,13 @@ function main() {
     }
 
     var cmds: any = {
-        "deploy     deploy JS files": deployAsync,
-        "shell      see shell logs": shellAsync,
-        "log        see application logs": logAsync,
-        "stats      see various shell stats": statsAsync,
-        "getenv     fetch current environment config": getconfigAsync,
-        "setenv     fetch current environment config": setconfigAsync,
-        "restart    restart worker (poke the config)": restartAsync,
+        "deploy                deploy JS files": deployAsync,
+        "shell                 see shell logs": shellAsync,
+        "log                   see application logs": logAsync,
+        "stats                 see various shell stats": statsAsync,
+        "restart               restart worker (poke the config)": restartAsync,
+        "getenv                fetch current environment config": getconfigAsync,
+        "setenv file|VAR=val   set current environment config": setconfigAsync,
     }
 
     for (let n of Object.keys(cmds)) {
