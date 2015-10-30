@@ -675,7 +675,7 @@ export async function createNewUserAsync(username: string, email: string, profil
     }
     let dictionary = core.setBuilderIfMissing(userjs, "groups");
     let dictionary2 = core.setBuilderIfMissing(userjs, "owngroups");
-    await core.generateIdAsync(userjs, 8);
+    await core.generateIdAsync(userjs, core.fullTD ? 4 : 8);
     await users.insertAsync(userjs);
     await passcodesContainer.updateAsync(profileId, async (entry: JsonBuilder) => {
         entry["kind"] = "userpointer";
