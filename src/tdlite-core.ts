@@ -275,6 +275,7 @@ export interface IRouteOptions {
     noSizeCheck?: boolean;
     sizeCheckExcludes?: string;
     cacheKey?: string;
+    override?: boolean;
 }
 
 /**
@@ -283,7 +284,8 @@ export interface IRouteOptions {
 export function addRoute(method: string, root: string, verb: string, handler: ApiReqHandler, options_: IRouteOptions = {}) : void
 {
     let route = RouteIndex.at(method, root, verb);
-    route.options = options_;
+    assert(options_.override || !route.handler, `route ${route.method} ${route.root}/${route.verb} added twice`); 
+    route.options = options_;    
 
     if (options_.noSizeCheck || method == "GET" || method == "DELETE") {
         route.handler = handler;

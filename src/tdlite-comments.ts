@@ -65,7 +65,7 @@ export async function initAsync() : Promise<void>
                 await core.anyListAsync(comments, req1, "publicationid", req1.rootId);
             }
         }
-    });
+    }, { override: true });
 }
 
 async function resolveCommentsAsync(entities: indexedStore.FetchResult) : Promise<void>
