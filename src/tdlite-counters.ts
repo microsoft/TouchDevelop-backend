@@ -129,8 +129,56 @@ export async function initAsync(include: string[]): Promise<void> {
     });
     
     cron.registerJob(new cron.Job("flushcounters", 1, flushCountersAsync));
-    
+ 
+    core.addRoute("POST", "dailystats", "", async(req) => {
+        if (!core.checkPermission(req, "stats"))
+            return;
+        
+        let maxlen = 366;
+        let now = await core.nowSecondsAsync();
+        let startTime = core.orZero(req.body["start"])
+        if (startTime <= 0) startTime = now - maxlen * 24 * 3600;
+        let len = td.clamp(1, maxlen, core.orZero(req.body["length"]));
+        let fields = td.toStringArray(req.body["fields"]) ||
+                     ["New_script", "New_script_hidden", "New_art", "New_comment", "PubUser@federated"]
+        
+        let totals = await countersContainer.getAsync("total");
+        
+        startTime = td.clamp(totals["min"], totals["max"], startTime)
+        startTime = dayAligned(startTime)
+        let ids: string[] = []
+        for (let i = 0; i < len; ++i) {
+            let curr = startTime + i * 24 * 3600;
+            if (curr > totals["max"])
+                break;
+            ids.push(dayIdForTime(curr))
+        }
+        len = ids.length;
+        
+        let vals = await countersContainer.getManyAsync(ids);
+        let res = {}
+        for (let fld of fields) {
+            let arr = []
+            for (let j = 0; j < len; ++j) {
+                let v = 0
+                if (vals[j] && vals[j]["counters"])
+                    v = core.orZero(vals[j]["counters"][fld])
+                arr.push(v)
+            }
+            res[fld] = arr
+        }
+        
+        req.response = {
+            start: startTime,
+            length: len,
+            values: res,
+        }        
+    })
+            
     core.addRoute("GET", "stats", "", async(req) => {
+        if (!core.fullTD && !core.checkPermission(req, "stats"))
+            return;
+        
         let totals = await countersContainer.getAsync("total") || {}
         totals = totals["counters"] || {}
         req.response = {
