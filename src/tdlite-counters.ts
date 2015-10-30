@@ -158,13 +158,14 @@ export async function initAsync(include: string[]): Promise<void> {
         let vals = await countersContainer.getManyAsync(ids);
         let res = {}
         for (let fld of fields) {
-            let arr = []
+            let arr = []            
             for (let j = 0; j < len; ++j) {
                 let v = 0
                 if (vals[j] && vals[j]["counters"])
                     v = core.orZero(vals[j]["counters"][fld])
                 arr.push(v)
             }
+            arr.push(core.orZero(totals["counters"][fld]))
             res[fld] = arr
         }
         
@@ -172,7 +173,7 @@ export async function initAsync(include: string[]): Promise<void> {
             start: startTime,
             length: len,
             values: res,
-        }        
+        }     
     })
             
     core.addRoute("GET", "stats", "", async(req) => {
