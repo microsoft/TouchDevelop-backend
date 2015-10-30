@@ -24,6 +24,7 @@ import * as audit from "./tdlite-audit"
 import * as search from "./tdlite-search"
 import * as tdliteGroups from "./tdlite-groups"
 import * as tdlitePointers from "./tdlite-pointers"
+import * as tdliteLegacy from "./tdlite-legacy"
 
 var orFalse = core.orFalse;
 var withDefault = core.withDefault;
@@ -639,7 +640,8 @@ async function importUserAsync(req: core.ApiRequest, body: JsonObject) : Promise
     jsb["pub"] = user.toJson();
     jsb["id"] = user.id;
     jsb["secondaryid"] = cachedStore.freshShortId(12);
-    await users.insertAsync(jsb);
+    await users.insertAsync(jsb);    
+    await tdliteLegacy.importSettingsAsync(jsb);
 }
 
 export async function createNewUserAsync(username: string, email: string, profileId: string, perms: string, realname: string, awaiting: boolean) : Promise<JsonBuilder>
@@ -672,10 +674,12 @@ export async function createNewUserAsync(username: string, email: string, profil
 }
 
 
-export async function setProfileIdAsync(uid: string, profileId: string) {
+export async function setProfileIdFromLegacyAsync(uid: string, profileId: string) {
     let final = await core.pubsContainer.updateAsync(uid, async(v) => {
         if (!v["login"])
             v["login"] = profileId;
+        if (v["login"] == profileId)
+            v["importworkspace"] = "2";
     })
 
     if (final["login"] != profileId) return false;

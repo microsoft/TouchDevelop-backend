@@ -252,6 +252,7 @@ export class TableQuery
 {
     public table: Table;
     public onlyTop: number;
+    public onlyFields: string[];
 
     // azure-table-node interface:
     public limitTo: number;

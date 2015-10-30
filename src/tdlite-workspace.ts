@@ -19,6 +19,7 @@ import * as core from "./tdlite-core"
 import * as tdliteScripts from "./tdlite-scripts"
 import * as tdliteUsers from "./tdlite-users"
 import * as tdliteCppCompiler from "./tdlite-cppcompiler"
+import * as tdliteLegacy from "./tdlite-legacy"
 
 
 var orFalse = core.orFalse;
@@ -250,27 +251,34 @@ export async function initAsync() : Promise<void>
     });
 }
 
+export async function getInstalledHeadersAsync(uid: string): Promise<IPubHeader[]>
+{
+    let jsons = await installSlotsTable.createQuery().partitionKeyIs(uid).fetchAllAsync(); 
+    return jsons.map(headerFromSlot)
+}
+
 async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<void>
 {
+    let uid = req.rootId
     if (req.argument == "") {
-        let v = await core.longPollAsync("installed:" + req.rootId, long, req);
+        // this normally doesn't do anything, but it will fetch more
+        // scripts while import is enabled
+        await tdliteLegacy.importWorkspaceAsync(req.rootPub);
+        
+        let v = await core.longPollAsync("installed:" + uid, long, req);
         if (req.status == 200) {
             if (long) {
                 // re-get for new notifiacation count if any
-                req.rootPub = await core.getPubAsync(req.rootId, "user");
-            }
-            let entities = await installSlotsTable.createQuery().partitionKeyIs(req.rootId).fetchAllAsync();
+                req.rootPub = await core.getPubAsync(uid, "user");
+            }             
             let res:IPubHeaders = <any>{};
-            res.blobcontainer = workspaceForUser(req.userid).blobContainer().url() + "/";
+            res.headers = await getInstalledHeadersAsync(uid);
+            res.blobcontainer = workspaceForUser(uid).blobContainer().url() + "/";
             res.time = await core.nowSecondsAsync();
-            res.random = crypto.randomBytes(16).toString("base64");
-            res.headers = [];
+            res.random = crypto.randomBytes(16).toString("base64");            
             res.newNotifications = core.orZero(req.rootPub["notifications"]);
             res.notifications = res.newNotifications > 0;
             res.v = v;
-            for (let js of entities) {
-                res.headers.push(headerFromSlot(js));
-            }
             req.response = res
         }
     }
@@ -280,7 +288,7 @@ async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<
             await getInstalledHistoryAsync(req);
         }
         else {
-            let result = await installSlotsTable.getEntityAsync(req.rootId, req.argument);
+            let result = await installSlotsTable.getEntityAsync(uid, req.argument);
             if (result == null) {
                 req.status = 404;
             }

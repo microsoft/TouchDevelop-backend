@@ -521,7 +521,7 @@ export async function initAsync() : Promise<void>
     });
     core.aliasRoute("GET", "featured-scripts", "showcase-scripts");
     core.aliasRoute("GET", "new-scripts", "scripts");
-    core.aliasRoute("GET", "top-scripts", "scripts");
+    core.aliasRoute("GET", "top-scripts", "showcase-scripts");
     // ### by base
     await scripts.createIndexAsync("baseid", entry1 => withDefault(entry1["pub"]["baseid"], "-"));
     core.addRoute("GET", "*script", "successors", async (req10: core.ApiRequest) => {

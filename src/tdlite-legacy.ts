@@ -85,8 +85,11 @@ export async function initAsync()
     });
     
     core.addRoute("POST", "*user", "importworkspace", async (req: core.ApiRequest) => {
-        if (!core.checkPermission(req, "operator")) return;        
-        req.response = await importWorkspaceAsync(req.rootPub);        
+        if (!core.checkPermission(req, "operator")) return;
+        await core.pubsContainer.updateAsync(req.rootId, async(v) => {
+            v["importworkspace"] = "1";
+        })
+        req.response = {};                
     });   
 }
 
@@ -214,25 +217,47 @@ async function importHeaderAsync(v: WorkspaceEntry) {
         throw new Error("save error: " + res["error"]);
 }
 
-async function importWorkspaceAsync(jsb: {}) {
-    let userid = jsb["id"];
-    let entries = await workspaceTable.createQuery().partitionKeyIs(userid).fetchAllAsync()
-    let errors = {}
-    await parallel.forJsonAsync(entries, async(v: WorkspaceEntry) => {
-        try {
-            await importHeaderAsync(v);
-            errors[v.RowKey] = "OK";
-        } catch (e) {
-            errors[v.RowKey] = e.stack;
-        }
+export async function importWorkspaceAsync(userjson: {}) {
+    if (!userjson["importworkspace"])
+        return;
+    
+    let userid = userjson["id"];
+    let query = workspaceTable.createQuery().partitionKeyIs(userid).and("RowKey", "<", "C")
+    query.onlyFields = ["RowKey", "ScriptStatus"];
+    let entries = <WorkspaceEntry[]>await query.fetchAllAsync()
+    let current = await tdliteWorkspace.getInstalledHeadersAsync(userid);
+    let currDict = td.toDictionary(current, c => c.guid);
+    entries = entries.filter(e => e.ScriptStatus != "deleted")
+    logger.debug(`importworkspace size: ${entries.length}`)
+    entries = entries.filter(e => !currDict.hasOwnProperty(e.RowKey.replace(/^B/, "").toLowerCase()))
+    td.permute(entries)
+    let slice = entries.slice(0, 40) 
+
+    await parallel.forJsonAsync(slice, async(v: WorkspaceEntry) => {
+        logger.debug(`import: ${v.RowKey}`)
+        v = <WorkspaceEntry>await workspaceTable.getEntityAsync(userid, v.RowKey);
+        logger.debug(`fetchdone: ${v.RowKey}`)
+        await importHeaderAsync(v);
+        logger.debug(`importdone: ${v.RowKey}`)
     }, 20)
-    return errors;
+    
+    let left = entries.length - slice.length
+    if (left == 0) {
+        logger.info("workspace import finished for " + userid)
+        await core.pubsContainer.updateAsync(userid, async(v) => {
+            v["importworkspace"] = "";
+        })
+    } else {
+        logger.info(`workspace import will continue for ${userid}; ${left} entries left`)
+    }
+    
+    await core.pokeSubChannelAsync("installed:" + userid);    
 }
 
 var normalFields = ["AboutMe", "Culture", "Email", "Gender", "HowFound", "Location", "Occupation",
                     "ProgrammingKnowledge", "RealName", "TwitterHandle", "Website"]
 
-async function importSettingsAsync(jsb: {}) {
+export async function importSettingsAsync(jsb: {}) {
     let force = false;
 
     let s = await tdliteUsers.buildSettingsAsync(jsb);
@@ -370,7 +395,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         
         if (session.legacyCodes && session.legacyCodes.hasOwnProperty(legCode)) {
             let uid = session.legacyCodes[legCode]            
-            let ok = await tdliteUsers.setProfileIdAsync(uid, session.profileId);
+            let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, session.profileId);
             
             if (!ok) {            
                 alreadyBound();

@@ -729,6 +729,9 @@ async function getLoginHtmlAsync(inner: string, lang: string) : Promise<string>
     if (text.length < 100) {
         text = loginHtml[inner];
     }
+    if (!text) {
+        text = "signin/" + inner + " is missing"
+    }
     text = td.replaceAll(text, "@JS@", tdliteHtml.login_js);
     return text;
 }
