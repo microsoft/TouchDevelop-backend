@@ -156,9 +156,6 @@ async function performSingleRequestAsync(apiRequest: core.ApiRequest) : Promise<
         evArgs["user"] = apiRequest.userid;
         evArgs["cat"] = cat;
         evArgs["statusCode"] = apiRequest.status;
-        if (false) {
-            logger.customTick(path, td.clone(evArgs));
-        }
         logger.measure(cat + "@" + path, logger.contextDuration());
     }
 }

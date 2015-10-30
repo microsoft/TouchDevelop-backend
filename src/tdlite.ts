@@ -49,6 +49,7 @@ import * as tdliteRuntime from "./tdlite-runtime"
 import * as tdliteRouting from "./tdlite-routing"
 import * as tdliteStatus from "./tdlite-status"
 import * as tdliteLegacy from "./tdlite-legacy"
+import * as tdliteCounters from "./tdlite-counters"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -83,7 +84,8 @@ async function _initAsync() : Promise<void>
         let libSource = withDefault(td.serverSetting("RoleInstanceId", true), "local");
         await libratoNode.initAsync({
             period: 60000,
-            aggregate: true
+            aggregate: true,
+            prefix: td.serverSetting("LIBRATO_PREFIX", true) || ""
         });
         /* async */ tdliteStatus.statusReportLoopAsync();
     } else {
@@ -179,7 +181,9 @@ async function _initAsync() : Promise<void>
             }
         }
     });
-    logger.debug("librato email: " + td.serverSetting("LIBRATO_EMAIL", false));
+    // logger.debug("librato email: " + td.serverSetting("LIBRATO_EMAIL", false));
+    
+    logger.tick("ServiceStart");
 }
 
 
@@ -195,6 +199,8 @@ async function initSubsystems() : Promise<void>
     core.addRoute("POST", "", "", tdliteRouting.performBatchAsync, { noSizeCheck: true });
     
     await cron.initAsync();
+    await tdliteCounters.initAsync([logger.category]);
+    
     await audit.initAsync();    
     await tdliteTicks.initAsync();
     await tdliteCrashes.initAsync();
@@ -233,7 +239,7 @@ async function main()
         })
         console.log("loaded cfg")
     }
-    await _initAsync();
+    await _initAsync();    
     // For new int re-deployment
     // await core.redisClient.sendCommandAsync("flushall", []);
     restify.finishStartup();

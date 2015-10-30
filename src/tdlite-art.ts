@@ -216,7 +216,6 @@ async function postArtAsync(req: core.ApiRequest) : Promise<void>
     pubArt.time = await core.nowSecondsAsync();
     let jsb = {};
     jsb["pub"] = pubArt.toJson();
-    logger.tick("PubArt");
     jsb["kind"] = "art";
     await postArtLikeAsync(req, jsb);
     if (jsb.hasOwnProperty("existing")) {
