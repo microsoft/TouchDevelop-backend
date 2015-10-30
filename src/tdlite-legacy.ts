@@ -4,6 +4,7 @@
 
 import * as td from './td';
 import * as assert from 'assert';
+import * as zlib from 'zlib';
 
 import * as azureBlobStorage from "./azure-blob-storage"
 import * as parallel from "./parallel"
@@ -22,6 +23,8 @@ import * as tdlitePointers from "./tdlite-pointers"
 import * as azureTable from "./azure-table"
 import * as tdliteUsers from "./tdlite-users"
 import * as tdliteLogin from "./tdlite-login"
+import * as tdliteWorkspace from "./tdlite-workspace"
+import * as tdliteScripts from "./tdlite-scripts"
 
 var logger = core.logger;
 var httpCode = core.httpCode;
@@ -46,6 +49,8 @@ interface LegacySettings {
 var legacyTable: azureTable.Client;
 var legacyBlob: azureBlobStorage.BlobService;
 var settingsTable: azureTable.Table;
+var workspaceTable: azureTable.Table;
+var largeinstalledContainer: azureBlobStorage.Container;
 
 export async function initAsync()
 {
@@ -56,7 +61,9 @@ export async function initAsync()
         storageAccessKey: td.serverSetting(pref + "_KEY", false)
     });
     
-    settingsTable = legacyTable.getTable("svcUSRsettings");
+    settingsTable = legacyTable.getTable("svcUSRsettings");    
+    workspaceTable = legacyTable.getTable("svcUSRscripts");
+    largeinstalledContainer = legacyBlob.getContainer("largeinstalled");
     
     core.addRoute("POST", "*user", "importsettings", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
@@ -75,7 +82,151 @@ export async function initAsync()
             continuation: entities.continuation,
             publications: resp
         };
+    });
+    
+    core.addRoute("POST", "*user", "importworkspace", async (req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "operator")) return;        
+        req.response = await importWorkspaceAsync(req.rootPub);        
     });   
+}
+
+function decompress(buf: Buffer)
+{
+    if (!buf) return "";
+    
+	if (buf.length <= 1) return "";
+	
+	if (buf[0] == 0) {
+		buf = buf.slice(1);
+	} else if (buf[0] == 1 || buf[0] == 2) {
+		let len = buf.readInt32LE(1);
+		if (buf[0] == 1)
+			buf = zlib.inflateRawSync(buf.slice(5));
+		else
+			buf = zlib.gunzipSync(buf.slice(5));
+		assert(len == buf.length)		
+	} else {
+		assert(false)		
+	}
+	
+	return buf.toString("utf8");
+}
+
+function decompressBlob(buf: Buffer) {
+    let json = [];
+    if (buf.readInt32LE(0) == 1) {
+        for (let pos = 4; pos < buf.length;) {
+            if (!buf[pos++]) {
+                json.push(null);
+                continue;
+            }
+
+            let len = buf.readInt32LE(pos);
+            pos += 4;
+            json.push(decompress(buf.slice(pos, pos + len)))
+            pos += len;
+            
+            if (json.length >= 5) break;
+        }
+    }
+
+    return json;
+}
+
+interface WorkspaceEntry {
+    PartitionKey:string;
+    RowKey:string;    
+    IsLarge: boolean;
+    LastUpdated: Date;
+    PrivateCompressedEditorState: Buffer;
+    PrivateCompressedScript: Buffer;
+    PrivateCompressedState: Buffer;
+    RecentUse: Date;
+    ScriptDescription: string;
+    ScriptId: string;
+    ScriptName: string;
+    ScriptStatus: string;
+    Uniquifier: string;
+}
+
+async function importHeaderAsync(v: WorkspaceEntry) {
+    let userid = v.PartitionKey;
+    if (v.ScriptStatus == "deleted") return;
+
+    let toTime = (d: Date) => Math.round(d.getTime() / 1000)
+
+    let scrjson = null
+    if (v.ScriptId) {
+        scrjson = await core.getPubAsync(v.ScriptId, "script")
+    }
+
+    let script = ""
+    let editorState = ""
+
+    if (v.IsLarge) {
+        let blobid = v.PartitionKey + "/" + v.RowKey
+        if (v.Uniquifier)
+            blobid += "/" + v.Uniquifier
+        let info = await largeinstalledContainer.getBlobToBufferAsync(blobid)
+        if (info.succeded()) {
+            let objs = decompressBlob(info.buffer());
+            script = objs[0] || "";
+            editorState = objs[2] || "";
+        }
+        else {
+            throw new Error("Blob not found: " + blobid)
+        }
+    } else {
+        script = decompress(v.PrivateCompressedScript)
+        editorState = decompress(v.PrivateCompressedEditorState)
+    }
+
+    if (scrjson && v.ScriptStatus == "published") {
+        let tmp = await tdliteScripts.getScriptTextAsync(scrjson["id"]);
+        if (tmp)
+            script = tmp["text"];
+    }
+
+    if (!script)
+        throw new Error("empty script")
+
+    let body: tdliteWorkspace.IPubBody = {
+        guid: v.RowKey.slice(1).toLowerCase(),
+        name: v.ScriptName,
+        scriptId: scrjson ? scrjson["id"] : "",
+        userId: scrjson ? scrjson["pub"]["userid"] : userid,
+        status: v.ScriptStatus,
+        scriptVersion: {
+            instanceId: "cloud",
+            baseSnapshot: "",
+            time: toTime(v.LastUpdated),
+            version: 1
+        },
+        recentUse: toTime(v.RecentUse),
+        editor: "",
+        meta: {},
+        script: script,
+        editorState: editorState,
+    }
+
+    let res = await tdliteWorkspace.saveScriptAsync(userid, tdliteWorkspace.PubBody.createFromJson(body), toTime(v.LastUpdated));
+    if (res["error"])
+        throw new Error("save error: " + res["error"]);
+}
+
+async function importWorkspaceAsync(jsb: {}) {
+    let userid = jsb["id"];
+    let entries = await workspaceTable.createQuery().partitionKeyIs(userid).fetchAllAsync()
+    let errors = {}
+    await parallel.forJsonAsync(entries, async(v: WorkspaceEntry) => {
+        try {
+            await importHeaderAsync(v);
+            errors[v.RowKey] = "OK";
+        } catch (e) {
+            errors[v.RowKey] = e.stack;
+        }
+    }, 20)
+    return errors;
 }
 
 var normalFields = ["AboutMe", "Culture", "Email", "Gender", "HowFound", "Location", "Occupation",
@@ -151,8 +302,6 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         let body = ""
         let numsent = 0
         
-        
-    
         // more than one user should be rather uncommon    
         for (let u of users) {
             if (u["login"]) continue;

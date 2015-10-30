@@ -78,7 +78,7 @@ export interface IPubHeader {
     userId: string;
     status: string;
     scriptVersion: IPubVersion;
-    hasErrors: string;
+    hasErrors?: string;
     recentUse: number;
     editor: string;
     meta: JsonObject;
@@ -401,7 +401,7 @@ async function getInstalledHistoryAsync(req: core.ApiRequest) : Promise<void>
     req.response = entities2.toJson();
 }
 
-async function saveScriptAsync(userid: string, body: PubBody) : Promise<JsonObject>
+export async function saveScriptAsync(userid: string, body: PubBody, importTime = 0) : Promise<JsonObject>
 {
     let newSlot: JsonObject;
     core.progress("save 0");
@@ -412,25 +412,36 @@ async function saveScriptAsync(userid: string, body: PubBody) : Promise<JsonObje
     assert(JSON.stringify(bodyJson).length < 10000, "too large header");
     let slotJson = await installSlotsTable.getEntityAsync(userid, body.guid);
     let updatedSlot = azureTable.createEntity(userid, body.guid);
-
+    let isImport = importTime != 0;
+    
+    if (isImport && slotJson) {
+        return { error: "imported slot already exists" }
+    }
+        
     core.progress("save 1");
-    let id2 = (20000000000000 - await core.redisClient.cachedTimeAsync()) + "." + userid + "." + azureTable.createRandomId(12);
+    let time = importTime;
+    if (!time) time = await core.redisClient.cachedTimeAsync();
+    let id2 = (20000000000000 - time) + "." + userid + "." + azureTable.createRandomId(12);
     let _new = false;
     let prevBlob = "";
     if (slotJson == null) {
         _new = true;
-        let s2 = orEmpty(body.userId);
-        let source = "@fork";
-        if (s2 == "" || s2 == userid) {
-            source = "@fresh";
+        if (!isImport) {
+            let s2 = orEmpty(body.userId);
+            let source = "@fork";
+            if (s2 == "" || s2 == userid) {
+                source = "@fresh";
+            }
+            logger.tick("New_slot" + source);
         }
-        logger.tick("New_slot" + source);
     }
     else {
         prevBlob = slotJson["currentBlob"];
         updatedSlot = td.clone(slotJson);
     }
-    logger.tick("SaveScript");
+    if (!isImport)
+        logger.tick("SaveScript");
+        
     bodyBuilder["slotUserId"] = userid;
     for (let s of Object.keys(bodyJson)) {
         if (s != "scriptVersion") {

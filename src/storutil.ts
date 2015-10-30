@@ -78,6 +78,11 @@ addCommand("query", "table {count=N|part=S|row=S|cont=S|hex|line}", "list tables
 			delete item["PartitionKey"];
 			delete item["RowKey"];
 			delete item["Timestamp"];
+			for (let k of Object.keys(item)) {
+				if (/Compressed/.test(k) && Buffer.isBuffer(item[k])) {
+					item[k] = decompress(item[k])
+				}
+			}
 			if (oneline) {
 				for (let k of Object.keys(item)) {
 					hd += k + ": " + util.inspect(item[k]) + ", ";
