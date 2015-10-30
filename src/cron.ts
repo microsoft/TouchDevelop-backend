@@ -23,51 +23,60 @@ export class Job {
     }
 }
 
-async function initAsync(): Promise<void> {
+var lastCheck = 0;
+var jobRunning: Job;
+
+export function poke()
+{   
+    if (restify.server().inShutdownMode) {
+        logger.warning("got poke in shutdown mode")
+        return
+    }
+    
+    let now = Date.now();
+    if (!lastCheck) lastCheck = now;
+    let delta = now - lastCheck 
+    if (delta < td.randomRange(20000, 60000))
+        return;
+    
+    lastCheck = now
+    
+    if (jobRunning) {
+        logger.warning("job still running: " + jobRunning.id + "; skipping")
+        return
+    }
+    
+    setTimeout(runJobsAsync, 10);
+}
+
+export async function initAsync(): Promise<void> {
     if (logger != null) return;
     logger = td.createLogger("cron");
     logger.info("initialized");
     redisClient = await redis.createClientAsync();
-    /* async */ loopAsync();
 }
 
-function init()
-{
-    if (logger == null)
-        /* async */ initAsync();
-}
-
-async function loopAsync()
-{
-    let runTime = 0;
-    
-    let server = restify.server()
-    while (!server.inShutdownMode) {
-        let sleepTime = td.randomRange(20, 70) - runTime;
-        logger.debug("enter loop; sleep " + sleepTime)
-        if (sleepTime > 0)
-            await td.sleepAsync(sleepTime);
-        let jobsNow = jobs.slice(0)
-        let start = Date.now();
-        td.permute(jobsNow)
-        for (let j of jobsNow) {
-            if (server.inShutdownMode) break;
-            logger.debug("check job " + j.id)
-            let res = await redisClient.sendCommandAsync("set", ["cronlock:" + j.id, "working", "NX", "EX", j.everyMinutes * 60])
-            if (td.toString(res) != "OK") continue;
-            logger.info("starting cronjob " + j.id)
-            await j.callbackAsync()
-            logger.info("finished cronjob " + j.id)
-        }     
-        runTime = (start - Date.now()) / 1000;
+async function runJobsAsync() {
+    let jobsNow = jobs.slice(0)
+    let start = Date.now();
+    td.permute(jobsNow)
+    for (let j of jobsNow) {
+        jobRunning = j;
+        let runtime = Date.now() - start 
+        if (runtime > 30000)
+            break
+        logger.debug(`check job ${j.id}; loop @ ${runtime}ms`)
+        let res = await redisClient.sendCommandAsync("set", ["cronlock:" + j.id, "working", "NX", "EX", j.everyMinutes * 60])
+        if (td.toString(res) != "OK") continue;
+        logger.info("starting cronjob " + j.id)
+        await j.callbackAsync()
+        logger.info("finished cronjob " + j.id)
     }
-    
-    logger.info("shutting down cron loop")
+    jobRunning = null;
 }
 
 export function registerJob(j:Job)
 {
-    init();
     assert(jobs.filter(x => x.id == j.id).length == 0)
     jobs.push(j);    
 }
