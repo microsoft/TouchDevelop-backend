@@ -111,7 +111,7 @@ async function importReviewAsync(req: core.ApiRequest, body: JsonObject) : Promi
         }
     }
     else {
-        req.status = 404;
+        req.status = httpCode._412PreconditionFailed;
     }
 }
 

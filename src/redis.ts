@@ -386,7 +386,7 @@ async function initAsync() : Promise<void>
 /**
  * Creates a redis client and authenticates using the password
  */
-export async function createClientAsync(host: string, port: number, password: string) : Promise<Client>
+export async function createClientAsync(host: string = "", port: number = 0, password: string = "") : Promise<Client>
 {
     let client: Client;
     if (host == "") {
