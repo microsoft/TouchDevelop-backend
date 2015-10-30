@@ -12,6 +12,7 @@ var asArray = td.asArray;
 
 import * as parallel from "./parallel"
 import * as core from "./tdlite-core"
+import * as cron from "./cron"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -20,7 +21,6 @@ var orEmpty = td.orEmpty;
 
 var logger = core.logger;
 var httpCode = core.httpCode;
-var importRunning: boolean = false;
 
 export class RecImportResponse
     extends td.JsonRecord
@@ -59,6 +59,9 @@ async function importAnythingAsync(req: core.ApiRequest) : Promise<void>
 
 export async function initAsync() : Promise<void>
 {
+    if (!core.fullTD)
+        return;
+    
     core.addRoute("GET", "tdtext", "*", async (req1: core.ApiRequest) => {
         if (/^[a-z]+$/.test(req1.verb)) {
             let s = await td.downloadTextAsync("https://www.touchdevelop.com/api/" + req1.verb + "/text?original=true");
@@ -68,6 +71,7 @@ export async function initAsync() : Promise<void>
             req1.status = httpCode._400BadRequest;
         }
     });
+    /*
     core.addRoute("POST", "import", "", async (req2: core.ApiRequest) => {
         core.checkPermission(req2, "root");
         if (req2.status == 200) {
@@ -81,28 +85,25 @@ export async function initAsync() : Promise<void>
             }
         }
     });
+    */
     core.addRoute("POST", "import", "pubs", async (req2: core.ApiRequest) => {
         await importPubsAsync(req2);
     });
     core.addRoute("POST", "import", "*", async (req2: core.ApiRequest) => {
         await importListAsync(req2);
     });
-    core.addRoute("GET", "importsync", "", async (req5: core.ApiRequest) => {
-        let key = req5.queryOptions["key"];
-        if (key != null && key == td.serverSetting("LOGIN_SECRET", false)) {
-            if (importRunning) {
-                req5.status = httpCode._503ServiceUnavailable;
-            }
-            else {
-                importRunning = true;
-                await importFromPubloggerAsync(req5);
-                importRunning = false;
-            }
-        }
-        else {
-            req5.status = httpCode._402PaymentRequired;
-        }
+    core.addRoute("POST", "importsync", "", async(req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "operator")) return;
+            await importFromPubloggerAsync(req);
     });
+    
+    cron.registerJob(new cron.Job("importsync", 2, async() => {
+        let req = core.buildApiRequest("/api/importsync");
+        await importFromPubloggerAsync(req)
+        logger.info(`importsync: ${req.status}; ` + (req.response ? JSON.stringify(req.response,null,2) : ""))
+    }));
+    
+    /*
     core.addRoute("POST", "recimport", "*", async (req3: core.ApiRequest) => {
         core.checkPermission(req3, "root");
         let id = req3.verb;
@@ -118,43 +119,93 @@ export async function initAsync() : Promise<void>
             req3.response = resp.toJson();
         }
     });
+    */
 }
 
 async function importFromPubloggerAsync(req: core.ApiRequest) : Promise<void>
 {
-    let entry = await core.pubsContainer.getAsync("cfg-lastsync");
+    let cfgname = "cfg-lastsync3"
+    let prevLockTime = 0
+    let now = await core.nowSecondsAsync();
+    let entry = await core.pubsContainer.updateAsync(cfgname, async(v) => {
+        prevLockTime = core.orZero(v["locktime"])
+        if (prevLockTime == 0) {
+            v["locktime"] = now;
+        } else if (now - prevLockTime > 200) {
+            logger.error(`cleaning dead lock, from ${prevLockTime}, now ${now}`);
+            v["locktime"] = now;
+            prevLockTime = 0;
+        }
+    })
+    
+    if (prevLockTime) {
+        req.status = httpCode._503ServiceUnavailable;
+        return;
+    }
+    
     let start = 0;
     if (entry != null) {
         start = entry["start"];
     }
+    
+    // Start on Oct 22nd 2015; I know...
+    start = Math.max(core.orZero(start), 1445549047)
+    
     let resp = {};
     let coll2 = (<JsonObject[]>[]);
     let continuation = "&fake=blah";
     let lastTime = start;
+    let numiter = 0;
     while (continuation != "") {
+        numiter++;
         logger.info("download from publogger: " + start + " : " + continuation);
         let js2 = await td.downloadJsonAsync("http://tdpublogger.azurewebsites.net/syncpubs?count=30&start=" + start + continuation);
         await parallel.forJsonAsync(js2["items"], async (json: JsonObject) => {
-            lastTime = json["notificationtime"];
+            lastTime = Math.max(json["notificationtime"], lastTime);
             await importDownloadPublicationAsync(json["id"], resp, coll2);
         });
         let cont = orEmpty(js2["continuation"]);
-        if (coll2.length > 30 || cont == "") {
+        if (coll2.length > 50 || cont == "" || numiter > 5) {
             continuation = "";
         }
         else {
             continuation = "&continuation=" + cont;
         }
     }
-    for (let js4 of coll2) {
-        let apiRequest = await importOneAnythingAsync(js4);
-        resp[js4["id"]] = apiRequest.status;
-    }
-    await core.pubsContainer.updateAsync("cfg-lastsync", async (entry1: JsonBuilder) => {
+    // do reviews after everything else; otherwise import may fail 
+    let normal = coll2.filter(e => e["kind"] != "review")
+    let reviews = coll2.filter(e => e["kind"] == "review")
+    await parallel.forJsonAsync(normal, async(v) => {
+        let apiRequest = await importOneAnythingAsync(v);
+        resp[v["id"]] = apiRequest.status;        
+    })
+    await parallel.forJsonAsync(reviews, async(v) => {
+        let apiRequest = await importOneAnythingAsync(v);
+        resp[v["id"]] = apiRequest.status;        
+    })
+    await core.pubsContainer.updateAsync(cfgname, async (entry1: JsonBuilder) => {
         let r = core.orZero(entry1["start"]);
         entry1["start"] = Math.max(r, lastTime);
+        entry1["locktime"] = 0;
     });
-    req.response = td.clone(resp);
+    let ok = {}
+    let nok = {}
+    let numImp = 0
+    for (let k of Object.keys(resp)) {
+        let code = resp[k]
+        if (code == 200) {
+            ok[k] = code
+            numImp++
+        }
+        else if (code == 404 || code == 409 || code == 410 || code == 501)
+            ok[k] = code
+        else
+            nok[k] = code
+    }
+    nok["_NUMIMP"] = numImp
+    nok["_OK"] = ok
+    nok["_HOURSLEFT"] = ((Date.now() / 1000 - lastTime) / 3600).toFixed(3);
+    req.response = nok;
 }
 
 async function importOneAnythingAsync(js: JsonObject) : Promise<core.ApiRequest>
@@ -280,6 +331,7 @@ async function downloadSupplementalAsync(js: JsonObject, resp: JsonBuilder): Pro
                 jsb["baseid"] = js3["id"];
         }
         let s2 = "";
+        /*
         if (jsb["time"] < 1420099200) {            
             let tmp = await td.downloadJsonAsync("https://tdlite.blob.core.windows.net/scripttext/" + id)
             if (tmp) {
@@ -289,6 +341,7 @@ async function downloadSupplementalAsync(js: JsonObject, resp: JsonBuilder): Pro
                 logger.debug("missed on tdlite: " + id)
             }
         }
+        */
         if (!s2)
             s2 = await td.downloadTextAsync(url + "/text?original=true");
         jsb["text"] = s2;        
@@ -313,6 +366,7 @@ async function importDownloadPublicationAsync(id: string, resp: JsonBuilder, col
         else {
             let js2 = await downloadSupplementalAsync(js, resp);
             if (js2) coll2.push(js2);
+            else resp[id] = httpCode._501NotImplemented;
         }
     } else {
         resp[id] = httpCode._409Conflict;

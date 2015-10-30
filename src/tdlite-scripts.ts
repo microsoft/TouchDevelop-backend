@@ -540,6 +540,23 @@ export async function initAsync() : Promise<void>
         await core.anyListAsync(scripts, req13, "rootid", req13.rootPub["pub"]["rootid"]);
     });
     
+    core.addRoute("POST", "*script", "importfixup", async(req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "root")) return;
+        let text = orEmpty(req.body["text"]);
+        if (!text) {
+            req.status = 400;            
+            return;
+        }
+        await scriptText.updateAsync(req.rootId, async(v) => {
+            v["text"] = req.body["text"];
+        })
+        let hash = core.sha256(text).substr(0, 32)
+        await scripts.reindexAsync(req.rootId, async(v) => {
+            v["pub"]["scripthash"] = hash;
+        })
+        req.response = { scripthash: hash }
+    }, { sizeCheckExcludes: "text" });
+    
     if (false)
     core.addRoute("POST", "admin", "reindexscripts", async (req15: core.ApiRequest) => {
         core.checkPermission(req15, "operator");

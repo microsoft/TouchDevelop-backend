@@ -49,11 +49,13 @@ var httpStatus = {
 
 var restify = require('restify');
 var domain = require('domain');
+var isReady = false;
 
 
 export class Server
 {
-    public handle:any;
+    public handle: any;
+    public inShutdownMode = false;
 
     /**
      * Installs a middleware for a given route path.
@@ -845,7 +847,6 @@ export function disableTicks() : void
     logger.customTick = function() {}
 }
 
-var isReady = false;
 export function finishStartup() : void
 {
     isReady = true;
@@ -873,6 +874,13 @@ export function setupShellHooks() : void
             res.sendError(503, "Not yet ready")
         else
             res.json({ ready: isReady })
+    })
+
+    // Once we get that we should not start any new background tasks    
+    server().get("/-tdevmgmt-/:key/shutdown", async(req, res) => {
+        if (wrong(req, res)) return;
+        server().inShutdownMode = true;
+        res.json({ accepted: true })
     })
 
     server().get("/-tdevmgmt-/:key/info/:which", async(req, res) => {

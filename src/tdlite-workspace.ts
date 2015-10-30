@@ -217,10 +217,23 @@ export async function initAsync() : Promise<void>
         if (req2.status == 200) {
             await postInstalledAsync(req2);
         }
-    }
-    , {
-        noSizeCheck: true
+    }, {
+            noSizeCheck: true
+        });
+    
+    
+    core.addRoute("DELETE", "*user", "workspace", async(req: core.ApiRequest) => {
+        // this isn't really safe - has interactions with client syncing
+        if (!core.checkPermission(req, "root")) return;
+        core.meOnly(req);
+        let entities = await installSlotsTable.createQuery().partitionKeyIs(req.rootId).fetchAllAsync();
+        await parallel.forJsonAsync(entities, async(v) => {
+            await installSlotsTable.deleteEntityAsync(v);
+        })
+        //await core.pokeSubChannelAsync("installed:" + req.rootId);
+        req.response = {}
     });
+ 
     core.addRoute("DELETE", "*user", "installed", async (req3: core.ApiRequest) => {
         core.meOnly(req3);
         if (req3.status == 200) {

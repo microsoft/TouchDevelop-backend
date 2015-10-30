@@ -101,17 +101,6 @@ export async function logAsync(req: core.ApiRequest, type: string, options_0: IP
     await cleanLogAsync();
 }
 
-export function permute<T>(arr: T[])
-{
-    for (let i = 0; i < arr.length; ++i) {
-        let x = td.randomInt(arr.length);
-        let y = td.randomInt(arr.length);
-        let tmp = arr[x];
-        arr[x] = arr[y];
-        arr[y] = tmp;
-    }        
-}
-
 async function cleanLogAsync(): Promise<void>
 {
     // only try this in 10% of cases
@@ -121,7 +110,7 @@ async function cleanLogAsync(): Promise<void>
     let q = auditStore.getIndex("all").table.createQuery();
     q = q.partitionKeyIs("all").and("RowKey", ">=", pastId).top(200);
     let res = await q.fetchAllAsync();
-    permute(res);
+    td.permute(res);
     res = res.slice(0, 50);    
     await parallel.forJsonAsync(res, async(ent) => {
         //let ee = await auditStore.container.getAsync(ent["pub"])

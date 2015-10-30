@@ -448,6 +448,17 @@ export function sha256(b:Buffer):string
     return h.digest('hex').toLowerCase()
 }
 
+export function permute<T>(arr: T[])
+{
+    for (let i = 0; i < arr.length; ++i) {
+        let x = randomInt(arr.length);
+        let y = randomInt(arr.length);
+        let tmp = arr[x];
+        arr[x] = arr[y];
+        arr[y] = tmp;
+    }        
+}
+
 export function orderedBy<T>(arr:T[], key:(e:T)=>number)
 {
     arr = arr.slice(0)

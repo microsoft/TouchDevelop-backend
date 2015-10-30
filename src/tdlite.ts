@@ -19,6 +19,7 @@ import * as raygun from "./raygun"
 import * as loggly from "./loggly"
 import * as libratoNode from "./librato-node"
 import * as tdliteIndex from "./tdlite-index"
+import * as cron from "./cron"
 
 import * as core from "./tdlite-core"
 import * as audit from "./tdlite-audit"
@@ -141,6 +142,7 @@ async function _initAsync() : Promise<void>
     // ## batch api here
     server.post("/api", async(req2: restify.Request, res2: restify.Response) => {
         await core.refreshSettingsAsync();
+        cron.poke(); // we're getting requests; it seems we're alive
         await tdliteRouting.performRoutingAsync(req2, res2);
     });
     server.routeRegex("OPTS", ".*", async (req3: restify.Request, res3: restify.Response) => {
@@ -152,6 +154,7 @@ async function _initAsync() : Promise<void>
     });
     server.all(async(req4: restify.Request, res4: restify.Response) => {
         await core.refreshSettingsAsync();
+        cron.poke(); // we're getting requests; it seems we're alive
         if (td.startsWith(req4.url(), "/api/")) {
             await tdliteRouting.performRoutingAsync(req4, res4);
         }
@@ -191,6 +194,7 @@ async function initSubsystems() : Promise<void>
     
     core.addRoute("POST", "", "", tdliteRouting.performBatchAsync, { noSizeCheck: true });
     
+    await cron.initAsync();
     await audit.initAsync();    
     await tdliteTicks.initAsync();
     await tdliteCrashes.initAsync();
