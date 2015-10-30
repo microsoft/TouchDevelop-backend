@@ -85,6 +85,29 @@ export async function initAsync()
         };
     });
     
+    core.addRoute("POST", "import", "useremail", async(req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "operator")) return;
+        let entities = await tdliteUsers.users.getIndex("all").fetchAsync("all", req.queryOptions);
+        let resp = {}
+        await parallel.forJsonAsync(entities.items, async(v) => {
+            let s = v["settings"]
+            resp[v["id"]] = 200;
+            if (!s) return
+            let e:string = s["email"]
+            if (!e) return
+            if (e.toLowerCase() != e) {
+                await tdliteUsers.users.reindexAsync(v["id"], async(v) => {
+                    v["settings"]["email"] = v["settings"]["email"].toLowerCase();
+                }, true);
+                //resp[v["id"]] = 200;
+            }         
+        }, 25);
+        req.response = {
+            continuation: entities.continuation,
+            publications: resp
+        };
+    });
+    
     core.addRoute("POST", "*user", "importworkspace", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
         await core.pubsContainer.updateAsync(req.rootId, async(v) => {
@@ -307,8 +330,6 @@ function gencode() {
 }
 
 export async function handleLegacyAsync(req: restify.Request, session: tdliteLogin.LoginSession, params: {}): Promise<void> {
-    // TODO reindex user to use lower-case emails!
-    
     if (session.askLegacy) {
         params["SESSION"] = session.state;
         params["LEGACYMSG"] = "";

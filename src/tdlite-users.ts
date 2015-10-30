@@ -122,18 +122,18 @@ export async function initAsync() : Promise<void>
     });
     
     if (core.encrypt("foobar", emailKeyid) == "foobar") {
-        await users.createIndexAsync("email", entry => orEmpty(entry["settings"] ? entry["settings"]["email"] : ""));
-        await users.createIndexAsync("previousemail", entry => orEmpty(entry["settings"] ? entry["settings"]["previousemail"] : ""));
+        await users.createIndexAsync("email", entry => orEmpty(entry["settings"] ? entry["settings"]["email"] : "").toLowerCase());
+        await users.createIndexAsync("previousemail", entry => orEmpty(entry["settings"] ? entry["settings"]["previousemail"] : "").toLowerCase());
         core.addRoute("GET", "useremail", "*", async(req: core.ApiRequest) => {
             core.checkPermission(req, "user-mgmt");
             if (req.status == 200) {
-                await core.anyListAsync(users, req, "email", req.verb);
+                await core.anyListAsync(users, req, "email", req.verb.toLowerCase());
             }
         });
         core.addRoute("GET", "userpreviousemail", "*", async(req: core.ApiRequest) => {
             core.checkPermission(req, "user-mgmt");
             if (req.status == 200) {
-                await core.anyListAsync(users, req, "previousemail", req.verb);
+                await core.anyListAsync(users, req, "previousemail", req.verb.toLowerCase());
             }
         });
     }
