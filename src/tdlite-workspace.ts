@@ -329,6 +329,20 @@ async function postInstalledAsync(req: core.ApiRequest) : Promise<void>
                 }
                 req.verb = "installedrecent";
             }
+        }        
+        // This is used to patch-up missing metas. This happens after import from the legacy system.
+        if (req.body["metas"]) {
+            for (let meta of req.body["metas"]) {
+                let guid = orEmpty(meta["guid"]);
+                let existing = await installSlotsTable.getEntityAsync(req.rootId, guid)
+                if (existing && core.withDefault(existing["meta"], "{}") == "{}") {
+                    existing["meta"] = JSON.stringify(meta["meta"] || {})
+                    await installSlotsTable.tryUpdateEntityAsync(existing, "merge");
+                } else {
+                    installedResult.numErrors++;
+                }
+                req.verb = "installedmeta";
+            }
         }
         await core.pokeSubChannelAsync("installed:" + req.rootId);
         req.response = installedResult.toJson();
