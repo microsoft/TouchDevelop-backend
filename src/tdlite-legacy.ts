@@ -236,7 +236,7 @@ async function importHeaderAsync(v: WorkspaceEntry) {
         editorState: editorState,
     }
 
-    let res = await tdliteWorkspace.saveScriptAsync(userid, tdliteWorkspace.PubBody.createFromJson(body), toTime(v.LastUpdated));
+    let res = await tdliteWorkspace.saveScriptAsync(userid, tdliteWorkspace.PubBody.createFromJson(body), toTime(v.LastUpdated)*1000);
     if (res["error"])
         throw new Error("save error: " + res["error"]);
 }
