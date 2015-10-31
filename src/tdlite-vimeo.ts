@@ -116,7 +116,7 @@ export async function initAsync() : Promise<void>
                 return;
             }
             let pubVideo = new PubVideo();
-            pubVideo.blobid = azureBlobStorage.createRandomId(20).toLowerCase();
+            pubVideo.blobid = td.createRandomId(20).toLowerCase();
             pubVideo.provider = "vimeo";
             pubVideo.providerid = id;
             if (false) {

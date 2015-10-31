@@ -508,18 +508,13 @@ export function init() : void
     agentSSL.maxSockets = 50;
 
     logSeqNo = 1000000;
-    instanceId = createRandomId(6);
+    instanceId = td.createRandomId(6);
 }
 
 export function assumeContainerExists()
 {
     assumeExists = true;
 }
-
-/**
- * Creates a random id.
- */
-export var createRandomId = td.createRandomId;
 
 /**
  * Logs a message to the console.

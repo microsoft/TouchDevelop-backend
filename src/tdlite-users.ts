@@ -427,7 +427,7 @@ export async function initAsync() : Promise<void>
                         }
                         sett.emailverified = false;
                         sett.email = newEmail;
-                        let id = azureBlobStorage.createRandomId(16).toLowerCase();
+                        let id = td.createRandomId(16).toLowerCase();
                         entry["emailcode"] = id;
                         if (/^[^@]+@[^@]+$/.test(newEmail)) {
                             let txt = "Please follow the link below to verify your new email address on " + core.myHost + "\n\n" +

@@ -491,7 +491,7 @@ export async function initAsync() : Promise<void>
 export function freshShortId(len: number) : string
 {
     let id: string;
-    id = azureBlobStorage.createRandomId(len * 4).replace(/[^a-zA-Z]/g, "").toLowerCase().replace(/^[acegikmoqsuwy]*/g, "").substr(0, len);
+    id = td.createRandomId(len * 4).toLowerCase().replace(/^[acegikmoqsuwy]*/g, "").substr(0, len);
     if (id.length < len || isBadWord(id)) {
         id = freshShortId(len);
     }

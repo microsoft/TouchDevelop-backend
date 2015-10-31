@@ -417,6 +417,7 @@ export class JsonRecord
 }
 
 
+/** Generate a random id consisting of upper and lower case letters */
 export function createRandomId(size: number) : string
 {
     let buf = crypto.randomBytes(size * 2)

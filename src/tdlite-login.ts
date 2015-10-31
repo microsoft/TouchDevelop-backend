@@ -356,12 +356,12 @@ async function generateTokenAsync(user: string, reason: string, client_id: strin
 {
     let token = new core.Token();
     token.PartitionKey = user;
-    token.RowKey = azureBlobStorage.createRandomId(32);
+    token.RowKey = td.createRandomId(32);
     token.time = await core.nowSecondsAsync();
     token.reason = reason;
     token.version = 2;
     if (orEmpty(client_id) != "no-cookie") {
-        token.cookie = azureBlobStorage.createRandomId(32);
+        token.cookie = td.createRandomId(32);
     }
     await core.pubsContainer.updateAsync(user, async (entry: JsonBuilder) => {
         entry["lastlogin"] = await core.nowSecondsAsync();
