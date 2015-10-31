@@ -55,6 +55,7 @@ export class LoginSession
 
     @td.json public profileId: string;
     @td.json public oauthClientId: string;
+    @td.json public oauthU: string;
     @td.json public federatedUserInfo: serverAuth.IUserInfo;
 
     static createFromJson(o: JsonObject) { let r = new LoginSession(); r.fromJson(o); return r; }
@@ -463,6 +464,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     session.federatedUserInfo = <any>profile.toJson();
     session.profileId = profileId;
     session.oauthClientId = clientOAuth.client_id;
+    session.oauthU = clientOAuth.u;
     
     if (userjs == null) {
         if (core.jsonArrayIndexOf(core.serviceSettings.blockedAuth, provider) >= 0) {
@@ -474,7 +476,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     else {
         logger.tick("Login@federated");
         let uidOverride = withDefault(clientOAuth.u, userjs["id"]);
-        if (uidOverride != userjs["id"]) {
+        if (/^[a-z]+$/.test(uidOverride) && uidOverride != userjs["id"]) {
             logger.info("login with override: " + userjs["id"] + "->" + uidOverride);
             if (core.hasPermission(td.clone(userjs), "signin-" + uidOverride)) {
                 let entry41 = await core.getPubAsync(uidOverride, "user");

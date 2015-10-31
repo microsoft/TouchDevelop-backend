@@ -25,6 +25,7 @@ import * as tdliteUsers from "./tdlite-users"
 import * as tdliteLogin from "./tdlite-login"
 import * as tdliteWorkspace from "./tdlite-workspace"
 import * as tdliteScripts from "./tdlite-scripts"
+import * as tdliteImport from "./tdlite-import"
 
 var logger = core.logger;
 var httpCode = core.httpCode;
@@ -114,7 +115,49 @@ export async function initAsync()
             v["importworkspace"] = "1";
         })
         req.response = {};                
-    });   
+    });
+    
+    core.addRoute("POST", "migrationtoken", "", async(req) => {
+        let tok = td.orEmpty(req.body["access_token"])        
+        if (!tok || !core.fullTD) {
+            req.status = httpCode._400BadRequest;
+            return;
+        }
+        
+        let q = td.createRequest("https://www.touchdevelop.com/api/me?access_token=" + encodeURIComponent(tok))
+        let resp = await q.sendAsync()
+        let json = resp.contentAsJson()
+        if (!json) { 
+            req.status = httpCode._403Forbidden;
+            return;
+        }
+        
+        let uid = json["id"]
+        let userjson = await core.getPubAsync(uid, "user");
+        if (!userjson) {
+            userjson = await tdliteImport.reimportPub(uid, "user");
+            if (!userjson) {
+                req.status = httpCode._424FailedDependency;
+                return;
+            }    
+        }
+        
+        if (userjson["login"]) {
+            req.status = httpCode._409Conflict;
+            return;            
+        }
+        
+        userjson = await core.pubsContainer.updateAsync(uid, async(v) => {
+            if (!v["migrationtoken"]) {
+                v["migrationtoken"] = "1" + uid + "." + td.createRandomId(32);
+            }
+        })
+        
+        req.response = {
+            userid: uid,
+            migrationtoken: userjson["migrationtoken"]
+        }        
+    })
 }
 
 function decompress(buf: Buffer)
@@ -329,6 +372,8 @@ function gencode() {
     return numCode;
 }
 
+// TODO throttling for emails etc
+
 export async function handleLegacyAsync(req: restify.Request, session: tdliteLogin.LoginSession, params: {}): Promise<void> {
     if (session.askLegacy) {
         params["SESSION"] = session.state;
@@ -341,6 +386,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     let legCode = sett("legacyemailcode")
     let lang = params["LANG"];
     let err = m => params["LEGACYMSG"] = core.translateMessage(m, lang);
+    let tokM = /^1([a-z]+)\.\w+$/.exec(session.oauthU)
     
     let alreadyBound = () => err("This user account was already tied to the new system.");
     
@@ -374,10 +420,25 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
 
         session.legacyCodes = codes
     };
-
-
     
-    if (sett("legacyskip")) {
+    logger.info(`tokM:${!!tokM}, ${session.oauthU}`)
+    
+    if (tokM) {
+        let userjson = await core.getPubAsync(tokM[1], "user");
+        if (userjson && userjson["migrationtoken"] === session.oauthU) {
+            let ok = await tdliteUsers.setProfileIdFromLegacyAsync(userjson["id"], session.profileId);
+            if (!ok) {
+                alreadyBound();
+                return
+            }
+            
+            session.userid = userjson["id"]
+            session.askLegacy = false
+        } else {
+            err("Invalid migration code.")
+            return;
+        }
+    } else if (sett("legacyskip")) {
         session.askLegacy = false;
     } else if (sett("legacyrestart")) {
         session.askLegacy = true;

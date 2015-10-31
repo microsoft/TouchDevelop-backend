@@ -258,13 +258,27 @@ var allowedLists = [
     "tags",
 ]
 
+export async function reimportPub(id: string, kind:string)
+{
+    await importPubsCoreAsync([id]);
+    return await core.getPubAsync(id, kind);
+}
+
 async function importPubsAsync(req: core.ApiRequest) {
     if (!core.checkPermission(req, "root"))
         return;
+    let resp = await importPubsCoreAsync(req.argument.split(/[,\s]+/).filter(e => !!e))
+    req.response = {
+        continuation: "",
+        publications: resp
+    }
+    
+}
 
+async function importPubsCoreAsync(ids:string[]) {
     let coll: {}[] = [];
     let resp = {};
-    for (let pub of req.argument.split(/[,\s]+/).filter(e => !!e)) {
+    for (let pub of ids) {
         await importDownloadPublicationAsync(pub, resp, coll);
     }
     for (let suppl of coll) {
@@ -272,10 +286,7 @@ async function importPubsAsync(req: core.ApiRequest) {
         resp[suppl["id"]] = apiRequest.status;
     }
 
-    req.response = {
-        continuation: "",
-        publications: resp,
-    };
+    return resp;
 }
 
 async function importListAsync(req: core.ApiRequest) {
