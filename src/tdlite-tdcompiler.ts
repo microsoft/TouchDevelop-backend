@@ -100,7 +100,7 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
 {
     let cfg = {};
     let clientConfig = tdliteReleases.clientConfigForRelease(rel);
-    clientConfig.doNothingText = "...";
+    clientConfig.doNothingText = core.fullTD ? "..." : "add code here"
     cfg["TDC_AUTH_KEY"] = td.serverSetting("TDC_AUTH_KEY", false);
     cfg["TDC_ACCESS_TOKEN"] = td.serverSetting("TDC_ACCESS_TOKEN", false);
     cfg["TDC_LITE_STORAGE"] = tdliteReleases.appContainerUrl().replace(/\/[^\/]+$/g, "");
