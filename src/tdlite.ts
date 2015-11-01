@@ -112,14 +112,6 @@ async function _initAsync() : Promise<void>
     indexedStore.init(core.tableClient);
     // cachedStore.getLogger().setVerbosity("info");
 
-    await initSubsystems();
-
-    if (core.hasSetting("LIBRATO_TOKEN")) {
-        /* async */ tdliteStatus.failureReportLoopAsync();
-    }
-    
-    await core.initFinalAsync();
-
     let server = restify.server();
     server.use(restify.bodyParser());
     server.use(restify.queryParser());
@@ -131,6 +123,15 @@ async function _initAsync() : Promise<void>
     server.use(cors);
     restify.disableTicks();
     restify.setupShellHooks();
+    
+    await initSubsystems();
+
+    if (core.hasSetting("LIBRATO_TOKEN")) {
+        /* async */ tdliteStatus.failureReportLoopAsync();
+    }
+    
+    await core.initFinalAsync();
+
     await restify.startAsync();
 
     server.get("/api/ping", async (req: restify.Request, res: restify.Response) => {

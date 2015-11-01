@@ -779,7 +779,7 @@ export function addAzureAd(options_: IProviderOptions = {}) : void
     });
 }
 
-function base64urlDecode(s: string): Buffer
+export function base64urlDecode(s: string): Buffer
 {
     return new Buffer(s.replace(/-/g, '+').replace(/_/g, '/'), "base64");
 }

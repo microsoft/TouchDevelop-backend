@@ -64,6 +64,24 @@ export class LoginSession
         return (this.userid && this.userid != "pending");
     }
     
+    static async loadAsync(id: string): Promise<LoginSession>
+    {
+        let sessionString = orEmpty(await serverAuth.options().getData(orEmpty(id)));
+        logger.debug("session string: " + sessionString);
+        if (sessionString != "") {
+            return LoginSession.createFromJson(JSON.parse(sessionString));
+        } else return <LoginSession>null;        
+    }
+    
+    public async setMigrationUserAsync(uid: string)
+    {
+        let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, this.profileId);
+        if (!ok) return false;
+        this.userid = uid
+        this.askLegacy = false
+        return true
+    }
+    
     public async createUserIfNeededAsync(req: restify.Request): Promise<{}>
     {
         if (this.userCreated()) {
@@ -246,13 +264,11 @@ export async function initAsync(): Promise<void> {
         }
     });
     restify.server().get("/oauth/dialog", async(req: restify.Request, res: restify.Response) => {
-        let sessionString = orEmpty(await serverAuth.options().getData(orEmpty(req.query()["td_session"])));
-        let session = new LoginSession();
-        session.state = cachedStore.freshShortId(16);
-        logger.debug("session string: " + sessionString);
-        if (sessionString != "") {
-            session = LoginSession.createFromJson(JSON.parse(sessionString));
-        }
+        let session = await LoginSession.loadAsync(req.query()["td_session"]);
+        if (!session) {
+            session = new LoginSession();
+            session.state = cachedStore.freshShortId(16);
+        }    
         if (session.userid == "") {
             serverAuth.validateOauthParameters(req, res);
         }

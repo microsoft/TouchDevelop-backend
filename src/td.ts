@@ -237,7 +237,7 @@ export function stringContains(s:string, what:string)
     return s.indexOf(what) >= 0
 }
 
-export function serverSetting(sett:string, optional:boolean)
+export function serverSetting(sett:string, optional:boolean = false)
 {
     if (process.env.hasOwnProperty(sett))
         return process.env[sett]

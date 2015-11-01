@@ -5,6 +5,8 @@
 import * as td from './td';
 import * as assert from 'assert';
 import * as zlib from 'zlib';
+import * as crypto from 'crypto';
+import * as querystring from 'querystring';
 
 import * as azureBlobStorage from "./azure-blob-storage"
 import * as parallel from "./parallel"
@@ -26,6 +28,7 @@ import * as tdliteLogin from "./tdlite-login"
 import * as tdliteWorkspace from "./tdlite-workspace"
 import * as tdliteScripts from "./tdlite-scripts"
 import * as tdliteImport from "./tdlite-import"
+import * as serverAuth from "./server-auth"
 
 var logger = core.logger;
 var httpCode = core.httpCode;
@@ -52,6 +55,7 @@ var legacyTable: azureTable.Client;
 var legacyBlob: azureBlobStorage.BlobService;
 var settingsTable: azureTable.Table;
 var workspaceTable: azureTable.Table;
+var identityTable: azureTable.Table;
 var largeinstalledContainer: azureBlobStorage.Container;
 
 export async function initAsync()
@@ -65,6 +69,7 @@ export async function initAsync()
     
     settingsTable = legacyTable.getTable("svcUSRsettings");    
     workspaceTable = legacyTable.getTable("svcUSRscripts");
+    identityTable = legacyTable.getTable("svcUSRidentity");
     largeinstalledContainer = legacyBlob.getContainer("largeinstalled");
     
     core.addRoute("POST", "*user", "importsettings", async (req: core.ApiRequest) => {
@@ -158,7 +163,94 @@ export async function initAsync()
             migrationtoken: userjson["migrationtoken"]
         }        
     })
+    
+    restify.server().post("/oauth/legacycallback", async(req, res) => {
+        let body = req.handle.body;
+        if (typeof body == "string")
+            body = querystring.parse(body);
+        let token = null
+        if (body)
+            token = decodeJWT(body["wresult"]);
+        if (!token) {
+            res.sendError(httpCode._400BadRequest, "no token");
+            return;
+        }
+        if (token.header.alg !== "HS256") {
+            res.sendError(httpCode._415UnsupportedMediaType, "bad alg");
+            return;
+        }
+        let key = new Buffer(td.serverSetting("ACCESS_CONTROL_SERVICE_JWT_KEY"), "base64")
+        let hmac = crypto.createHmac("sha256", key)
+        hmac.update(token.tosign)
+        let digest = hmac.digest("hex")
+        if (digest !== token.sig) {
+            logger.warning("acs signature mismatch; " + JSON.stringify(token.payload))
+            res.sendError(httpCode._403Forbidden, "signature mismatch");
+            return;
+        }
+        let idprov = token.payload["identityprovider"];
+        let name = token.payload["nameid"];
+        let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
+        let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
+
+        if (!ent) {
+            //TODO be nicer here
+            logger.warning("cannot find ACS user: " + encode(name) + ":" + encode(idprov))
+            res.sendError(httpCode._404NotFound, "User doesn't exists in legacy system");
+            return;
+        }
+
+        let uid = td.orEmpty(ent["UserId"])
+        let userjson = await core.getPubAsync(uid, "user")
+        if (!userjson)
+            userjson = await tdliteImport.reimportPub(uid, "user");
+
+        if (!userjson) {
+            // log crash
+            logger.error("cannot import user: " + JSON.stringify(ent))
+            res.sendError(httpCode._500InternalServerError, "cannot import user; sorry");
+            return;
+        }
+
+        let session = await tdliteLogin.LoginSession.loadAsync(req.query()["token"])
+        if (!session) {
+            logger.info("session not found; id=" + req.query()["token"])
+            res.sendError(httpCode._412PreconditionFailed, "Session not found; uid=" + userjson["id"])
+            return
+        }
+        let ok = await session.setMigrationUserAsync(userjson["id"])
+        if (!ok) {
+            // TODO be nicer
+            res.sendError(httpCode._409Conflict, "User already bound")
+            return
+        }
+        await session.saveAsync();        
+        res.redirect(302, "/oauth/dialog?td_session=" + session.state)
+    });
 }
+
+function decodeJWT(wresult: string) {
+    let mtch = />([^<>]+)<\/wsse:BinarySecurityToken>/.exec(wresult)
+    if (!mtch) return null;
+
+    let jwt = new Buffer(mtch[1], "base64").toString("utf8")
+    if (!jwt) return null;
+    let words = jwt.split('.');
+
+    if (words.length != 3) return null;
+
+    try {
+        return {
+            header: JSON.parse(serverAuth.base64urlDecode(words[0]).toString("utf8")),
+            payload: JSON.parse(serverAuth.base64urlDecode(words[1]).toString("utf8")),
+            tosign: words[0] + "." + words[1],
+            sig: serverAuth.base64urlDecode(words[2]).toString("hex")
+        }
+    } catch (e) {
+        return null;
+    }
+}
+
 
 function decompress(buf: Buffer)
 {
@@ -421,19 +513,14 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         session.legacyCodes = codes
     };
     
-    logger.info(`tokM:${!!tokM}, ${session.oauthU}`)
-    
     if (tokM) {
         let userjson = await core.getPubAsync(tokM[1], "user");
         if (userjson && userjson["migrationtoken"] === session.oauthU) {
-            let ok = await tdliteUsers.setProfileIdFromLegacyAsync(userjson["id"], session.profileId);
+            let ok = await session.setMigrationUserAsync(userjson["id"]);
             if (!ok) {
                 alreadyBound();
                 return
             }
-            
-            session.userid = userjson["id"]
-            session.askLegacy = false
         } else {
             err("Invalid migration code.")
             return;
@@ -482,15 +569,11 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         
         if (session.legacyCodes && session.legacyCodes.hasOwnProperty(legCode)) {
             let uid = session.legacyCodes[legCode]            
-            let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, session.profileId);
-            
+            let ok = await session.setMigrationUserAsync(uid);            
             if (!ok) {            
                 alreadyBound();
                 return
             }
-            
-            session.userid = uid
-            session.askLegacy = false
             
         } else {
             err("The code is invalid; please try again")
