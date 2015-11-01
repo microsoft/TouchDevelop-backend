@@ -20,6 +20,7 @@ import * as indexedStore from "./indexed-store"
 import * as restify from "./restify"
 import * as tdliteHtml from "./tdlite-html"
 import * as tdliteDocs from "./tdlite-docs"
+import * as tdliteUsers from "./tdlite-users"
 
 export type ApiReqHandler = (req: ApiRequest) => Promise<void>;
 export type ResolutionCallback = (fetchResult: indexedStore.FetchResult, apiRequest: ApiRequest) => Promise<void>;
@@ -212,7 +213,7 @@ export class ApireqUserInfo
 {
     public id: string = "";
     public token: Token;
-    public json: JsonObject;
+    public json: tdliteUsers.IUser;
     public permissionCache: JsonBuilder;
     public ip: string = "";
 }
@@ -1466,7 +1467,7 @@ export async function initFinalAsync()
 
     emptyRequest = buildApiRequest("/api");
     adminRequest = buildApiRequest("/api");
-    adminRequest.userinfo.json = ({ "groups": {} });
+    adminRequest.userinfo.json = <any> { "groups": {} };
 
     self = td.serverSetting("SELF", false).toLowerCase();
     myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
@@ -1682,7 +1683,7 @@ export async function deleteAsync(delEntry: JsonObject) : Promise<boolean>
 
 export async function setReqUserIdAsync(req: ApiRequest, uid: string) : Promise<void>
 {
-    let userjs = await getPubAsync(uid, "user");
+    let userjs = <tdliteUsers.IUser> await getPubAsync(uid, "user");
     if (userjs == null) {
         req.status = httpCode._401Unauthorized;
         logger.info("accessing token for deleted user, " + uid);

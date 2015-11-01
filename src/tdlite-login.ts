@@ -82,7 +82,7 @@ export class LoginSession
         return true
     }
     
-    public async createUserIfNeededAsync(req: restify.Request): Promise<{}>
+    public async createUserIfNeededAsync(req: restify.Request): Promise<tdliteUsers.IUser>
     {
         if (this.userCreated()) {
             let js = await core.getPubAsync(this.userid, "user");
@@ -113,8 +113,8 @@ export class LoginSession
     public async updateTermsVersionAsync(req:restify.Request, userjs:{})
     {          
         if (core.serviceSettings.termsversion != "") {
-            userjs = await core.pubsContainer.updateAsync(this.userid, async(entry1: JsonBuilder) => {
-                entry1["termsversion"] = core.serviceSettings.termsversion;
+            userjs = await tdliteUsers.updateAsync(this.userid, async(entry1) => {
+                entry1.termsversion = core.serviceSettings.termsversion;
             });
         }
         await audit.logAsync(audit.buildAuditApiRequest(req), "user-agree", {

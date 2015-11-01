@@ -39,6 +39,42 @@ var emailKeyid: string = "EMAIL";
 var settingsOptionsJson = tdliteData.settingsOptionsJson;
 var useSendgrid: boolean = false;
 
+export interface IUser
+{
+    id: string;
+    kind: string;
+    pub: IPubUser;
+    settings: any;
+    login: string;
+    altLogins: string[];
+    credit: number;
+    emailcode: string; // verification code
+    totalcredit: number;
+    permissions: string;
+    secondaryid: string;
+    nopublish: boolean;
+    lastlogin: number; // seconds since epoch
+    awaiting: boolean; // awaiting admission to the system
+    groups: td.SMap<number>;
+    owngroups: td.SMap<number>;
+    termsversion: string;
+    importworkspace: string; // set to non-empty if we're still importing workspace for this user from the legacy system
+}
+
+export interface IPubUser
+{
+    name: string;
+    haspicture: boolean;
+    time: number;
+    about: string;
+    features: number;
+    activedays: number;
+    receivedpositivereviews: number;
+    subscribers: number;
+    score: number;
+    isadult: boolean;
+    avatar: string;    
+}    
 
 export class PubUser
     extends core.IdObject
@@ -157,8 +193,8 @@ export async function initAsync() : Promise<void>
                         data: perm
                     });
                 }
-                await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
-                    entry["permissions"] = perm;
+                await updateAsync(req.rootId, async (entry: IUser) => {
+                    entry.permissions = perm;
                     await sendPermissionNotificationAsync(req, entry);
                 });
             }
@@ -167,9 +203,9 @@ export async function initAsync() : Promise<void>
                 await audit.logAsync(req, "set-credit", {
                     data: credit.toString()
                 });
-                await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
-                    entry["credit"] = credit;
-                    entry["totalcredit"] = credit;
+                await updateAsync(req.rootId, async (entry: IUser) => {
+                    entry.credit = credit;
+                    entry.totalcredit = credit;
                 });
             }
             let nopublish = td.toBoolean(req.body["nopublish"]);
@@ -177,11 +213,11 @@ export async function initAsync() : Promise<void>
                 await audit.logAsync(req, "set-nopublish", {
                     data: nopublish.toString()
                 });
-                await search.updateAndUpsertAsync(core.pubsContainer, req, async (entry: JsonBuilder) => {
-                    entry["nopublish"] = nopublish;                    
+                await updateAsync(req.rootId, async(entry: IUser) => {
+                    entry.nopublish = nopublish;
                 });
             }
-            req.response = ({});
+            req.response = {};
         }
     });
     core.addRoute("GET", "*user", "permissions", async (req: core.ApiRequest) => {
@@ -207,18 +243,15 @@ export async function initAsync() : Promise<void>
             pubUser.name = withDefault(opts["name"], "Dummy" + td.randomInt(100000));
             pubUser.about = withDefault(opts["about"], "");
             pubUser.time = await core.nowSecondsAsync();
-            let jsb1 = {};
-            jsb1["pub"] = pubUser.toJson();
-            jsb1["settings"] = ({});
-            jsb1["permissions"] = ",preview,";
-            jsb1["secondaryid"] = cachedStore.freshShortId(12);
-            if (false) {
-                jsb1["password"] = core.hashPassword("", opts["password"]);
-            }
+            let jsb1: IUser = <any>{};            
+            jsb1.pub = <IPubUser> pubUser.toJson();
+            jsb1.settings = {};            
+            jsb1.permissions = ",preview,";
+            jsb1.secondaryid = cachedStore.freshShortId(12);
             await core.generateIdAsync(jsb1, 4);
             await users.insertAsync(jsb1);
             let pass2 = wordPassword.generate();
-            req4.rootId = jsb1["id"];
+            req4.rootId = jsb1.id;            
             req4.rootPub = td.clone(jsb1);
             await setPasswordAsync(req4, pass2, "");
             let jsb3 = td.clone(await core.resolveOnePubAsync(users, req4.rootPub, req4));
@@ -256,43 +289,47 @@ export async function initAsync() : Promise<void>
             req.status = httpCode._412PreconditionFailed;
             return;
         }
-        let otherUser = await core.getPubAsync(req.argument, "user");
+        let otherUser = await getAsync(req.argument);
         if (otherUser == null) {
             req.status = httpCode._404NotFound;
             return;
         }
-        let rootPassId = req.rootPub["login"];
+        let rootUser = <IUser>req.rootPub;
+        let rootPassId = rootUser.login;
         let rootPass = await passcodesContainer.getAsync(rootPassId);
-        let otherPassId = otherUser["login"];
+        let otherPassId = otherUser.login;
         let otherPass = await passcodesContainer.getAsync(otherPassId);
         if (rootPass == null || otherPass == null) {
             req.status = httpCode._424FailedDependency;
             return;
         }
+        if (rootUser.altLogins || otherUser.altLogins) {
+            req.status = httpCode._412PreconditionFailed;
+            return;            
+        }
         await passcodesContainer.updateAsync(rootPassId, async (entry4: JsonBuilder) => {
-            entry4["userid"] = otherUser["id"];
+            entry4["userid"] = otherUser.id;
         });
         await passcodesContainer.updateAsync(otherPassId, async (entry5: JsonBuilder) => {
-            entry5["userid"] = req.rootId;
+            entry5["userid"] = rootUser.id;
         });
-        await core.pubsContainer.updateAsync(req.rootId, async (entry6: JsonBuilder) => {
-            entry6["login"] = otherPassId;
+        await updateAsync(rootUser.id, async (entry6) => {
+            entry6.login = otherPassId;
         });
-        await core.pubsContainer.updateAsync(otherUser["id"], async (entry7: JsonBuilder) => {
-            entry7["login"] = rootPassId;
+        await updateAsync(otherUser["id"], async (entry7) => {
+            entry7.login = rootPassId;
         });
-        let jsb4 = {};
-        jsb4["oldrootpass"] = rootPass;
-        jsb4["oldotherpass"] = otherPass;
-        req.response = td.clone(jsb4);
+        req.response = {
+            oldrootpass: rootPass,
+            oldotherpass: otherPass
+        };
     });
     core.addRoute("GET", "*user", "resetpassword", async (req9: core.ApiRequest) => {
         await core.checkFacilitatorPermissionAsync(req9, req9.rootId);
         if (req9.status == 200) {
-            let jsb2 = {};
-            let coll2 = td.range(0, 10).map<string>(elt => wordPassword.generate());
-            jsb2["passwords"] = td.arrayToJson(coll2);
-            req9.response = td.clone(jsb2);
+            req9.response = {
+                passwords: td.range(0, 10).map<string>(elt => wordPassword.generate()) 
+            }
         }
     });
     core.addRoute("POST", "*user", "resetpassword", async (req10: core.ApiRequest) => {
@@ -382,20 +419,6 @@ export async function initAsync() : Promise<void>
         }
     });
     
-    if (false)
-    core.addRoute("POST", "admin", "reindexusers", async (req13: core.ApiRequest) => {
-        core.checkPermission(req13, "operator");
-        if (req13.status == 200) {
-            /* async */ users.getIndex("all").forAllBatchedAsync("all", 50, async (json2) => {
-                await parallel.forJsonAsync(json2, async (json3: JsonObject) => {
-                    let userid = json3["id"];
-                    let js2 = json3["settings"];
-                });
-            });
-            req13.response = ({});
-        }
-    });
-
     core.addRoute("POST", "*user", "settings", async (req4: core.ApiRequest) => {
         let logcat = "admin-settings";
         let updateOwn = false;
@@ -417,8 +440,8 @@ export async function initAsync() : Promise<void>
             }
         }
         if (req4.status == 200) {
-            let bld = await users.reindexAsync(req4.rootId, async(entry: JsonBuilder) => {
-                let sett = await buildSettingsAsync(td.clone(entry));
+            let bld = await users.reindexAsync(req4.rootId, async(entry: IUser) => {
+                let sett = await buildSettingsAsync(entry);                
                 let newEmail = td.toString(req4.body["email"]);
                 if (newEmail != null) {
                     if (updateOwn) {
@@ -428,7 +451,7 @@ export async function initAsync() : Promise<void>
                         sett.emailverified = false;
                         sett.email = newEmail;
                         let id = td.createRandomId(16).toLowerCase();
-                        entry["emailcode"] = id;
+                        entry.emailcode = id;
                         if (/^[^@]+@[^@]+$/.test(newEmail)) {
                             let txt = "Please follow the link below to verify your new email address on " + core.myHost + "\n\n" +
                                 "      " + core.self + "verify/" + req4.rootId + "/" + id + "\n\n" +
@@ -444,7 +467,7 @@ export async function initAsync() : Promise<void>
                         sett.email = newEmail;
                         sett.emailverified = true;
                         sett.previousemail = "";
-                        entry["emailcode"] = "";
+                        entry.emailcode = "";
                     }
                 }
                 
@@ -473,39 +496,43 @@ export async function initAsync() : Promise<void>
             if (req5.userid != req5.rootId) {
                 await audit.logAsync(req5, "view-settings");
             }
-            let jsb = td.clone((await buildSettingsAsync(req5.rootPub)).toJson());
+            let jsb = (await buildSettingsAsync(<IUser>req5.rootPub)).toJson();
             if (orEmpty(req5.queryOptions["format"]) != "short") {
                 core.copyJson(settingsOptionsJson, jsb);
             }
-            req5.response = td.clone(jsb);
+            req5.response = jsb;
         }
     });
 
     core.addRoute("POST", "*user", "progress", async (req: core.ApiRequest) => {
         core.meOnly(req);
         if (req.status == 200) {
-            req.response = ({});
+            req.response = {};
         }
     });
 
     core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
-        let login = req.rootPub["login"]
-        if (!login) {
-            req.status = httpCode._412PreconditionFailed;
+        let u = <IUser>req.rootPub;
+        if (!u.login) {
+            req.status = httpCode._404NotFound
             return;            
         }
-        await passcodesContainer.updateAsync(login, async(v) => {
-            v["userid"] = "";
-        })
-        await core.pubsContainer.updateAsync(req.rootId, async(v) => {
-            delete v["login"];
+        let logins = (u.altLogins || []).concat([u.login])
+        for (let login of logins) {
+            await passcodesContainer.updateAsync(login, async(v) => {
+                v["userid"] = "";
+            })
+        }    
+        await updateAsync(req.rootId, async(v) => {
+            delete v.login;
+            delete v.altLogins;
         })
         req.response = {};
     });
 }
 
-export function applyUserSettings(userjson: {}, settings: {}) {
+export function applyUserSettings(userjson: IUser, settings: {}) {
     for (let k of ["culture", "email", "previousemail", "gender", "location", "occupation",
         "programmingknowledge", "realname", "school"]) {
         let val = settings[k];
@@ -514,12 +541,22 @@ export function applyUserSettings(userjson: {}, settings: {}) {
         }
     }
     let value = td.clone(settings);
-    userjson["settings"] = value;
+    userjson.settings = value;
     let sett = PubUserSettings.createFromJson(value);
     sett.nickname = sett.nickname.substr(0, 25);
-    userjson["pub"]["name"] = sett.nickname;
-    userjson["pub"]["about"] = sett.aboutme;
-    userjson["pub"]["avatar"] = sett.avatar;
+    userjson.pub.name = sett.nickname;
+    userjson.pub.about = sett.aboutme;
+    userjson.pub.avatar = sett.avatar;
+}
+
+export async function updateAsync(id:string, f:(v:IUser) => Promise<void>)
+{
+    return <IUser>await core.pubsContainer.updateAsync(id, f)
+}
+
+export async function getAsync(id:string)
+{
+    return <IUser>await core.getPubAsync(id, "user");
 }
 
 export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRequest) : void
@@ -528,12 +565,13 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
     if (orFalse(req.queryOptions["imported"])) {
         entities.items = td.arrayToJson(asArray(entities.items).filter(elt => ! elt["login"]));
     }
-    for (let jsb of entities.items) {
+    for (let jsb0 of entities.items) {
+        let jsb = <IUser>jsb0;
         let user = new PubUser();
         coll.push(user);
-        user.fromJson(jsb["pub"]);
-        user.id = jsb["id"];
-        user.kind = jsb["kind"];
+        user.fromJson(jsb.pub);
+        user.id = jsb.id;
+        user.kind = jsb.kind;
         if ( ! core.fullTD) {
             user.time = 0;
         }
@@ -543,12 +581,12 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
 }
 
 
-export async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUserSettings>
+export async function buildSettingsAsync(userJson: IUser) : Promise<PubUserSettings>
 {
     let settings = new PubUserSettings();
     let user = new PubUser();
-    user.fromJson(userJson["pub"]);
-    let js = userJson["settings"];
+    user.fromJson(userJson.pub);
+    let js = userJson.settings;
     if (js != null) {
         let jsb = td.clone(js);
         for (let kk of Object.keys(jsb)) {
@@ -564,7 +602,7 @@ export async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUser
     settings.aboutme = user.about;
     settings.avatar = user.avatar || "";
     let perms = {};
-    for (let s of orEmpty(userJson["permissions"]).split(",")) {
+    for (let s of orEmpty(userJson.permissions).split(",")) {
         if (s != "") {
             perms[s] = 1;
             let js2 = core.settingsPermissions[s];
@@ -574,7 +612,7 @@ export async function buildSettingsAsync(userJson: JsonObject) : Promise<PubUser
         }
     }
     settings.permissions = "," + Object.keys(perms).join(",") + ",";
-    settings.credit = core.orZero(userJson["credit"]);
+    settings.credit = core.orZero(userJson.credit);
     return settings;
 }
 
@@ -603,36 +641,35 @@ async function setPasswordAsync(req: core.ApiRequest, pass: string, prevPass: st
         }
     });
     if (ok) {
-        await core.pubsContainer.updateAsync(req.rootId, async (entry1: JsonBuilder) => {
-            entry1["login"] = pass;
+        await updateAsync(req.rootId, async (entry1) => {
+            entry1.login = pass;
         });
         if (prevPass != pass) {
             await passcodesContainer.updateAsync(prevPass, async (entry2: JsonBuilder) => {
                 entry2["kind"] = "reserved";
             });
         }
-        req.response = ({});
+        req.response = {};
     }
     else {
         req.status = httpCode._400BadRequest;
     }
 }
 
-async function sendPermissionNotificationAsync(req: core.ApiRequest, r: JsonBuilder) : Promise<void>
+async function sendPermissionNotificationAsync(req: core.ApiRequest, r: IUser) : Promise<void>
 {
     await core.refreshSettingsAsync();
-    if (core.isAlarming(r["permissions"])) {
-        if ( ! r.hasOwnProperty("settings")) {
-            r["settings"] = ({});
-        }
-        let name_ = withDefault(core.decrypt(r["settings"]["realname"]), r["pub"]["name"]);
+    if (core.isAlarming(r.permissions)) {
+        if (!r.settings)
+            r.settings = {};
+        let name_ = withDefault(core.decrypt(r.settings["realname"]), r.pub.name);
         let subj = "[TDLite] permissions for " + name_ + " set to " + r["permissions"];
         let body = "By code.";
         if (req.userid != "") {
             let entry2 = req.userinfo.json;
-            body = "Permissions set by: " + entry2["pub"]["name"] + " " + core.self + req.userid;
+            body = "Permissions set by: " + entry2.pub.name + " " + core.self + req.userid;
         }
-        body = body + "\n\nTarget user: " + core.self + r["id"];
+        body = body + "\n\nTarget user: " + core.self + r.id;
         await parallel.forJsonAsync(core.serviceSettings.alarmingEmails, async (json: JsonObject) => {
             let email = td.toString(json);
             await sendgrid.sendAsync(email, "noreply@touchdevelop.com", subj, body);
@@ -652,30 +689,30 @@ async function importUserAsync(req: core.ApiRequest, body: JsonObject) : Promise
     user.score = 0;
     user.haspicture = false;
 
-    let jsb = {};
-    jsb["pub"] = user.toJson();
-    jsb["id"] = user.id;
-    jsb["secondaryid"] = cachedStore.freshShortId(12);
+    let jsb:IUser = <any> {};
+    jsb.pub = <IPubUser>user.toJson();
+    jsb.id = user.id;
+    jsb.secondaryid = cachedStore.freshShortId(12);
     await users.insertAsync(jsb);    
     await tdliteLegacy.importSettingsAsync(jsb);
 }
 
-export async function createNewUserAsync(username: string, email: string, profileId: string, perms: string, realname: string, awaiting: boolean) : Promise<JsonBuilder>
+export async function createNewUserAsync(username: string, email: string, profileId: string, perms: string, realname: string, awaiting: boolean) : Promise<IUser>
 {
-    let userjs = {};
+    let userjs:IUser = <any>{};
     let pubUser = new PubUser();
     pubUser.name = username;
     let settings = new PubUserSettings();
     settings.email = core.encrypt(email, emailKeyid);
     settings.realname = core.encrypt(realname, emailKeyid);
     settings.emailverified = orEmpty(settings.email) != "";
-    userjs["pub"] = pubUser.toJson();
-    userjs["settings"] = settings.toJson();
-    userjs["login"] = profileId;
-    userjs["permissions"] = perms;
-    userjs["secondaryid"] = cachedStore.freshShortId(12);
+    userjs.pub = <IPubUser> pubUser.toJson();
+    userjs.settings = settings.toJson();
+    userjs.login = profileId;
+    userjs.permissions = perms;
+    userjs.secondaryid = cachedStore.freshShortId(12);
     if (awaiting) {
-        userjs["awaiting"] = awaiting;
+        userjs.awaiting = awaiting;
     }
     let dictionary = core.setBuilderIfMissing(userjs, "groups");
     let dictionary2 = core.setBuilderIfMissing(userjs, "owngroups");
@@ -691,14 +728,14 @@ export async function createNewUserAsync(username: string, email: string, profil
 
 
 export async function setProfileIdFromLegacyAsync(uid: string, profileId: string) {
-    let final = await core.pubsContainer.updateAsync(uid, async(v) => {
-        if (!v["login"])
-            v["login"] = profileId;
-        if (v["login"] == profileId)
-            v["importworkspace"] = "2";
+    let final = await updateAsync(uid, async(v) => {
+        if (!v.login)
+            v.login = profileId;
+        if (v.login == profileId)
+            v.importworkspace = "2";
     })
 
-    if (final["login"] != profileId) return false;
+    if (final.login != profileId) return false;
 
     await passcodesContainer.updateAsync(profileId, async(entry: JsonBuilder) => {
         entry["kind"] = "userpointer";
@@ -708,16 +745,16 @@ export async function setProfileIdFromLegacyAsync(uid: string, profileId: string
     return true;
 }
 
-export async function applyCodeAsync(userjson: JsonObject, codeObj: JsonObject, passId: string, auditReq: core.ApiRequest) : Promise<void>
+export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passId: string, auditReq: core.ApiRequest) : Promise<void>
 {
-    let userid = userjson["id"];
+    let userid = userjson.id;
     let credit = codeObj["credit"];
     let singleCredit = codeObj["singlecredit"];
     if (singleCredit != null) {
         credit = Math.min(credit, singleCredit);
     }
     let perm = withDefault(codeObj["permissions"], "preview,");
-    await core.pubsContainer.updateAsync(userid, async (entry: JsonBuilder) => {
+    await updateAsync(userid, async (entry) => {
         core.jsonAdd(entry, "credit", credit);
         core.jsonAdd(entry, "totalcredit", credit);
         if ( ! core.hasPermission(td.clone(entry), perm)) {
@@ -753,21 +790,21 @@ export async function handleEmailVerificationAsync(req: restify.Request, res: re
 {
     let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
     let coll = (/^\/verify\/([a-z]+)\/([a-z]+)/.exec(req.url()) || []);
-    let userJs = await core.getPubAsync(coll[1], "user");
+    let userJs = await getAsync(coll[1]);
     let msg = "";
     if (userJs == null) {
         msg = core.translateMessage("Cannot verify email - no such user.", lang);
     }
-    else if (orEmpty(userJs["emailcode"]) != coll[2]) {
+    else if (orEmpty(userJs.emailcode) != coll[2]) {
         msg = core.translateMessage("Cannot verify email - invalid or expired code.", lang);
     }
     else {
         msg = core.translateMessage("Thank you, your email was updated.", lang);
-        await core.pubsContainer.updateAsync(userJs["id"], async (entry: JsonBuilder) => {
+        await updateAsync(userJs.id, async (entry) => {
             let jsb = entry["settings"];
             jsb["emailverified"] = true;
             jsb["previousemail"] = "";
-            entry["emailcode"] = "";
+            entry.emailcode = "";
         });
     }
     res.sendText(msg, "text/plain");

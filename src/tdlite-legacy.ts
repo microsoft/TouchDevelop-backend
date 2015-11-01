@@ -58,6 +58,8 @@ var workspaceTable: azureTable.Table;
 var identityTable: azureTable.Table;
 var largeinstalledContainer: azureBlobStorage.Container;
 
+type IUser = tdliteUsers.IUser;
+
 export async function initAsync()
 {
     let pref = "LEGACY"
@@ -74,14 +76,14 @@ export async function initAsync()
     
     core.addRoute("POST", "*user", "importsettings", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
-        req.response = await importSettingsAsync(req.rootPub)
+        req.response = await importSettingsAsync(<IUser>req.rootPub)
     });
    
     core.addRoute("POST", "import", "usersettings", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
         let entities = await tdliteUsers.users.getIndex("all").fetchAsync("all", req.queryOptions);
         let resp = {}
-        await parallel.forJsonAsync(entities.items, async(v) => {
+        await parallel.forJsonAsync(entities.items, async(v:IUser) => {
             let r = await importSettingsAsync(v);
             resp[v["id"]] = r["code"];
         }, 25);
@@ -416,7 +418,7 @@ export async function importWorkspaceAsync(userjson: {}) {
 var normalFields = ["Nickname", "AboutMe", "Culture", "Email", "Gender", "HowFound", "Location", "Occupation",
                     "ProgrammingKnowledge", "RealName", "TwitterHandle", "Website"]
 
-export async function importSettingsAsync(jsb: {}) {
+export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
     let force = false;
 
     let s = await tdliteUsers.buildSettingsAsync(jsb);
@@ -443,7 +445,7 @@ export async function importSettingsAsync(jsb: {}) {
     let s1 = JSON.stringify(s.toJson())
 
 
-    await tdliteUsers.users.reindexAsync(id, async(v) => {
+    await tdliteUsers.users.reindexAsync(id, async(v:tdliteUsers.IUser) => {
         tdliteUsers.applyUserSettings(v, s.toJson());
         if (!v["permissions"])
             v["permissions"] = ",user,";
@@ -545,7 +547,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
             return
         }
         
-        let u = await core.getPubAsync(legId, "user");
+        let u = await tdliteUsers.getAsync(legId);
         if (!u) {
             err("We couldn't find this user ID.")
             return;
@@ -553,7 +555,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         
         // refresh settings
         await importSettingsAsync(u);
-        u = await core.getPubAsync(legId, "user");        
+        u = await tdliteUsers.getAsync(legId);        
         
         if (!u["settings"] || !u["settings"]["email"]) {
             err("No email associated with that user ID. Please go to www.touchdevelop.com and set your email first.")
