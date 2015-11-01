@@ -380,8 +380,8 @@ export async function initAsync() : Promise<void>
                         publicationid: gr.id,
                         publicationkind: "group"
                     });
-                    await core.pubsContainer.updateAsync(req.rootId, async (entry7: JsonBuilder) => {
-                        delete entry7["awaiting"];
+                    await tdliteUsers.updateAsync(req.rootId, async (entry7) => {
+                        delete entry7.awaiting;
                     });
                 }
                 await core.pubsContainer.updateAsync(gr.id, async (entry8: JsonBuilder) => {
@@ -482,13 +482,10 @@ export async function addUserToGroupAsync(userid: string, gr: JsonObject, auditR
     await groupMemberships.insertAsync(jsb);
     let pub = gr["pub"];
     if (pub["isclass"]) {
-        await core.pubsContainer.updateAsync(userid, async (entry: JsonBuilder) => {
-            let grps = core.setBuilderIfMissing(entry, "groups");
-            grps[gr["id"]] = 1;
-            if (pub["userid"] == userid) {
-                let dictionary = core.setBuilderIfMissing(entry, "owngroups");
-                dictionary[gr["id"]] = 1;
-            }
+        await tdliteUsers.updateAsync(userid, async (entry) => {
+            entry.groups[gr["id"]] = 1;
+            if (pub["userid"] == userid)
+                entry.owngroups[gr["id"]] = 1;                
         });
     }
     if (auditReq != null) {
@@ -505,8 +502,8 @@ async function reindexGroupsAsync(json: JsonObject) : Promise<void>
 {
     let userid = json["id"];
     let groups = await getUser_sGroupsAsync(userid);
-    let grps = {};
-    let owngrps = {};
+    let grps:td.SMap<number> = {};
+    let owngrps:td.SMap<number> = {};
     for (let js of groups) {
         let grp = PubGroup.createFromJson(js["pub"]);
         if (grp.isclass) {
@@ -516,9 +513,9 @@ async function reindexGroupsAsync(json: JsonObject) : Promise<void>
             }
         }
     }
-    await core.pubsContainer.updateAsync(userid, async (entry: JsonBuilder) => {
-        entry["groups"] = grps;
-        entry["owngroups"] = owngrps;
+    await tdliteUsers.updateAsync(userid, async (entry) => {
+        entry.groups = grps;
+        entry.owngroups = owngrps;
     });
     logger.debug("reindex grps: " + userid + " -> " + JSON.stringify(grps));
 }

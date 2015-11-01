@@ -111,8 +111,9 @@ export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind
             jsb3["PartitionKey"] = id;
             jsb3["notificationkind"] = toNotify[id];
             await notificationsTable.insertEntityAsync(td.clone(jsb3), "or merge");
-            if (id != "all") {
-                await core.pubsContainer.updateAsync(id, async (entry: JsonBuilder) => {
+            if (id != "all") {                 
+                await core.pubsContainer.updateAsync(id, async(entry: JsonBuilder) => {
+                    // this may be a user or a group
                     let num = core.orZero(entry["notifications"]);
                     entry["notifications"] = num + 1;
                 });
@@ -204,7 +205,7 @@ async function addSubscriptionAsync(follower: string, celebrity: string) : Promi
         jsb["pub"] = sub.toJson();
         jsb["id"] = sub.id;
         await subscriptions.insertAsync(jsb);
-        await core.pubsContainer.updateAsync(sub.publicationid, async (entry: JsonBuilder) => {
+        await tdliteUsers.updateAsync(sub.publicationid, async (entry) => {
             core.increment(entry, "subscribers", 1);
         });
     }
@@ -218,7 +219,7 @@ async function removeSubscriptionAsync(follower: string, celebrity: string) : Pr
     if (entry2 != null) {
         let delok = await core.deleteAsync(entry2);
         if (delok) {
-            await core.pubsContainer.updateAsync(celebrity, async (entry: JsonBuilder) => {
+            await tdliteUsers.updateAsync(celebrity, async (entry) => {
                 core.increment(entry, "subscribers", -1);
             });
         }
@@ -279,8 +280,9 @@ export async function sendAsync(about: JsonObject, notkind: string, suplemental:
     jsb2["PartitionKey"] = target;
     jsb2["RowKey"] = notification.id;
     await notificationsTable.insertEntityAsync(td.clone(jsb2), "or merge");
-    await core.pubsContainer.updateAsync(target, async (entry: JsonBuilder) => {
-        core.jsonAdd(entry, "notifications", 1);
+    await tdliteUsers.updateAsync(target, async(entry) => {
+        // target is always user
+        entry.notifications++;
     });
     await core.pokeSubChannelAsync("notifications:" + target);
     await core.pokeSubChannelAsync("installed:" + target);

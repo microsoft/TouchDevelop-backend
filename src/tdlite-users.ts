@@ -39,8 +39,7 @@ var emailKeyid: string = "EMAIL";
 var settingsOptionsJson = tdliteData.settingsOptionsJson;
 var useSendgrid: boolean = false;
 
-export interface IUser
-{
+export interface IUser {
     id: string;
     kind: string;
     pub: IPubUser;
@@ -61,8 +60,10 @@ export interface IUser
     termsversion: string;
     migrationtoken: string;
     importworkspace: string; // set to non-empty if we're still importing workspace for this user from the legacy system
-    lastNotificationId: string;
+    lastNotificationId: string;    
     notifications: number;
+    numAbusesByUser: number;
+    numReports: number;
 }
 
 export interface IPubUser
@@ -560,6 +561,9 @@ export function normalizeUser(v: IUser)
     if (!v.owngroups) v.owngroups = {};
     v.credit = core.orZero(v.credit);
     v.totalcredit = core.orZero(v.totalcredit);
+    v.numAbusesByUser = core.orZero(v.numAbusesByUser);
+    v.numReports = core.orZero(v.numReports);
+    v.notifications = core.orZero(v.notifications);
 }
 
 export async function updateAsync(id:string, f:(v:IUser) => Promise<void>)

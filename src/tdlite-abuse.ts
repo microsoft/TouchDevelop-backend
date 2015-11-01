@@ -16,6 +16,7 @@ import * as tdliteWorkspace from "./tdlite-workspace"
 import * as audit from "./tdlite-audit"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteReviews from "./tdlite-reviews"
+import * as tdliteUsers from "./tdlite-users"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -286,14 +287,12 @@ export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
             entry["abuseStatusPosted"] = "active";
             core.bareIncrement(entry, "numAbuses");
         });        
-        await core.pubsContainer.updateAsync(report.publicationuserid, async(entry: JsonBuilder) => {
-            core.bareIncrement(entry, "numAbusesByUser");
+        await tdliteUsers.updateAsync(report.publicationuserid, async(entry) => {
+            entry.numAbusesByUser++;
         });               
-        let tmp = await core.pubsContainer.updateAsync(report.userid, async(entry: JsonBuilder) => {
-            core.bareIncrement(entry, "numReports");
+        await tdliteUsers.updateAsync(report.userid, async(entry) => {
+            entry.numReports++;
         })
-        //let tmp2 = await core.pubsContainer.getAsync(report.userid);
-        //logger.info("userrep: " + tmp["id"] + ":" + tmp["__version"] + " - " + tmp2["__version"])
         await notifications.storeAsync(req, jsb, "");
         await core.returnOnePubAsync(abuseReports, td.clone(jsb), req);
     }
