@@ -20,7 +20,7 @@ import * as search from "./tdlite-search"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteTdCompiler from "./tdlite-tdcompiler"
 import * as tdlitePromos from "./tdlite-promos"
-
+import * as tdliteUsers from "./tdlite-users"
 
 var orFalse = core.orFalse;
 var withDefault = core.withDefault;
@@ -250,7 +250,7 @@ async function canSeeRootpubScriptAsync(req: core.ApiRequest) : Promise<boolean>
         return true;
     }
     else {
-        let entry4 = await core.getPubAsync(scr.userid, "user");
+        let entry4 = await tdliteUsers.getAsync(scr.userid);
         return core.callerSharesGroupWith(req, entry4);
     }
     return seeIt2;
@@ -566,7 +566,7 @@ export async function initAsync() : Promise<void>
                     let pub = json1["pub"];
                     let r = orFalse(pub["noexternallinks"]);
                     if ( ! r) {
-                        let userjson = await core.getPubAsync(pub["userid"], "user");
+                        let userjson = await tdliteUsers.getAsync(pub["userid"]);
                         if ( ! core.hasPermission(userjson, "external-links")) {
                             logger.debug("noexternallink -> true on " + json1["id"]);
                             await scripts.container.updateAsync(json1["id"], async (entry7: JsonBuilder) => {

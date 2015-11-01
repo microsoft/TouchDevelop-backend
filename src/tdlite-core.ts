@@ -24,6 +24,7 @@ import * as tdliteUsers from "./tdlite-users"
 
 export type ApiReqHandler = (req: ApiRequest) => Promise<void>;
 export type ResolutionCallback = (fetchResult: indexedStore.FetchResult, apiRequest: ApiRequest) => Promise<void>;
+export type IUser = tdliteUsers.IUser;
 
 export var executeSearchAsync : (kind: string, q: string, req: ApiRequest) => Promise<void>;
 var somePubStore: indexedStore.Store;
@@ -173,6 +174,15 @@ export class ApiRequest
     public headers: td.StringMap;
     public userinfo: ApireqUserInfo;
     public isCached: boolean = false;
+    
+    public rootUser(): IUser
+    {
+        if (this.rootPub && this.rootPub["kind"] === "user") {
+            return <IUser>this.rootPub;            
+        } else {
+            return null;
+        }
+    }
 }
 
 export interface DecoratedStore
@@ -213,7 +223,7 @@ export class ApireqUserInfo
 {
     public id: string = "";
     public token: Token;
-    public json: tdliteUsers.IUser;
+    public json: IUser;
     public permissionCache: JsonBuilder;
     public ip: string = "";
 }
@@ -791,7 +801,7 @@ export async function checkFacilitatorPermissionAsync(req: ApiRequest, subjectUs
         req.status = httpCode._401Unauthorized;
     }
     if (req.status == 200) {
-        let userjs = await getPubAsync(subjectUserid, "user");
+        let userjs = <IUser>await getPubAsync(subjectUserid, "user");
         if (userjs == null) {
             checkPermission(req, "root");
             return;
@@ -1092,7 +1102,7 @@ export function bareIncrement(entry: JsonBuilder, key: string) : void
     entry[key] = orZero(entry[key]) + 1;
 }
 
-export function hasPermission(userjs: JsonObject, perm: string) : boolean
+export function hasPermission(userjs: IUser, perm: string) : boolean
 {
     if (userjs == null) {
         return false;
@@ -1198,7 +1208,7 @@ export function decrypt(val: string) : string
 export function checkMgmtPermission(req: ApiRequest, addPerm: string) : void
 {
     if (req.status == 200) {
-        let perm = getPermissionLevel(req.rootPub) + "," + addPerm;
+        let perm = getPermissionLevel(req.rootUser()) + "," + addPerm;
         checkPermission(req, perm);
     }
 }
@@ -1237,9 +1247,8 @@ export function setBuilderIfMissing(entry: JsonBuilder, key: string) : JsonBuild
     return dictionary;
 }
 
-export function callerIsFacilitatorOf(req: ApiRequest, subjectJson: JsonObject) : boolean
+export function callerIsFacilitatorOf(req: ApiRequest, subjectJson: IUser) : boolean
 {
-    let isFacilitator: boolean;
     if (req === adminRequest) {
         return true;
     }
@@ -1260,7 +1269,6 @@ export function callerIsFacilitatorOf(req: ApiRequest, subjectJson: JsonObject) 
         }
     }
     return false;
-    return isFacilitator;
 }
 
 export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject) : boolean
@@ -1296,7 +1304,6 @@ export function isAbuseSafe(elt: JsonObject) : boolean
 
 export function callerHasPermission(req: ApiRequest, perm: string) : boolean
 {
-    let hasPerm: boolean;
     if (req === adminRequest) {
         return true;
     }
@@ -1304,7 +1311,6 @@ export function callerHasPermission(req: ApiRequest, perm: string) : boolean
         return false;
     }
     return hasPermission(req.userinfo.json, perm);
-    return hasPerm;
 }
 
 export function encryptJson(js: JsonObject, keyid: string) : JsonObject
@@ -1316,9 +1322,8 @@ export function encryptJson(js: JsonObject, keyid: string) : JsonObject
 }
 
 
-export function getPermissionLevel(userjs: JsonObject) : string
+export function getPermissionLevel(userjs: IUser) : string
 {
-    let lastperm2: string;
     let lastperm = "level0";
     for (let i = 0; i < 7; i++) {
         if (hasPermission(userjs, "level" + i)) {
@@ -1329,12 +1334,10 @@ export function getPermissionLevel(userjs: JsonObject) : string
         }
     }
     return lastperm;
-    return lastperm2;
 }
 
 export async function handledByCacheAsync(apiRequest: ApiRequest) : Promise<boolean>
 {
-    let handled: boolean;
     let entry = await cachedApiContainer.getAsync(apiRequest.origUrl);
     if (entry == null) {
         return false;
@@ -1350,7 +1353,6 @@ export async function handledByCacheAsync(apiRequest: ApiRequest) : Promise<bool
     apiRequest.response = entry["response"];
     apiRequest.status = entry["status"];
     return true;
-    return handled;
 }
 
 /**
@@ -1358,13 +1360,11 @@ export async function handledByCacheAsync(apiRequest: ApiRequest) : Promise<bool
  */
 export async function flushApiCacheAsync(s: string) : Promise<string>
 {
-    let val: string;
     let jsb2 = {};
     let value = azureTable.createRandomId(10);
     jsb2["value"] = value;
     await cachedApiContainer.justInsertAsync("@" + s, jsb2);
     return value;
-    return val;
 }
 
 /**
@@ -1372,7 +1372,6 @@ export async function flushApiCacheAsync(s: string) : Promise<string>
  */
 export async function acquireCacheLockAsync(path: string) : Promise<string>
 {
-    let b2: string;
     let timeout = 10;
     let item = "lock:" + path
     let args = [item, "self", "EX", timeout.toString(), "NX"]
@@ -1390,7 +1389,6 @@ export async function acquireCacheLockAsync(path: string) : Promise<string>
     }
     logger.debug("failed cache lock, wait finished: " + item);
     return "";
-    return b2;
 }
 
 export async function releaseCacheLockAsync(lock: string) : Promise<void>
@@ -1536,7 +1534,7 @@ export function isAlarming(perm: string) : boolean
 {
     let jsb = {};
     jsb["permissions"] = "non-alarming";
-    return ! hasPermission(jsb, perm);
+    return ! hasPermission(<IUser>jsb, perm);
 }
 
 export function getSettings(name: string): JsonObject
@@ -1683,7 +1681,7 @@ export async function deleteAsync(delEntry: JsonObject) : Promise<boolean>
 
 export async function setReqUserIdAsync(req: ApiRequest, uid: string) : Promise<void>
 {
-    let userjs = <tdliteUsers.IUser> await getPubAsync(uid, "user");
+    let userjs = <IUser> await getPubAsync(uid, "user");
     if (userjs == null) {
         req.status = httpCode._401Unauthorized;
         logger.info("accessing token for deleted user, " + uid);

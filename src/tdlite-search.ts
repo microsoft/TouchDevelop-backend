@@ -20,8 +20,7 @@ import * as tdliteIndex from "./tdlite-index"
 import * as tdliteScripts from "./tdlite-scripts"
 import * as tdliteAbuse from "./tdlite-abuse"
 import * as tdlitePointers from "./tdlite-pointers"
-
-
+import * as tdliteUsers from "./tdlite-users"
 
 var orEmpty = td.orEmpty;
 var logger = core.logger;
@@ -129,7 +128,7 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
         let desc = orEmpty(pub["description"]) + " " + orEmpty(pub["name"]) 
         
         // TODO this was alrady fetched in "resolve" above...
-        let userjson = await core.getPubAsync(pub["userid"], "user");        
+        let userjson = await tdliteUsers.getAsync(pub["userid"]);        
         await tdliteAbuse.scanAndPostAsync(pub["id"], text, desc, userjson);
 
         if (acsCallbackUrl) { 

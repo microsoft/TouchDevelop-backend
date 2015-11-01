@@ -135,7 +135,7 @@ export async function initAsync() : Promise<void>
                 user = "";
             }
             if (user != "") {
-                let newOwner = await core.getPubAsync(user, "user");
+                let newOwner = await tdliteUsers.getAsync(user);
                 if (newOwner == null || ! core.hasPermission(newOwner, "post-group") || ! newOwner["groups"].hasOwnProperty(req.rootId)) {
                     req.status = httpCode._412PreconditionFailed;
                     return;
@@ -231,7 +231,7 @@ export async function initAsync() : Promise<void>
                         req5.status = httpCode._409Conflict;
                     }
                     else if (codeObj1["credit"] > 0) {
-                        await tdliteUsers.applyCodeAsync(req5.rootPub, codeObj1, passId1, req5);
+                        await tdliteUsers.applyCodeAsync(req5.rootUser(), codeObj1, passId1, req5);
                         req5.response = ({});
                     }
                     else {

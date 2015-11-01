@@ -22,6 +22,7 @@ import * as tdliteTdCompiler from "./tdlite-tdcompiler"
 import * as tdliteDocs from "./tdlite-docs"
 import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteArt from "./tdlite-art"
+import * as tdliteUsers from "./tdlite-users"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -432,7 +433,7 @@ async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: Json
     td.jsonCopyFrom(pubdata, scriptjs["pub"]);
     pubdata["scriptId"] = scriptjs["id"];
     let userid = scriptjs["pub"]["userid"];
-    let userjs = await core.getPubAsync(userid, "user");
+    let userjs = await tdliteUsers.getAsync(userid);
     let username = "User " + userid;
     let allowlinks = "";
     if (core.hasPermission(userjs, "external-links")) {

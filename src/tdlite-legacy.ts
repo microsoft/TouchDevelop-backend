@@ -76,7 +76,7 @@ export async function initAsync()
     
     core.addRoute("POST", "*user", "importsettings", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
-        req.response = await importSettingsAsync(<IUser>req.rootPub)
+        req.response = await importSettingsAsync(req.rootUser())
     });
    
     core.addRoute("POST", "import", "usersettings", async(req: core.ApiRequest) => {
@@ -140,9 +140,9 @@ export async function initAsync()
         }
         
         let uid = json["id"]
-        let userjson = await core.getPubAsync(uid, "user");
+        let userjson = await tdliteUsers.getAsync(uid);
         if (!userjson) {
-            userjson = await tdliteImport.reimportPub(uid, "user");
+            userjson = <IUser> await tdliteImport.reimportPub(uid, "user");
             if (!userjson) {
                 req.status = httpCode._424FailedDependency;
                 return;
@@ -154,15 +154,15 @@ export async function initAsync()
             return;            
         }
         
-        userjson = await core.pubsContainer.updateAsync(uid, async(v) => {
-            if (!v["migrationtoken"]) {
-                v["migrationtoken"] = "1" + uid + "." + td.createRandomId(32);
+        userjson = await tdliteUsers.updateAsync(uid, async(v) => {            
+            if (!v.migrationtoken) {
+                v.migrationtoken = "1" + uid + "." + td.createRandomId(32);
             }
         })
         
         req.response = {
             userid: uid,
-            migrationtoken: userjson["migrationtoken"]
+            migrationtoken: userjson.migrationtoken
         }        
     })
     
@@ -203,9 +203,9 @@ export async function initAsync()
         }
 
         let uid = td.orEmpty(ent["UserId"])
-        let userjson = await core.getPubAsync(uid, "user")
+        let userjson = await tdliteUsers.getAsync(uid)
         if (!userjson)
-            userjson = await tdliteImport.reimportPub(uid, "user");
+            userjson = <IUser> await tdliteImport.reimportPub(uid, "user");
 
         if (!userjson) {
             // log crash
@@ -516,7 +516,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     };
     
     if (tokM) {
-        let userjson = await core.getPubAsync(tokM[1], "user");
+        let userjson = await tdliteUsers.getAsync(tokM[1]);
         if (userjson && userjson["migrationtoken"] === session.oauthU) {
             let ok = await session.setMigrationUserAsync(userjson["id"]);
             if (!ok) {

@@ -14,6 +14,7 @@ import * as core from "./tdlite-core"
 import * as tdliteScripts from "./tdlite-scripts"
 import * as search from "./tdlite-search"
 import * as notifications from "./tdlite-notifications"
+import * as tdliteUsers from "./tdlite-users"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -120,7 +121,7 @@ export async function initAsync() : Promise<void>
         if (req3.argument == "me") {
             req3.argument = req3.userid;
         }
-        let userJs = await core.getPubAsync(req3.argument, "user");
+        let userJs = await tdliteUsers.getAsync(req3.argument);
         if (userJs == null) {
             req3.status = 404;
         }

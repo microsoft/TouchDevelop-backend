@@ -49,6 +49,7 @@ export interface IUser
     altLogins: string[];
     credit: number;
     emailcode: string; // verification code
+    firstcode: string; // code used to create the account
     totalcredit: number;
     permissions: string;
     secondaryid: string;
@@ -58,6 +59,7 @@ export interface IUser
     groups: td.SMap<number>;
     owngroups: td.SMap<number>;
     termsversion: string;
+    migrationtoken: string;
     importworkspace: string; // set to non-empty if we're still importing workspace for this user from the legacy system
 }
 
@@ -294,7 +296,7 @@ export async function initAsync() : Promise<void>
             req.status = httpCode._404NotFound;
             return;
         }
-        let rootUser = <IUser>req.rootPub;
+        let rootUser = req.rootUser();
         let rootPassId = rootUser.login;
         let rootPass = await passcodesContainer.getAsync(rootPassId);
         let otherPassId = otherUser.login;
@@ -496,7 +498,7 @@ export async function initAsync() : Promise<void>
             if (req5.userid != req5.rootId) {
                 await audit.logAsync(req5, "view-settings");
             }
-            let jsb = (await buildSettingsAsync(<IUser>req5.rootPub)).toJson();
+            let jsb = (await buildSettingsAsync(req5.rootUser())).toJson();
             if (orEmpty(req5.queryOptions["format"]) != "short") {
                 core.copyJson(settingsOptionsJson, jsb);
             }
@@ -513,7 +515,7 @@ export async function initAsync() : Promise<void>
 
     core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
-        let u = <IUser>req.rootPub;
+        let u = req.rootUser();
         if (!u.login) {
             req.status = httpCode._404NotFound
             return;            
@@ -754,15 +756,15 @@ export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passI
         credit = Math.min(credit, singleCredit);
     }
     let perm = withDefault(codeObj["permissions"], "preview,");
-    await updateAsync(userid, async (entry) => {
-        core.jsonAdd(entry, "credit", credit);
-        core.jsonAdd(entry, "totalcredit", credit);
-        if ( ! core.hasPermission(td.clone(entry), perm)) {
-            let existing = core.normalizePermissions(orEmpty(entry["permissions"]));
-            entry["permissions"] = existing + "," + perm;
+    await updateAsync(userid, async(entry: IUser) => {
+        entry.credit = core.orZero(entry.credit) + credit;
+        entry.totalcredit = core.orZero(entry.totalcredit) + credit;
+        if ( ! core.hasPermission(entry, perm)) {
+            let existing = core.normalizePermissions(orEmpty(entry.permissions));
+            entry.permissions = existing + "," + perm;
         }
-        if (! entry["firstcode"]) {
-            entry["firstcode"] = passId;
+        if (! entry.firstcode) {
+            entry.firstcode = passId;
         }
         await sendPermissionNotificationAsync(core.emptyRequest, entry);
     });

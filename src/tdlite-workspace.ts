@@ -269,7 +269,7 @@ async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<
         if (req.status == 200) {
             if (long) {
                 // re-get for new notifiacation count if any
-                req.rootPub = await core.getPubAsync(uid, "user");
+                req.rootPub = await tdliteUsers.getAsync(uid);
             }             
             let res:IPubHeaders = <any>{};
             res.headers = await getInstalledHeadersAsync(uid);

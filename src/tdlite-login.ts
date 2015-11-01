@@ -26,6 +26,8 @@ import * as tdliteLegacy from "./tdlite-legacy"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
+type IUser = tdliteUsers.IUser;
+
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
 
@@ -82,10 +84,10 @@ export class LoginSession
         return true
     }
     
-    public async createUserIfNeededAsync(req: restify.Request): Promise<tdliteUsers.IUser>
+    public async createUserIfNeededAsync(req: restify.Request): Promise<IUser>
     {
         if (this.userCreated()) {
-            let js = await core.getPubAsync(this.userid, "user");
+            let js = await tdliteUsers.getAsync(this.userid);
             if (this.termsOk)
                 js = await this.updateTermsVersionAsync(req, js)
             return js
@@ -110,7 +112,7 @@ export class LoginSession
         return userjs
     }
     
-    public async updateTermsVersionAsync(req:restify.Request, userjs:{})
+    public async updateTermsVersionAsync(req:restify.Request, userjs:IUser)
     {          
         if (core.serviceSettings.termsversion != "") {
             userjs = await tdliteUsers.updateAsync(this.userid, async(entry1) => {
@@ -179,7 +181,7 @@ export async function initAsync(): Promise<void> {
         }
         else {
             let uid = req1.param("userid");
-            let entry2 = await core.getPubAsync(uid, "user");
+            let entry2 = await tdliteUsers.getAsync(uid);
             if (entry2 == null) {
                 if (await core.throttleCoreAsync(throttleKey, 100)) {
                     res1.sendError(httpCode._429TooManyRequests, "");
@@ -282,10 +284,10 @@ export async function initAsync(): Promise<void> {
             else if (accessCode == core.tokenSecret && session.userid != "") {
                 // **this is to be used during initial setup of a new cloud deployment**
                 await session.createUserIfNeededAsync(req);
-                await core.pubsContainer.updateAsync(session.userid, async(entry: JsonBuilder) => {
-                    core.jsonAdd(entry, "credit", 1000);
-                    core.jsonAdd(entry, "totalcredit", 1000);
-                    entry["permissions"] = ",admin,";
+                await tdliteUsers.updateAsync(session.userid, async(entry) => {
+                    entry.credit = 1000;
+                    entry.totalcredit = 1000;
+                    entry.permissions = ",admin,";
                 });
                 await session.accessTokenRedirectAsync(req);                
             }
@@ -380,8 +382,8 @@ async function generateTokenAsync(user: string, reason: string, client_id: strin
     if (orEmpty(client_id) != "no-cookie") {
         token.cookie = td.createRandomId(32);
     }
-    await core.pubsContainer.updateAsync(user, async (entry: JsonBuilder) => {
-        entry["lastlogin"] = await core.nowSecondsAsync();
+    await tdliteUsers.updateAsync(user, async (entry) => {
+        entry.lastlogin = await core.nowSecondsAsync();
     });
     await tokensTable.insertEntityAsync(token.toJson(), "or merge");
     return {
@@ -440,7 +442,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         if (upointer == null) {
             let legacyId = "id/" + provider + "/" + core.sha256(providerUserId);
             let entry = await tdliteUsers.passcodesContainer.getAsync(legacyId);
-            if (core.isGoodPub(entry, "userpointer") && await core.getPubAsync(entry["userid"], "user") != null) {
+            if (core.isGoodPub(entry, "userpointer") && await tdliteUsers.getAsync(entry["userid"]) != null) {
                 upointer = entry;
                 profileId = legacyId;
             }
@@ -448,7 +450,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         if (upointer == null) {
             let legacyId1 = "id/" + provider + "/" + td.replaceAll(providerUserId, ":", "/");
             let entry1 = await tdliteUsers.passcodesContainer.getAsync(legacyId1);
-            if (core.isGoodPub(entry1, "userpointer") && await core.getPubAsync(entry1["userid"], "user") != null) {
+            if (core.isGoodPub(entry1, "userpointer") && await tdliteUsers.getAsync(entry1["userid"]) != null) {
                 upointer = entry1;
                 profileId = legacyId1;
             }
@@ -461,16 +463,15 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         }
     }
 
-    let userjs = (<JsonBuilder>null);
+    let userjs: IUser = null;
     if (core.isGoodPub(upointer, "userpointer")) {
-        let entry31 = await core.getPubAsync(upointer["userid"], "user");
+        let entry31 = await tdliteUsers.getAsync(upointer["userid"]);
         if (entry31 != null) {
-            userjs = td.clone(entry31);
-            if (orEmpty(userjs["login"]) != profileId) {
-                await core.pubsContainer.updateAsync(userjs["id"], async(entry4: JsonBuilder) => {
-                    entry4["login"] = profileId;
+            userjs = entry31;
+            if (orEmpty(userjs.login) != profileId) {
+                userjs = await tdliteUsers.updateAsync(userjs.id, async(entry4) => {
+                    entry4.login = profileId;
                 });
-                userjs["login"] = profileId;
             }
         }
     }
@@ -487,18 +488,18 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
             // New accounts blocked for now.
             return "/";
         }
-        userjs = { id: "pending" }
+        userjs = <any> { id: "pending" }
     }
     else {
         logger.tick("Login@federated");
         let uidOverride = withDefault(clientOAuth.u, userjs["id"]);
         if (/^[a-z]+$/.test(uidOverride) && uidOverride != userjs["id"]) {
             logger.info("login with override: " + userjs["id"] + "->" + uidOverride);
-            if (core.hasPermission(td.clone(userjs), "signin-" + uidOverride)) {
-                let entry41 = await core.getPubAsync(uidOverride, "user");
+            if (core.hasPermission(userjs, "signin-" + uidOverride)) {
+                let entry41 = await tdliteUsers.getAsync(uidOverride);
                 if (entry41 != null) {
                     logger.debug("login with override OK: " + userjs["id"] + "->" + uidOverride);
-                    userjs = td.clone(entry41);
+                    userjs = entry41;
                 }
             }
         }
@@ -591,7 +592,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
         else {
             let kind = codeObj["kind"];
             if (kind == "userpointer") {
-                let userJson = await core.getPubAsync(codeObj["userid"], "user");
+                let userJson = await tdliteUsers.getAsync(codeObj["userid"]);
                 if (session.userid != "") {
                     msg = core.translateMessage("We need an activation code here, not user password.", lang);
                 }
@@ -629,7 +630,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
                 else {
                     session.ownerId = groupJson["pub"]["userid"];
-                    let groupOwner = await core.getPubAsync(session.ownerId, "user");
+                    let groupOwner = await tdliteUsers.getAsync(session.ownerId);
                     if (core.orZero(groupOwner["credit"]) <= 0) {
                         msg = core.translateMessage("Group owner is out of activation credits.", lang);
                     }
@@ -670,7 +671,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             if (termsversion == "noway") {
                 await serverAuth.options().setData(session.state, "{}");
                 if (session.userCreated()) {
-                    let delEntry = await core.getPubAsync(session.userid, "user");
+                    let delEntry = await tdliteUsers.getAsync(session.userid);
                     if (delEntry != null && ! delEntry["termsversion"] && ! delEntry["permissions"]) {
                         let delok = await core.deleteAsync(delEntry);
                         await core.pubsContainer.updateAsync(session.userid, async (entry: JsonBuilder) => {
@@ -702,7 +703,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 inner = "newadult";
                 params["EXAMPLES"] = "";
                 params["SESSION"] = session.state;
-                let uentry = await core.getPubAsync(session.userid, "user");
+                let uentry = await tdliteUsers.getAsync(session.userid);
                 if (uentry) {
                     let nm = uentry["pub"].name
                     params["EXAMPLES"] = ["Ms" + nm, "Mr" + nm, nm + td.randomRange(10, 99)].join(", ");

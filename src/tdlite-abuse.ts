@@ -102,7 +102,7 @@ export async function initAsync() : Promise<void>
     
     abuseReports = await indexedStore.createStoreAsync(core.pubsContainer, "abusereport");
     await core.setResolveAsync(abuseReports, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
-        let users = await core.followPubIdsAsync(fetchResult.items, "publicationuserid", "");
+        let users = <core.IUser[]>await core.followPubIdsAsync(fetchResult.items, "publicationuserid", "");
         let pubs = await core.followPubIdsAsync(fetchResult.items, "publicationid", "");
         let withUsers = await core.addUsernameEtcCoreAsync(fetchResult.items);
         let coll = (<PubAbusereport[]>[]);
@@ -166,7 +166,7 @@ export async function initAsync() : Promise<void>
     core.addRoute("DELETE", "*user", "", async (req8: core.ApiRequest) => {
         await checkDeletePermissionAsync(req8);
         // Level4 users cannot be deleted; you first have to downgrade their permissions.
-        if (req8.status == 200 && core.hasPermission(req8.rootPub, "level4")) {
+        if (req8.status == 200 && core.hasPermission(req8.rootUser(), "level4")) {
             req8.status = httpCode._402PaymentRequired;
         }
         if (req8.status == 200) {
@@ -446,7 +446,7 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     return res;
 }
 
-export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: {}) {
+export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: core.IUser) {
     let msg = scanText(body, core.hasPermission(userjson, "external-links"), false);
     msg += scanText(desc, core.hasPermission(userjson, "external-links"), true);
     if (!msg) return;
