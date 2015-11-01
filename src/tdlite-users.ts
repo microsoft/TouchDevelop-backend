@@ -491,6 +491,10 @@ export async function initAsync() : Promise<void>
     core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
         let login = req.rootPub["login"]
+        if (!login) {
+            req.status = httpCode._412PreconditionFailed;
+            return;            
+        }
         await passcodesContainer.updateAsync(login, async(v) => {
             v["userid"] = "";
         })

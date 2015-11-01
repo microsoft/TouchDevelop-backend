@@ -1,0 +1,241 @@
+{% extends "_layouts/signin.html" %}
+{% set title = "Touch Develop - Sign in" %}
+
+{% block innerbody %}
+
+{% include "_includes/providers-css.html" %}
+
+<style type="text/css">
+.progressBar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0.3em;
+  overflow: hidden;
+}
+
+.progressDot {
+  background: purple;
+  width: 0.3em;
+  height: 0.3em;
+  position: absolute;
+  animation: moveProgressDot 3s infinite;                      /*CSSpref*/  -ms-animation: moveProgressDot 3s infinite;  -webkit-animation: moveProgressDot 3s infinite;  -moz-animation: moveProgressDot 3s infinite;
+  transform: translate(-11em, 0);                      /*CSSpref*/  -ms-transform: translate(-11em, 0);  -webkit-transform: translate(-11em, 0);  -moz-transform: translate(-11em, 0);
+}
+
+.progressDot-0 {
+    left: 7em;
+  animation-delay: 0.9s;                      /*CSSpref*/  -ms-animation-delay: 0.9s;  -webkit-animation-delay: 0.9s;  -moz-animation-delay: 0.9s;
+}
+
+.progressDot-1 {
+    left: 8em;
+  animation-delay: 0.6s;                      /*CSSpref*/  -ms-animation-delay: 0.6s;  -webkit-animation-delay: 0.6s;  -moz-animation-delay: 0.6s;
+}
+
+.progressDot-2 {
+    left: 9em;
+  animation-delay: 0.3s;                      /*CSSpref*/  -ms-animation-delay: 0.3s;  -webkit-animation-delay: 0.3s;  -moz-animation-delay: 0.3s;
+}
+
+.progressDot-3 {
+    left: 10em;
+  animation-delay: 0s;                      /*CSSpref*/  -ms-animation-delay: 0s;  -webkit-animation-delay: 0s;  -moz-animation-delay: 0s;
+}
+
+@keyframes moveProgressDot {
+  0% { transform: translate(-11em, 0); }
+  35% { transform: translate(0, 0); }
+  65% { transform: translate(0, 0); }
+  100% { transform: translate(20em, 0); }
+}   /*CSSpref*/ @-ms-keyframes moveProgressDot { 0% { -ms-transform: translate(-11em, 0); } 35% { -ms-transform: translate(0, 0); } 65% { -ms-transform: translate(0, 0); } 100% { -ms-transform: translate(20em, 0); } }  @-webkit-keyframes moveProgressDot { 0% { -webkit-transform: translate(-11em, 0); } 35% { -webkit-transform: translate(0, 0); } 65% { -webkit-transform: translate(0, 0); } 100% { -webkit-transform: translate(20em, 0); } }  @-moz-keyframes moveProgressDot { 0% { -moz-transform: translate(-11em, 0); } 35% { -moz-transform: translate(0, 0); } 65% { -moz-transform: translate(0, 0); } 100% { -moz-transform: translate(20em, 0); } } 
+
+</style>
+
+
+<div id="main">
+	<h2>
+		Legacy sign-in
+	</h2>
+                
+    <div class="agree">
+        By signing in to TouchDevelop you agree to the
+        <a href="/legal">Cloud Services Agreement</a>
+        with Microsoft Research. Please read our statement on
+        <a href="/privacy">Privacy and Cookies</a>.
+    </div>
+
+	<div id="SignInContent" class="SignInContent">
+		<div id="LeftArea" class="LeftArea">
+			<div id="LeftAreaText" class="Header"  style="display:none;"><b>sign in with...</b></div>   
+			<div id="IdentityProvidersList"></div><br />
+			<div class="Header" id="MoreOptions" style="display:none;padding-top:0px;"><a href="javascript:;" onclick="ShowDefaultSigninPage(); return false;">show more account options</a></div>
+		</div> 
+		<div id="Divider" class="Divider" style="display:none;">
+			<div class="DividerLine"></div>
+			<div>Or</div>
+			<div class="DividerLine"></div>
+		</div>
+	</div>
+
+    <div class="agree">
+        TouchDevelop client apps use cloud services to synchronize your scripts across all your devices.
+    </div>
+</div>
+
+
+    <script type="text/javascript">
+        var identity_provider = '';
+    </script>
+    <script type="text/javascript">
+        var identityProviders = [];
+        var maxImageWidth = 240;
+        var maxImageHeight = 40;
+        var progress = mkProgressBar();
+        var numIdentityProviderButtons = 0;
+        var showMoreOptionsLink = false;
+
+        document.getElementById("LeftArea").appendChild(progress);
+        progress.start();
+
+        function ShowSigninPage(json) {
+            if (progress) { progress.stop(); progress = null; }
+            document.getElementById("LeftAreaText").style.display = "block";
+            var lastIdentityProvider = !!window.localStorage ? window.localStorage.last_identity_provider : undefined;
+            identityProviders = json;
+
+            for (var i in identityProviders) {
+                var identityProvider = identityProviders[i];
+                var shortName = identityProvider.Name;
+                if (shortName == "Windows Live™ ID") shortName = "Microsoft";
+                if (shortName == identity_provider) {
+                    if (!!window.localStorage) try { window.localStorage.last_identity_provider = identityProvider.Name; } catch (e) { }
+                    window.location = identityProvider.LoginUrl;
+                    return;
+                }
+
+                if (!lastIdentityProvider) {
+                    CreateIdentityProviderButton(identityProvider);
+                    numIdentityProviderButtons++;
+                }
+                else {
+                    if (lastIdentityProvider == identityProvider.Name) {
+                        CreateIdentityProviderButton(identityProvider);
+                        numIdentityProviderButtons++;
+                    }
+                    else
+                        showMoreOptionsLink = true;
+                }
+            }
+            if (!!lastIdentityProvider && numIdentityProviderButtons === 0)
+                ShowDefaultSigninPage();
+            else
+                ShowSigninControls();
+        }
+
+        function ShowDefaultSigninPage() {
+            if (progress) { progress.stop(); progress = null; }
+            document.getElementById("LeftAreaText").style.display = "block";
+            document.getElementById("IdentityProvidersList").innerHTML = "";
+            numIdentityProviderButtons = 0;
+            for (var i in identityProviders) {
+                CreateIdentityProviderButton(identityProviders[i]);
+                numIdentityProviderButtons++;
+            }
+            showMoreOptionsLink = false;
+            ShowSigninControls();
+        }
+
+        function ShowSigninControls() {
+            if (numIdentityProviderButtons > 0)
+                document.getElementById("LeftArea").style.display = "";
+            if (showMoreOptionsLink)
+                document.getElementById("MoreOptions").style.display = "";
+            else
+                document.getElementById("MoreOptions").style.display = "none";
+        }
+
+        function CreateIdentityProviderButton(identityProvider) {
+            var idpList = document.getElementById("IdentityProvidersList");
+            var button = document.createElement("button");
+            button.setAttribute("name", identityProvider.Name);
+            button.setAttribute("id", identityProvider.LoginUrl);
+            button.className = "IdentityProvider";
+            button.onclick = IdentityProviderButtonClicked;
+            if (identityProvider.ImageUrl.length > 0) {
+                var img = document.createElement("img");
+                var p = mkProgressBar();
+                img.className = "IdentityProviderImage";
+                img.setAttribute("src", identityProvider.ImageUrl);
+                img.setAttribute("alt", identityProvider.Name);
+                img.setAttribute("border", "0");
+                img.onload = function() { Loaded(img, p); };
+                button.appendChild(img);
+                button.appendChild(p);
+                p.start();
+            }
+            else {
+                Loaded();
+                if (identityProvider.ImageUrl.length === 0)
+                    button.appendChild(document.createTextNode(identityProvider.Name));
+            }
+            idpList.appendChild(button);
+        }
+
+        function IdentityProviderButtonClicked() {
+            if (!!window.localStorage) try { window.localStorage.last_identity_provider = this.getAttribute("name"); } catch (e) { }
+            window.location = this.getAttribute("id");
+            return false;
+        }
+
+        function Loaded(img, p) {
+            if (img && img.height > maxImageHeight || img.width > maxImageWidth) {
+                var resizeRatio = 1;
+                if (img.width / img.height > maxImageWidth / maxImageHeight)
+                    resizeRatio = maxImageWidth / img.width;
+                else
+                    resizeRatio = maxImageHeight / img.height;
+                img.setAttribute("height", img.height * resizeRatio);
+                img.setAttribute("width", img.width * resizeRatio);
+            }
+            if (p) p.stop();
+        }
+
+        function div(cl, children) {
+            var elt = document.createElement("div");
+            if (cl != null)
+                elt.className = cl;
+            if (children)
+                for (var i in children)
+                    if (children[i]) elt.appendChild(children[i]);
+            return elt;
+        }
+        function mkProgressBar() {
+            var a = [];
+            for (var i=0; i<4; i++)
+                a.push(div("progressDot progressDot-" + i));
+            var r = div("progressBar", a);
+            var n = 0;
+            function update(k) {
+                n += k;
+                if (n < 0) n = 0;
+                r.style.display = n > 0 ? "block" : "none";
+            }
+            update(0);
+
+            r.start = function() { update(+1) };
+            r.stop = function() { update(-1) };
+            r.reset = function() { update(-n) };
+
+            return r;
+        }
+
+        window.openUrl = "#";
+        initBanner();
+    </script>
+    <script src="https://touchdevelop.accesscontrol.windows.net/v2/metadata/IdentityProviders.js?protocol=wsfederation&amp;realm=https%3a%2f%2fnext.touchdevelop.com%2f&amp;reply_to=https%3a%2f%2fnext.touchdevelop.com%2foauth%2flegacycallback%3ftoken%3d@TOKEN@&amp;context=&amp;request_id=&amp;version=1.0&amp;callback=ShowSigninPage" type="text/javascript"></script>
+
+
+{% endblock %}
+
