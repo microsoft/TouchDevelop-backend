@@ -304,23 +304,6 @@ export async function initAsync(): Promise<void> {
         let _new = "<p>Your access token is below. Only paste in applications you absolutely trust.</p>\n<pre id=\"token\">\nloading...\n</pre>\n<p>You could have added <code>?u=xyzw</code> to get access token for a different user (given the right permissions).\n</p>\n<script>\nsetTimeout(function() {\nvar h = document.location.href.replace(/oauth\\/gettoken.*access_token/, \"?access_token\").replace(/&.*/, \"\");\ndocument.getElementById(\"token\").textContent = h;\n}, 100)\n</script>";
         res4.html(td.replaceAll(td.replaceAll(template_html, "@JS@", ""), "@BODY@", _new));
     });
-    if (false) {
-        core.addRoute("GET", "*user", "rawtoken", async(req5: core.ApiRequest) => {
-            if (req5.userinfo.token.cookie != "") {
-                // Only cookie-less (service) tokens allowed here.
-                req5.status = httpCode._418ImATeapot;
-            }
-            core.checkPermission(req5, "root");
-            if (req5.status == 200) {
-                let tok = await generateTokenAsync(req5.rootId, "admin", "no-cookie");
-                assert(tok.cookie == "", "no cookie expected");
-                await audit.logAsync(req5, "rawtoken", {
-                    data: core.sha256(tok.url).substr(0, 10)
-                });
-                req5.response = (core.self + "?access_token=" + tok.url);
-            }
-        });
-    }
 
     core.addRoute("POST", "logout", "", async(req3: core.ApiRequest) => {
         if (req3.userid != "") {
@@ -535,8 +518,8 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
             session.pass = session.passwords[0];
         }
         // this can go negative; maybe we should reject it in this case?
-        await core.pubsContainer.updateAsync(session.ownerId, async(entry: JsonBuilder) => {
-            core.jsonAdd(entry, "credit", -1);
+        await tdliteUsers.updateAsync(session.ownerId, async(entry) => {
+            entry.credit -= 1;
         });
         logger.tick("PubUser@code");
         let jsb = await tdliteUsers.createNewUserAsync(tdUsername, "", core.normalizeAndHash(session.pass), ",student,", "", initialApprovals);
@@ -550,7 +533,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
             newvalue: td.clone(jsb)
         });
         if (initialApprovals) {
-            await tdliteGroups.addGroupApprovalAsync(groupJson, td.clone(jsb));
+            await tdliteGroups.addGroupApprovalAsync(groupJson, jsb);
         }
         else {
             await tdliteGroups.addUserToGroupAsync(user2, groupJson, (<core.ApiRequest>null));
@@ -670,7 +653,8 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             let termsversion = orEmpty(req.query()["td_agree"]);
             if (termsversion == "noway") {
                 await serverAuth.options().setData(session.state, "{}");
-                if (session.userCreated()) {
+                // this should never be true now
+                if (false && session.userCreated()) {
                     let delEntry = await tdliteUsers.getAsync(session.userid);
                     if (delEntry != null && ! delEntry["termsversion"] && ! delEntry["permissions"]) {
                         let delok = await core.deleteAsync(delEntry);

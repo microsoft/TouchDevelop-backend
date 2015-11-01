@@ -118,8 +118,8 @@ export async function initAsync()
     
     core.addRoute("POST", "*user", "importworkspace", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
-        await core.pubsContainer.updateAsync(req.rootId, async(v) => {
-            v["importworkspace"] = "1";
+        await tdliteUsers.updateAsync(req.rootId, async(v) => {
+            v.importworkspace = "1";
         })
         req.response = {};                
     });
@@ -378,11 +378,11 @@ async function importHeaderAsync(v: WorkspaceEntry) {
         throw new Error("save error: " + res["error"]);
 }
 
-export async function importWorkspaceAsync(userjson: {}) {
-    if (!userjson["importworkspace"])
+export async function importWorkspaceAsync(userjson: IUser) {
+    if (!userjson.importworkspace)        
         return;
     
-    let userid = userjson["id"];
+    let userid = userjson.id;
     let query = workspaceTable.createQuery().partitionKeyIs(userid).and("RowKey", "<", "C")
     query.onlyFields = ["RowKey", "ScriptStatus"];
     let entries = <WorkspaceEntry[]>await query.fetchAllAsync()
@@ -405,8 +405,8 @@ export async function importWorkspaceAsync(userjson: {}) {
     let left = entries.length - slice.length
     if (left == 0) {
         logger.info("workspace import finished for " + userid)
-        await core.pubsContainer.updateAsync(userid, async(v) => {
-            v["importworkspace"] = "";
+        await tdliteUsers.updateAsync(userid, async(v) => {
+            v.importworkspace = "";
         })
     } else {
         logger.info(`workspace import will continue for ${userid}; ${left} entries left`)

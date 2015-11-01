@@ -181,10 +181,10 @@ export async function initAsync() : Promise<void>
                 topNot = js["RowKey"];
             }
             let resp = {};
-            resp["lastNotificationId"] = orEmpty(req6.rootPub["lastNotificationId"]);
-            await core.pubsContainer.updateAsync(req6.rootId, async (entry: JsonBuilder) => {
-                entry["lastNotificationId"] = topNot;
-                entry["notifications"] = 0;
+            resp["lastNotificationId"] = orEmpty(req6.rootUser().lastNotificationId);
+            await tdliteUsers.updateAsync(req6.rootId, async (entry) => {
+                entry.lastNotificationId = topNot;
+                entry.notifications = 0;
             });
             req6.response = td.clone(resp);
         }
@@ -233,7 +233,7 @@ async function getNotificationsAsync(req: core.ApiRequest, long: boolean) : Prom
     else if (req.rootPub["kind"] == "group") {
         let pub = req.rootPub["pub"];
         if (pub["isclass"]) {
-            let b = req.userinfo.json["groups"].hasOwnProperty(pub["id"]);
+            let b = req.userinfo.json.groups.hasOwnProperty(pub["id"]);
             if ( ! b) {
                 core.checkPermission(req, "global-list");
             }

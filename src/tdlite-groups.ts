@@ -60,9 +60,9 @@ export async function initAsync() : Promise<void>
             await parallel.forJsonAsync(memberships, async (json: JsonObject) => {
                 let uid = json["pub"]["userid"];
                 let delok2 = await core.deleteAsync(json);
-                await core.pubsContainer.updateAsync(uid, async (entry: JsonBuilder) => {
-                    delete core.setBuilderIfMissing(entry, "groups")[entryid];
-                    delete core.setBuilderIfMissing(entry, "owngroups")[entryid];
+                await tdliteUsers.updateAsync(uid, async(entry) => {
+                    delete entry.groups[entryid];
+                    delete entry.owngroups[entryid];
                 });
             });
         },
@@ -246,7 +246,7 @@ export async function initAsync() : Promise<void>
                     else {
                         let grp1 = PubGroup.createFromJson(groupJson["pub"]);
                         if (grp1.isclass) {
-                            await addGroupApprovalAsync(groupJson, req5.rootPub);
+                            await addGroupApprovalAsync(groupJson, req5.rootUser());
                             req5.response = ({ "status": "waiting" });
                         }
                         else {
@@ -425,8 +425,9 @@ export async function initAsync() : Promise<void>
                 }
                 else {
                     let delok = await core.deleteAsync(entry41);
-                    await core.pubsContainer.updateAsync(req11.rootId, async (entry9: JsonBuilder) => {
-                        delete core.setBuilderIfMissing(entry9, "groups")[grid];
+                    await tdliteUsers.updateAsync(req11.rootId, async(entry9) => {
+                        if (entry9.groups)
+                            delete entry9.groups[grid];     
                     });
                     await audit.logAsync(req11, "leave-group", {
                         subjectid: req11.rootId,
@@ -522,7 +523,7 @@ async function reindexGroupsAsync(json: JsonObject) : Promise<void>
     logger.debug("reindex grps: " + userid + " -> " + JSON.stringify(grps));
 }
 
-export async function addGroupApprovalAsync(groupJson: JsonObject, userJson: JsonObject) : Promise<void>
+export async function addGroupApprovalAsync(groupJson: JsonObject, userJson: core.IUser) : Promise<void>
 {
     let grpid = groupJson["id"];
     let userid = userJson["id"];

@@ -61,6 +61,8 @@ export interface IUser
     termsversion: string;
     migrationtoken: string;
     importworkspace: string; // set to non-empty if we're still importing workspace for this user from the legacy system
+    lastNotificationId: string;
+    notifications: number;
 }
 
 export interface IPubUser
@@ -551,14 +553,28 @@ export function applyUserSettings(userjson: IUser, settings: {}) {
     userjson.pub.avatar = sett.avatar;
 }
 
+export function normalizeUser(v: IUser)
+{
+    if (!v || v.kind != "user") return
+    if (!v.groups) v.groups = {};
+    if (!v.owngroups) v.owngroups = {};
+    v.credit = core.orZero(v.credit);
+    v.totalcredit = core.orZero(v.totalcredit);
+}
+
 export async function updateAsync(id:string, f:(v:IUser) => Promise<void>)
 {
-    return <IUser>await core.pubsContainer.updateAsync(id, f)
+    return <IUser>await core.pubsContainer.updateAsync(id, async(v: IUser) => {
+        normalizeUser(v);
+        await f(v);  
+    })
 }
 
 export async function getAsync(id:string)
 {
-    return <IUser>await core.getPubAsync(id, "user");
+    let r = <IUser>await core.getPubAsync(id, "user");
+    normalizeUser(r)
+    return r
 }
 
 export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRequest) : void
@@ -757,8 +773,8 @@ export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passI
     }
     let perm = withDefault(codeObj["permissions"], "preview,");
     await updateAsync(userid, async(entry: IUser) => {
-        entry.credit = core.orZero(entry.credit) + credit;
-        entry.totalcredit = core.orZero(entry.totalcredit) + credit;
+        entry.credit += credit;
+        entry.totalcredit += credit;
         if ( ! core.hasPermission(entry, perm)) {
             let existing = core.normalizePermissions(orEmpty(entry.permissions));
             entry.permissions = existing + "," + perm;

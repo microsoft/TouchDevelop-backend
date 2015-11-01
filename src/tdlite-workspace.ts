@@ -263,7 +263,7 @@ async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<
     if (req.argument == "") {
         // this normally doesn't do anything, but it will fetch more
         // scripts while import is enabled
-        await tdliteLegacy.importWorkspaceAsync(req.rootPub);
+        await tdliteLegacy.importWorkspaceAsync(req.rootUser());
         
         let v = await core.longPollAsync("installed:" + uid, long, req);
         if (req.status == 200) {
