@@ -65,7 +65,7 @@ export async function initAsync() : Promise<void>
     
     core.addRoute("GET", "tdtext", "*", async (req1: core.ApiRequest) => {
         if (/^[a-z]+$/.test(req1.verb)) {
-            let s = await td.downloadTextAsync("https://www.touchdevelop.com/api/" + req1.verb + "/text?original=true");
+            let s = await td.downloadTextAsync("https://api.touchdevelop.com/" + req1.verb + "/text?original=true");
             req1.response = s;
         }
         else {
@@ -246,7 +246,7 @@ async function importOneAnythingAsync(js: JsonObject) : Promise<core.ApiRequest>
     return apiRequest;
 }
 
-var tdbaseUrl = "https://www.touchdevelop.com/api/"
+var tdbaseUrl = "https://api.touchdevelop.com/"
 var allowedLists = [
     "new-scripts",
     "comments",
@@ -412,7 +412,7 @@ export async function importRecAsync(resp: RecImportResponse, id: string) : Prom
             resp.present += 1;
         }
         else {
-            let tdapi = "https://www.touchdevelop.com/api/";
+            let tdapi = "https://api.touchdevelop.com/";
             let js = await td.downloadJsonAsync(tdapi + id);
             if (js == null) {
                 resp.problems += 1;
