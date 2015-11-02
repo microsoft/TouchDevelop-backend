@@ -193,6 +193,7 @@ export class ProviderIndex
     public makeCustomToken: MakeUserInfo;
     public name: string = "";
     public order: number = 0;
+    public shortname: string;
 
     static _providers:td.SMap<ProviderIndex> = {};
     static at(n:string)
@@ -215,6 +216,7 @@ export class ProviderIndex
         logger.info("adding provider: " + this.id);
         this.makeLoginUrl = makeUrl;
         this.getProfile = getProfile;
+        this.shortname = this.id;
         if (this.makeCustomToken == null) {
             this.makeCustomToken = async (profile: JsonObject) => {
                 let inf = await defaultCustomToken(profile);
@@ -418,6 +420,7 @@ export function addAzureAdClientOnly(options_: IProviderOptions = {}) : void
         info.email = profile1["unique_name"];
         return info;
     });
+    prov.shortname = "ad";
 }
 
 function fromQueryString(body: string) : JsonObject
@@ -562,6 +565,7 @@ export function addLiveId(options_: IProviderOptions = {}) : void
         return inf;
         return info;
     });
+    prov.shortname = "live";
 }
 
 /**
@@ -646,6 +650,7 @@ export function addFacebook(options_: IProviderOptions = {}) : void
         return inf;
         return info;
     });
+    prov.shortname = "fb";
 }
 
 /**
@@ -688,13 +693,11 @@ export function addGoogle(options_: IProviderOptions = {}) : void
         return profile;
     }
     , async (profile1: JsonObject) => {
-        let info: UserInfo;
         let inf = new UserInfo();
         inf.id = "google:" + profile1["id"];
         inf.name = profile1["name"];
         inf.email = profile1["email"];
         return inf;
-        return info;
     });
 }
 
@@ -777,6 +780,7 @@ export function addAzureAd(options_: IProviderOptions = {}) : void
         info.email = profile1["unique_name"];
         return info;
     });
+    prov.shortname = "ad";
 }
 
 export function base64urlDecode(s: string): Buffer

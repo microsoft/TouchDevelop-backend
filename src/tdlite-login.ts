@@ -56,6 +56,8 @@ export class LoginSession
     @td.json public legacyCodes: {}; // code -> userid; there may be multiple accounts attached to an email    
 
     @td.json public profileId: string;
+    @td.json public providerId: string;
+    @td.json public storedMessage: string;
     @td.json public oauthClientId: string;
     @td.json public oauthU: string;
     @td.json public federatedUserInfo: serverAuth.IUserInfo;
@@ -132,6 +134,12 @@ export class LoginSession
     public async saveAsync()
     {
         await serverAuth.options().setData(this.state, JSON.stringify(this.toJson()));
+    }
+    
+    public async saveAndRedirectAsync(req:restify.Request)
+    {
+        await this.saveAsync();
+        req.response.redirect(302, "/oauth/dialog?td_session=" + this.state)
     }
     
     private async generateRedirectUrlAsync(): Promise<string>
@@ -463,6 +471,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     let session = new LoginSession();
     session.federatedUserInfo = <any>profile.toJson();
     session.profileId = profileId;
+    session.providerId = provider;
     session.oauthClientId = clientOAuth.client_id;
     session.oauthU = clientOAuth.u;
     
@@ -699,8 +708,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             else {
                 await tdliteLegacy.handleLegacyAsync(req, session, params);                
                 if (session.askLegacy) {
-                    if (session.legacyCodes) inner = "emailcode";
-                    else inner = "legacy";
+                    inner = params["INNER"];
                 } else {
                     await session.createUserIfNeededAsync(req);
                     await session.accessTokenRedirectAsync(req);

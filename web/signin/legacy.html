@@ -4,33 +4,32 @@
 {% block innerbody %}
   	
   	<main role="main">
-        <h1>Already a touchdevelop.com user?</h1>
+        <h1>Link accounts?</h1>
         <p>
-            We have upgraded to a shiny, new, <a href="https://github.com/microsoft/touchdevelop-backend">open source backend</a>.
-            To move your account over, we have to send you a <b>verification code</b> in an email.             
+            It looks you have never used this @PROVIDER@ identity at touchdevelop.com (next).
         </p>
         <p class='bg-danger'>@LEGACYMSG@</p>
         
-        <h3>Please choose one option below</h3>
+        <h2>I already have an account</h2>
         <div class='form-group'>
-            <label for=email>
-              Existing account email:              
+            <label for=legacy>
+              I have last used it before November 7th 2015. Try this first if unsure.         
             </label>
-            <input type="email" id="legacyemail" placeholder='someone@example.com' class="form-control"/>
-            <button class='btn btn-lg btn-success' onclick='sendFld("legacyemail")'>Send code</button>
+            <button id=legacy class='btn btn-lg btn-success' onclick='sendFld("legacyacct")'>Link legacy account</button>
         </div>
-        <div class='form-group'>          
-            <label for=accountid>
-              Existing account id:              
+        <div class='form-group'>
+            <label for=modern>
+                I have used it more recently, but might have used a provider other than @PROVIDER@.              
             </label>
-            <input type="email" id="legacyid" placeholder='/xyzw' class="form-control"/>
-            <button class='btn btn-lg btn-success' onclick='sendFld("legacyid")'>Send code</button>
+            <button id=modern class='btn btn-lg btn-success' onclick='sendFld("linkacct")'>Link other provider</button>
         </div>
+        
+        <h2>I don't have an account yet</h2>
         <div class='form-group'>          
-            <label>
-            I don't have an existing account!            
+            <label for=new>
+               You're just one click away!
             </label>
-            <button class='btn btn-lg btn-warning create' onclick='sendFld("legacyskip")'>Create new account</button>
+            <button id=new class='btn btn-lg btn-warning' onclick='sendFld("legacyskip")'>Create new account</button>
         </div>
     </main>
 

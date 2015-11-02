@@ -32,6 +32,7 @@ import * as serverAuth from "./server-auth"
 
 var logger = core.logger;
 var httpCode = core.httpCode;
+var emailLinkingEnabled = false;
 
 interface LegacySettings {
     AboutMe: string;
@@ -131,7 +132,7 @@ export async function initAsync()
             return;
         }
         
-        let q = td.createRequest("https://www.touchdevelop.com/api/me?access_token=" + encodeURIComponent(tok))
+        let q = td.createRequest("https://api.touchdevelop.com/me?access_token=" + encodeURIComponent(tok))
         let resp = await q.sendAsync()
         let json = resp.contentAsJson()
         if (!json) { 
@@ -193,12 +194,20 @@ export async function initAsync()
         let idprov = token.payload["identityprovider"];
         let name = token.payload["nameid"];
         let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
-        let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
+        
 
-        if (!ent) {
-            //TODO be nicer here
+        let session = await tdliteLogin.LoginSession.loadAsync(req.query()["token"])
+        if (!session) {
+            logger.info("session not found; id=" + req.query()["token"])
+            res.sendError(httpCode._412PreconditionFailed, "Session not found: " + req.query()["token"])
+            return
+        }
+        
+        let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
+        if (!ent) {            
+            session.storedMessage = "Cannot find that user account in the legacy system. Maybe try linking other provider?"
             logger.warning("cannot find ACS user: " + encode(name) + ":" + encode(idprov))
-            res.sendError(httpCode._404NotFound, "User doesn't exists in legacy system");
+            await session.saveAndRedirectAsync(req);
             return;
         }
 
@@ -214,20 +223,12 @@ export async function initAsync()
             return;
         }
 
-        let session = await tdliteLogin.LoginSession.loadAsync(req.query()["token"])
-        if (!session) {
-            logger.info("session not found; id=" + req.query()["token"])
-            res.sendError(httpCode._412PreconditionFailed, "Session not found; uid=" + userjson["id"])
-            return
-        }
         let ok = await session.setMigrationUserAsync(userjson["id"])
         if (!ok) {
-            // TODO be nicer
-            res.sendError(httpCode._409Conflict, "User already bound")
-            return
-        }
-        await session.saveAsync();        
-        res.redirect(302, "/oauth/dialog?td_session=" + session.state)
+            session.storedMessage = "This user account was already bound to identity in the new system. Maybe try linking other provider?"
+        }        
+        
+        await session.saveAndRedirectAsync(req);                
     });
 }
 
@@ -472,7 +473,11 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     if (session.askLegacy) {
         params["SESSION"] = session.state;
         params["LEGACYMSG"] = "";
-    }
+        params["INNER"] = session.legacyCodes ? "emailcode" : "legacy";
+        
+        let prov = serverAuth.ProviderIndex.all().filter(p => p.shortname == session.providerId)[0]        
+        params["PROVIDER"] = prov ? prov.name : session.providerId
+    }  
     
     let sett = n => td.orEmpty(req.query()["fld_" + n]).toLowerCase().trim();
     let legEmail = sett("legacyemail");
@@ -513,9 +518,18 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         await sendgrid.sendAsync(email, "noreply@touchdevelop.com", "Verification code for touchdevelop.com user", body);
 
         session.legacyCodes = codes
+        params["INNER"] = "emailcode";
     };
     
-    if (tokM) {
+    if (session.storedMessage) {
+        err(session.storedMessage);
+        params["INNER"] = "legacy";
+        session.storedMessage = null; // only show once
+        await session.saveAsync();
+        return;
+    }
+
+    if(tokM) {
         let userjson = await tdliteUsers.getAsync(tokM[1]);
         if (userjson && userjson["migrationtoken"] === session.oauthU) {
             let ok = await session.setMigrationUserAsync(userjson["id"]);
@@ -532,7 +546,13 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     } else if (sett("legacyrestart")) {
         session.askLegacy = true;
         session.legacyCodes = null;
-    } else if (legEmail) {
+        params["INNER"] = "legacy";
+    } else if (sett("legacyacct")) {
+        params["INNER"] = "legacylogin"
+    } else if (sett("linkacct")) {
+        err("Sorry, not implemented yet")
+        params["INNER"] = "legacy";
+    } else if (emailLinkingEnabled && legEmail) {
         let users = await tdliteUsers.users.getIndex("email").fetchAllAsync(legEmail)
         if (users.length == 0) {
             err("We couldn't find this email.")
@@ -540,7 +560,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         }
         
         await sendCodeEmailAsync(users);
-    } else if (legId) {
+    } else if (emailLinkingEnabled && legId) {
         legId = legId.replace(/^\/+/, "")
         if (!/^[a-z]+$/.test(legId)) {
             err("Invalid characters in legacy user ID.")
@@ -563,7 +583,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         }
         
         await sendCodeEmailAsync([u]);
-    } else if (legCode) {
+    } else if (emailLinkingEnabled && legCode) {
         if (!/^\d+$/.test(legCode)) {
             err("Invalid characters in legacy email code")
             return
