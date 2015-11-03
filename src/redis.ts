@@ -312,10 +312,13 @@ export class Client
     {
         let redis = {};
         let redisText = td.toString(await this.sendCommandAsync("info", []));
+        if (!redisText) {
+            return <{}>null;
+        }
         let dummy = td.replaceFn(redisText, /(\w+):(.*)/g, (elt: string[]) => {
             let result: string;
             let x = parseFloat(elt[2]);
-            if (x == null) {
+            if (isNaN(x) || x == null) {
                 redis[elt[1]] = elt[2];
             }
             else {
