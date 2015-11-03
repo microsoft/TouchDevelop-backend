@@ -109,6 +109,7 @@ export class Container
             let isNew = false;
             if (text == null && info.error() == "404") {
                 text = "{}";
+                isNew = true;
             }
             let jsb = {};
             try {

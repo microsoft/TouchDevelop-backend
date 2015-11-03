@@ -88,7 +88,7 @@ export class Store
                 logger.debug("mis-reported azure error inserting for " + id);
             }
             else {
-                assert(false, "conflict inserting " + id);
+                assert(false, "conflict inserting " + id + " into " + this.container.name + ", prev=" + prevKind);
             }
         });
     }
