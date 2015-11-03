@@ -93,10 +93,10 @@ programmingknowledgeoptions: [ "none", "some", "self-taught", "formal classes" ]
 occupationoptions: [ "student", "teacher", "software developer", "other" ],
 emailnewsletter2options: [ "no", "yes" ],
 emailfrequencyoptions: [ "never", "hourly", "every 4 hours", "daily", "weekly", "monthly" ]
-	}
+    }
 
 export var artContentTypes: td.SMap<string> =
-	{ 
+    { 
       "image/jpeg": "jpg",
       "image/png": "png",
       "image/svg+xml": "svg",

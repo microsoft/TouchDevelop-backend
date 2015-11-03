@@ -259,22 +259,22 @@ function decompress(buf: Buffer)
 {
     if (!buf) return "";
     
-	if (buf.length <= 1) return "";
-	
-	if (buf[0] == 0) {
-		buf = buf.slice(1);
-	} else if (buf[0] == 1 || buf[0] == 2) {
-		let len = buf.readInt32LE(1);
-		if (buf[0] == 1)
-			buf = zlib.inflateRawSync(buf.slice(5));
-		else
-			buf = zlib.gunzipSync(buf.slice(5));
-		assert(len == buf.length)		
-	} else {
-		assert(false)		
-	}
-	
-	return buf.toString("utf8");
+    if (buf.length <= 1) return "";
+    
+    if (buf[0] == 0) {
+        buf = buf.slice(1);
+    } else if (buf[0] == 1 || buf[0] == 2) {
+        let len = buf.readInt32LE(1);
+        if (buf[0] == 1)
+            buf = zlib.inflateRawSync(buf.slice(5));
+        else
+            buf = zlib.gunzipSync(buf.slice(5));
+        assert(len == buf.length)       
+    } else {
+        assert(false)       
+    }
+    
+    return buf.toString("utf8");
 }
 
 function decompressBlob(buf: Buffer) {
