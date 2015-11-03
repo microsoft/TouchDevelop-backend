@@ -984,13 +984,14 @@ export function addYahoo(options_: IProviderOptions = {}) : void
         request.setHeader("Authorization", "Bearer " + js["access_token"]);
         request.setAccept("application/json");
         let response = await request.sendAsync();
-        logger.info("yahoo resp: " + response.statusCode() + ": " + response.content())        
+        //logger.info("yahoo resp: " + response.statusCode() + ": " + response.content())        
         profile = response.contentAsJson();
         if (profile) profile = profile["profile"];
         return profile;
     }
     , async (profile1: JsonObject) => {
         let inf = new UserInfo();
+        if (!profile1["guid"]) return <UserInfo>null;
         inf.id = "yahoo:" + profile1["guid"];
         inf.name = profile1["nickname"];
         return inf;
