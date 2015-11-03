@@ -473,6 +473,8 @@ export async function addUserToGroupAsync(userid: string, gr: JsonObject, auditR
 {
     let sub = new PubGroupMembership();
     sub.id = "gm-" + userid + "-" + gr["id"];
+    let existing = await core.getPubAsync(sub.id, "groupmembership")
+    if (existing) return
     sub.userid = userid;
     sub.time = await core.nowSecondsAsync();
     sub.publicationid = gr["id"];
