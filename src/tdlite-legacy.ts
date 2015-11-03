@@ -193,7 +193,6 @@ export async function initAsync()
         }
         let idprov = token.payload["identityprovider"];
         let name = token.payload["nameid"];
-        let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
         
 
         let session = await tdliteLogin.LoginSession.loadAsync(req.query()["token"])
@@ -203,6 +202,7 @@ export async function initAsync()
             return
         }
         
+        let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
         let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
         if (!ent) {            
             session.storedMessage = "Cannot find that user account in the legacy system. Maybe try linking other provider?"
@@ -211,10 +211,7 @@ export async function initAsync()
             return;
         }
 
-        let uid = td.orEmpty(ent["UserId"])
-        let userjson = await tdliteUsers.getAsync(uid)
-        if (!userjson)
-            userjson = <IUser> await tdliteImport.reimportPub(uid, "user");
+        let userjson = await reimportUserAsync(td.orEmpty(ent["UserId"]))
 
         if (!userjson) {
             // log crash
@@ -230,6 +227,13 @@ export async function initAsync()
         
         await session.saveAndRedirectAsync(req);                
     });
+}
+
+async function reimportUserAsync(uid: string) {
+    let userjson = await tdliteUsers.getAsync(uid)
+    if (!userjson)
+        userjson = <IUser>await tdliteImport.reimportPub(uid, "user");
+    return userjson;
 }
 
 function decodeJWT(wresult: string) {
@@ -467,6 +471,20 @@ function gencode() {
     return numCode;
 }
 
+async function handleFacebookAsync(session: tdliteLogin.LoginSession) {
+    let m = /^id\/fb\/(\d+)$/.exec(session.profileId);
+    if (!m) return;
+
+    let ent = await identityTable.getEntityAsync(m[1], "Facebook%002D256157661061452")
+    if (!ent) return;
+
+    let userjson = await reimportUserAsync(td.orEmpty(ent["UserId"]))
+    if (!userjson) return;
+    
+    await session.setMigrationUserAsync(userjson["id"])
+    await session.saveAsync()
+}
+    
 // TODO throttling for emails etc
 
 export async function handleLegacyAsync(req: restify.Request, session: tdliteLogin.LoginSession, params: {}): Promise<void> {
@@ -528,6 +546,10 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         await session.saveAsync();
         return;
     }
+    
+    await handleFacebookAsync(session);
+    if (session.userCreated())
+        return
 
     if (tokM) {
         let userjson = await tdliteUsers.getAsync(tokM[1]);
