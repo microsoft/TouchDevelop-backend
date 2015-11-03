@@ -136,8 +136,46 @@ async function uploadArtAsync(fn:string):Promise<string>
 	return id
 }
 
-async function uploadFileAsync(fn: string)
-{
+async function getPtrAsync(path: string) {
+	let rdreq = mkReq("ptr" + path.replace(/[^a-zA-Z0-9@]/g, "-"))
+	let curr = await rdreq.sendAsync();
+
+	if (curr.statusCode() == 200) {
+		return curr.contentAsJson();
+	} else {
+		return <{}>null;
+	}
+}
+
+async function uploadRedirectAsync(fn: string) {
+	let path = fn.replace(/\.redir.txt$/, "")
+	let url = fs.readFileSync("web" + fn, "utf8").trim()
+	if (!/^(\/|https?:\/\/)[\w\.\@\#\-\/\?]+/.test(url)) {
+		throw new Error("bad URL: " + url + " in " + fn)
+	}
+	let curr = await getPtrAsync(path);
+
+	if (curr && curr["redirect"] == url) {
+		console.log(`${fn}: already set to ${url}`)
+		return
+	}
+
+	let req = mkReq("pointers")
+	req.setMethod("post")
+	req.setContentAsJson({
+		path: path,
+		redirect: url
+	})
+	let resp = await req.sendAsync();
+	console.log(`${fn}: ${url} -> ${resp.statusCode() }`)
+}
+
+async function uploadFileAsync(fn: string) {
+	if (/\.redir\.txt$/.test(fn)) {
+		await uploadRedirectAsync(fn);
+		return;
+	}
+
 	let task = /* async */ uploadArtAsync(fn);
 	uploadPromises[fn] = task;
 	let bloburl = await task;
@@ -145,24 +183,21 @@ async function uploadFileAsync(fn: string)
 		let m = /\/pub\/([a-z]+)/.exec(bloburl)
 		let id = m[1]
 		let path = fn.replace(/\.html$/, "")
-		let rdreq = mkReq("ptr" + path.replace(/[^a-zA-Z0-9@]/g, "-"))
-		let curr = await rdreq.sendAsync();
-		
-		if (curr.statusCode() == 200) {
-			if (curr.contentAsJson()["htmlartid"] == id) {
-				console.log(`${fn}: already set to ${id}`)
-				return
-			}
+		let curr = await getPtrAsync(path);
+
+		if (curr && curr["htmlartid"] == id) {
+			console.log(`${fn}: already set to ${id}`)
+			return
 		}
-		
+
 		let req = mkReq("pointers")
 		req.setMethod("post")
 		req.setContentAsJson({
-			path: fn.replace(/\.html$/, ""),			
+			path: path,
 			htmlartid: id
 		})
 		let resp = await req.sendAsync();
-		console.log(`${fn}: ${id} -> ${resp.statusCode()}`)		
+		console.log(`${fn}: ${id} -> ${resp.statusCode() }`)
 	}
 }
 

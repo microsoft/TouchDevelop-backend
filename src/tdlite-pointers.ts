@@ -126,7 +126,7 @@ export async function initAsync() : Promise<void>
                     let jsb1 = {};
                     jsb1["id"] = ptr1.id;
                     jsb1["pub"] = ptr1.toJson();
-                    await setPointerPropsAsync(jsb1, body);
+                    await setPointerPropsAsync(req, jsb1, body);
                     await pointers.insertAsync(jsb1);
                     await notifications.storeAsync(req, jsb1, "");
                     await search.scanAndSearchAsync(jsb1);
@@ -177,7 +177,7 @@ export async function initAsync() : Promise<void>
                 await parallel.forJsonAsync(json, async (json1: JsonObject) => {
                     let ref = {}
                     await pointers.container.updateAsync(json1["id"], async (entry1: JsonBuilder) => {
-                        await setPointerPropsAsync(entry1, ({}));
+                        await setPointerPropsAsync(core.adminRequest, entry1, ({}));
                         ref = td.clone(entry1);
                     });
                     await audit.logAsync(req2, "reindex-ptr", {
@@ -201,7 +201,7 @@ export function pathToPtr(fn: string) : string
     return s;
 }
 
-async function setPointerPropsAsync(ptr: JsonBuilder, body: JsonObject) : Promise<void>
+async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body: JsonObject) : Promise<void>
 {
     let pub = ptr["pub"];
     let empty = new PubPointer().toJson();
@@ -263,7 +263,7 @@ async function setPointerPropsAsync(ptr: JsonBuilder, body: JsonObject) : Promis
         pub["artid"] = "";
     }
     let s = orEmpty(pub["redirect"]);
-    if ( ! /^\/[a-zA-Z0-9\/\-@]+$/.test(s)) {
+    if (!core.callerHasPermission(req, "post-raw") && ! /^\/[a-zA-Z0-9\/\-@]+$/.test(s)) {
         pub["redirect"] = "";
     }
 }
@@ -282,7 +282,7 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
             return;
 
         let bld = await search.updateAndUpsertAsync(core.pubsContainer, req, async(entry: JsonBuilder) => {
-            await setPointerPropsAsync(entry, req.body);
+            await setPointerPropsAsync(req, entry, req.body);
         });
         await audit.logAsync(req, "update-ptr", {
             oldvalue: req.rootPub,
