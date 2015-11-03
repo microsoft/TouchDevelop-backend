@@ -488,9 +488,15 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         let entry31 = await tdliteUsers.getAsync(upointer["userid"]);
         if (entry31 != null) {
             userjs = entry31;
-            if (orEmpty(userjs.login) != profileId) {
+            let logins = (userjs.altLogins || []).concat([userjs.login])
+            if (logins.indexOf(profileId) < 0) {
                 userjs = await tdliteUsers.updateAsync(userjs.id, async(entry4) => {
-                    entry4.login = profileId;
+                    if (!entry4.login)
+                        entry4.login = profileId;
+                    else {
+                        if (!entry4.altLogins) entry4.altLogins = [];
+                        entry4.altLogins.push(profileId)
+                    }
                 });
             }
         }
