@@ -283,6 +283,9 @@ export async function initAsync(): Promise<void> {
     if (core.hasSetting("FACEBOOK_CLIENT_SECRET")) {
         serverAuth.addFacebook();
     }
+    if (core.hasSetting("YAHOO_CLIENT_SECRET")) {
+        serverAuth.addYahoo();
+    }
     restify.server().get("/user/logout", async(req: restify.Request, res: restify.Response) => {
         res.redirect(302, "/signout");
     });

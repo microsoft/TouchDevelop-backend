@@ -948,3 +948,51 @@ export function providerLinks(query: JsonObject) : JsonBuilder
 }
 
 
+/**
+ * Setup Yahoo! authentication. Requires ``YAHOO_CLIENT_ID`` and ``YAHOO_CLIENT_SECRET`` env.
+ */
+export function addYahoo(options_: IProviderOptions = {}) : void
+{
+    let clientId = td.serverSetting("YAHOO_CLIENT_ID", false);
+    let clientSecret = td.serverSetting("YAHOO_CLIENT_SECRET", false);
+    let prov = ProviderIndex.at("yahoo");
+    prov.name = "Yahoo!";
+    prov.makeCustomToken = options_.makeCustomToken;
+    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+        let url: string;
+        p.client_id = clientId;
+        p.response_type = "code";
+        url = "https://api.login.yahoo.com/oauth2/request_auth?" + toQueryString(p.toJson());
+        return url;
+    }
+    , async (req1: restify.Request, p1: OauthRequest) => {
+        let profile: JsonObject;
+        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://api.login.yahoo.com/oauth2/get_token");
+        if (js == null) {
+            return js;
+        }
+        let profileExample =
+            {
+                "profile": { 
+                    "guid": "OTW....NRLXA",  
+                    "image": { "height": 192, "imageUrl": "https://s.yimg.com/dh/ap/social/profile/profile_b192.png", 
+                    "size": "192x192", "width": 192 }, 
+                    "nickname": "Touch",  
+                } 
+            }
+        let request = td.createRequest("https://social.yahooapis.com/v1/user/me/profile");
+        request.setHeader("Authorization", "Bearer " + js["access_token"]);
+        request.setAccept("application/json");
+        let response = await request.sendAsync();
+        logger.info("yahoo resp: " + response.statusCode() + ": " + response.content())        
+        profile = response.contentAsJson();
+        if (profile) profile = profile["profile"];
+        return profile;
+    }
+    , async (profile1: JsonObject) => {
+        let inf = new UserInfo();
+        inf.id = "yahoo:" + profile1["guid"];
+        inf.name = profile1["nickname"];
+        return inf;
+    });
+}
