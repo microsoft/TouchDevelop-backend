@@ -206,6 +206,7 @@ export async function initAsync()
         let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
         if (!ent) {            
             session.storedMessage = "Cannot find that user account in the legacy system. Maybe try linking other provider?"
+            logger.tick("Login_legacyNotFound")
             logger.warning("cannot find ACS user: " + encode(name) + ":" + encode(idprov))
             await session.saveAndRedirectAsync(req);
             return;
@@ -223,6 +224,9 @@ export async function initAsync()
         let ok = await session.setMigrationUserAsync(userjson["id"])
         if (!ok) {
             session.storedMessage = "This user account was already bound to identity in the new system. Maybe try linking other provider?"
+            logger.tick("Login_legacyBound")
+        } else {
+            logger.tick("Login_legacyOK")
         }        
         
         await session.saveAndRedirectAsync(req);                
@@ -481,6 +485,7 @@ async function handleFacebookAsync(session: tdliteLogin.LoginSession) {
     let userjson = await reimportUserAsync(td.orEmpty(ent["UserId"]))
     if (!userjson) return;
     
+    logger.tick("Login_fbauto")
     await session.setMigrationUserAsync(userjson["id"])
     await session.saveAsync()
 }
@@ -495,7 +500,9 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         
         let prov = serverAuth.ProviderIndex.all().filter(p => p.shortname == session.providerId)[0]        
         params["PROVIDER"] = prov ? prov.name : session.providerId
-    }  
+    } else {
+        return
+    }
     
     let sett = n => td.orEmpty(req.query()["fld_" + n]).toLowerCase().trim();
     let legEmail = sett("legacyemail");
@@ -559,19 +566,23 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
                 alreadyBound();
                 return
             }
+            logger.tick("Login_migrationtoken")
         } else {
             err("Invalid migration code. Please start over.")
             return;
         }
     } else if (sett("legacyskip")) {
+        logger.tick("Login_skiplegacy")
         session.askLegacy = false;
     } else if (sett("legacyrestart")) {
         session.askLegacy = true;
         session.legacyCodes = null;
         params["INNER"] = "legacy";
     } else if (sett("legacyacct")) {
+        logger.tick("Login_legacystart")
         params["INNER"] = "legacylogin"
     } else if (sett("linkacct")) {
+        logger.tick("Login_linkaccts")
         let redirUrl = "/oauth/providers?" + session.getRestartQuery();
         req.response.redirect(httpCode._302MovedTemporarily, redirUrl)
     } else if (emailLinkingEnabled && legEmail) {
