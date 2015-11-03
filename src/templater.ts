@@ -15,6 +15,7 @@ import * as tdliteData from './tdlite-data';
 var uploadCache: td.SMap<string> = {};
 var uploadPromises: td.SMap<Promise<string>> = {};
 var nunjucks = require("nunjucks");
+var clientConfig: any;
 
 function mimeType(fn: string)
 {
@@ -74,6 +75,12 @@ function replContent(str: string, waitFor: Promise<string>[]) {
 	})
 }
 
+function rewriteUrl(id: string): string {
+	for (let url of clientConfig.altCdnUrls)
+		id = id.replace(url, clientConfig.primaryCdnUrl);
+	return id;
+}
+
 async function uploadArtAsync(fn:string):Promise<string>
 {
 	await td.sleepAsync(0.001);
@@ -107,7 +114,7 @@ async function uploadArtAsync(fn:string):Promise<string>
 	let r = await mkReq("arthash/" + sha).sendAsync()
 	let it = r.contentAsJson()["items"][0]
 	if (it) {
-		let id0 = it.bloburl
+		let id0 = rewriteUrl(it.bloburl);
 		console.log(`already present: ${fn} at ${id0}`)
 		uploadCache[sha] = id0
 		return id0
@@ -130,7 +137,7 @@ async function uploadArtAsync(fn:string):Promise<string>
 		return ""
 	}
 	
-	let id = resp.contentAsJson()["bloburl"] 
+	let id = rewriteUrl(resp.contentAsJson()["bloburl"])
 	console.log(`upload: ${fn} -> ${id}`)
 	uploadCache[sha] = id
 	return id
@@ -208,7 +215,11 @@ async function uploadAsync() {
 	let cachepath = tmppath + "/uploadcache.json"
 	if (fs.existsSync(cachepath))
 		uploadCache = JSON.parse(fs.readFileSync(cachepath, "utf8"))
-	let files = getFiles().filter(fn => !/^\/_/.test(fn))	
+	let files = getFiles().filter(fn => !/^\/_/.test(fn))
+
+	let resp = await mkReq("clientconfig").sendAsync()
+	clientConfig = resp.contentAsJson()
+	
 	await parallel.forJsonAsync(files, uploadFileAsync)
 	fs.writeFileSync(cachepath, JSON.stringify(uploadCache, null, 2))
 }
