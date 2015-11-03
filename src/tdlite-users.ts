@@ -520,17 +520,21 @@ export async function initAsync() : Promise<void>
         if (!core.checkPermission(req, "root")) return;
         let u = req.rootUser();
         if (!u.login) {
-            req.status = httpCode._404NotFound
+            req.status = httpCode._412PreconditionFailed;
             return;            
         }
-        let logins = (u.altLogins || []).concat([u.login])
+        let logins = (u.altLogins || [])
+        let inclPrimary = !!req.queryOptions["primary"];
+        if (inclPrimary)
+            logins.push(u.login)
         for (let login of logins) {
             await passcodesContainer.updateAsync(login, async(v) => {
                 v["userid"] = "";
             })
         }    
         await updateAsync(req.rootId, async(v) => {
-            delete v.login;
+            if (inclPrimary)
+                delete v.login;
             delete v.altLogins;
         })
         req.response = {};

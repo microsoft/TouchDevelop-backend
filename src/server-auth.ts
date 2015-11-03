@@ -79,7 +79,17 @@ export class ClientOauth
     @td.json public provider: string = "";
     @td.json public td_state: string = "";
     @td.json public u: string = "";
-    static createFromJson(o:JsonObject) { let r = new ClientOauth(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new ClientOauth(); r.fromJson(o); return r; }
+    
+    public toQueryString()
+    {
+        return toQueryString({
+            state: this.state,
+            client_id: this.client_id,
+            redirect_uri: this.redirect_uri,
+            response_type: this.response_type,
+        })
+    }
 }
 
 export class UserInfo

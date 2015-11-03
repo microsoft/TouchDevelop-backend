@@ -529,7 +529,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         return;
     }
 
-    if(tokM) {
+    if (tokM) {
         let userjson = await tdliteUsers.getAsync(tokM[1]);
         if (userjson && userjson["migrationtoken"] === session.oauthU) {
             let ok = await session.setMigrationUserAsync(userjson["id"]);
@@ -538,7 +538,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
                 return
             }
         } else {
-            err("Invalid migration code.")
+            err("Invalid migration code. Please start over.")
             return;
         }
     } else if (sett("legacyskip")) {
@@ -550,8 +550,8 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     } else if (sett("legacyacct")) {
         params["INNER"] = "legacylogin"
     } else if (sett("linkacct")) {
-        err("Sorry, not implemented yet")
-        params["INNER"] = "legacy";
+        let redirUrl = "/oauth/providers?" + session.getRestartQuery();
+        req.response.redirect(httpCode._302MovedTemporarily, redirUrl)
     } else if (emailLinkingEnabled && legEmail) {
         let users = await tdliteUsers.users.getIndex("email").fetchAllAsync(legEmail)
         if (users.length == 0) {

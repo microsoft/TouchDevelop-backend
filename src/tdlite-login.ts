@@ -61,6 +61,8 @@ export class LoginSession
     @td.json public oauthClientId: string;
     @td.json public oauthU: string;
     @td.json public federatedUserInfo: serverAuth.IUserInfo;
+    @td.json public linksecret: string;
+    @td.json public restartQuery: string;
 
     static createFromJson(o: JsonObject) { let r = new LoginSession(); r.fromJson(o); return r; }
     
@@ -68,13 +70,37 @@ export class LoginSession
         return (this.userid && this.userid != "pending");
     }
     
-    static async loadAsync(id: string): Promise<LoginSession>
+    static async loadCoreAsync(id: string): Promise<LoginSession>
     {
         let sessionString = orEmpty(await serverAuth.options().getData(orEmpty(id)));
         logger.debug("session string: " + sessionString);
         if (sessionString != "") {
             return LoginSession.createFromJson(JSON.parse(sessionString));
         } else return <LoginSession>null;        
+    }
+    
+    public getRestartQuery()
+    {
+        if (!this.linksecret)
+            this.linksecret = td.createRandomId(12);
+        return this.restartQuery + "&u=2" + this.state + "." + this.linksecret
+    }
+    
+    public async getLinkedSessionAsync():Promise<LoginSession> {
+        let tokM2 = /^2(\w+)\.(\w+)$/.exec(this.oauthU);
+        if (tokM2) {
+            let othersession = await LoginSession.loadCoreAsync(tokM2[1])
+            if (othersession && othersession.linksecret && othersession.linksecret == tokM2[2]) {
+                return othersession
+            }
+        }
+        
+        return <LoginSession>null;
+    }
+    
+    static async loadAsync(id: string): Promise<LoginSession> {
+        let session = await LoginSession.loadCoreAsync(id);
+        return session
     }
     
     public async setMigrationUserAsync(uid: string)
@@ -474,6 +500,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     session.providerId = provider;
     session.oauthClientId = clientOAuth.client_id;
     session.oauthU = clientOAuth.u;
+    session.restartQuery = clientOAuth.toQueryString();
     
     if (userjs == null) {
         if (core.jsonArrayIndexOf(core.serviceSettings.blockedAuth, provider) >= 0) {
@@ -499,6 +526,26 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
 
     session.state = cachedStore.freshShortId(16);
     session.userid = userjs["id"];
+    
+    if (session.userCreated()) {
+        let linkedSession = await session.getLinkedSessionAsync();
+        if (linkedSession && linkedSession.profileId) {
+            let last = await tdliteUsers.passcodesContainer.updateAsync(linkedSession.profileId, async(v) => {
+                let kind = v["kind"]
+                if (!kind || kind == "reserved" || kind == "userpointer") {
+                    v["kind"] = "userpointer";
+                    let existing = await tdliteUsers.getAsync(v["userid"])
+                    if (!existing)
+                        v["userid"] = session.userid;
+                }
+            })
+            if (last["userid"] == session.userid)
+                await tdliteUsers.updateAsync(session.userid, async(v) => {
+                    if (!v.altLogins) v.altLogins = [];
+                    v.altLogins.push(linkedSession.profileId);
+                })
+        }
+    }
     
     if (core.fullTD) {
         session.termsOk = true;
