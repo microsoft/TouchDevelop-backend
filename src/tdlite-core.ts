@@ -52,7 +52,7 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 225;
+export var rewriteVersion: number = 226;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
@@ -1440,6 +1440,18 @@ export async function lateInitAsync()
     redisClient = await redis.createClientAsync("", 0, "");
 }
 
+export function cdnUrl(url:string)
+{
+    if (!fullTD) return url;
+    
+    for (let pref of currClientConfig.altCdnUrls) {
+        if (url.substr(0, pref.length) == pref)
+            url = currClientConfig.primaryCdnUrl + url.slice(pref.length)
+    }
+    
+    return url;
+}
+
 export async function initFinalAsync()
 {
     settingsContainer = await cachedStore.createContainerAsync("settings");
@@ -1455,9 +1467,14 @@ export async function initFinalAsync()
     currClientConfig.shareUrl = currClientConfig.rootUrl;
     currClientConfig.cdnUrl = pubsContainer.blobContainer().url().replace(/\/pubs$/g, "");
     currClientConfig.primaryCdnUrl = withDefault(td.serverSetting("CDN_URL", true), currClientConfig.cdnUrl);
-    currClientConfig.altCdnUrls = (<string[]>[]);
-    currClientConfig.altCdnUrls.push(pubsContainer.blobContainer().url().replace(/\/pubs$/g, ""));
-    currClientConfig.altCdnUrls.push(currClientConfig.primaryCdnUrl);
+    currClientConfig.altCdnUrls = [
+        pubsContainer.blobContainer().url().replace(/\/pubs$/g, ""),
+        currClientConfig.primaryCdnUrl
+    ];
+    if (fullTD) {
+        currClientConfig.altCdnUrls.push("http://cdn.touchdevelop.com")
+        currClientConfig.altCdnUrls.push("https://az31353.vo.msecnd.net")
+    }
     currClientConfig.anonToken = basicCreds;
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();

@@ -175,25 +175,25 @@ async function resolveArtAsync(entities: indexedStore.FetchResult, req: core.Api
             queueUpgradeTask(req, /* async */ redownloadArtAsync(jsb));
         }
         if (jsb["isImage"]) {
-            pubArt.pictureurl = artContainer.url() + id;
-            pubArt.thumburl = thumbContainers[0].container.url() + id;
-            pubArt.mediumthumburl = thumbContainers[1].container.url() + id;
-            pubArt.bloburl = pubArt.pictureurl;
+            pubArt.pictureurl = core.cdnUrl(artContainer.url() + id);
+            pubArt.thumburl = core.cdnUrl(thumbContainers[0].container.url() + id);
+            pubArt.mediumthumburl = core.cdnUrl(thumbContainers[1].container.url() + id);
+            pubArt.bloburl = core.cdnUrl(pubArt.pictureurl);
             pubArt.arttype = "picture";
         }
         else if (! pubArt.arttype || pubArt.arttype == "sound") {
-            pubArt.wavurl = artContainer.url() + id;
+            pubArt.wavurl = core.cdnUrl(artContainer.url() + id);
             if (orFalse(jsb["hasAac"])) {
-                pubArt.aacurl = aacContainer.url() + id + ".m4a";
+                pubArt.aacurl = core.cdnUrl(aacContainer.url() + id + ".m4a");
             }
             else {
                 pubArt.aacurl = "";
             }
-            pubArt.bloburl = withDefault(pubArt.aacurl, pubArt.wavurl);
+            pubArt.bloburl = core.cdnUrl(withDefault(pubArt.aacurl, pubArt.wavurl));
             pubArt.arttype = "sound";
         }
         else {
-            pubArt.bloburl = artContainer.url() + "/" + jsb["filename"];
+            pubArt.bloburl = core.cdnUrl(artContainer.url() + "/" + jsb["filename"]);
         }
     }
     await awaitUpgradeTasksAsync(req);
@@ -258,8 +258,8 @@ async function resolveScreenshotAsync(entities: indexedStore.FetchResult, req: c
         let screenshot = PubScreenshot.createFromJson(js["pub"]);
         coll.push(screenshot);
         let id = "/" + screenshot.id;
-        screenshot.pictureurl = artContainer.url() + id;
-        screenshot.thumburl = thumbContainers[0].container.url() + id;
+        screenshot.pictureurl = core.cdnUrl(artContainer.url() + id);
+        screenshot.thumburl = core.cdnUrl(thumbContainers[0].container.url() + id);
         if (req.isUpgrade) {
             queueUpgradeTask(req, /* async */ redownloadScreenshotAsync(js));
         }
