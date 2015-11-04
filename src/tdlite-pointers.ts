@@ -314,6 +314,7 @@ async function getHtmlArtAsync(templid: string) {
 
 async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
 {
+    logger.debug(`get template ${templatename} ${lang}`)
     let r: string;
     let id = pathToPtr(templatename.replace(/:.*/g, ""));
     let entry3 = (<JsonObject>null);
@@ -674,6 +675,8 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         if (msg != "") {
             pubdata["templatename"] = "templates/official-s";
         }
+        if (core.fullTD && pubdata["templatename"])
+            pubdata["templatename"] = pubdata["templatename"].replace(/-s$/, "");
         let templText = await getTemplateTextAsync(pubdata["templatename"] + templateSuffix, lang);
         if (msg == "" && templText.length < 100) {
             msg = templText;
