@@ -509,13 +509,6 @@ export async function initAsync() : Promise<void>
         }
     });
 
-    core.addRoute("POST", "*user", "progress", async (req: core.ApiRequest) => {
-        core.meOnly(req);
-        if (req.status == 200) {
-            req.response = {};
-        }
-    });
-
     core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
         let u = req.rootUser();

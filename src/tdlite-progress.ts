@@ -20,6 +20,7 @@ var logger = core.logger;
 var httpCode = core.httpCode;
 
 var progressContainer: cachedStore.Container;
+var userProgressContainer: cachedStore.Container;
 var prefix = "tprg:"
 var idxKey = prefix + "INDEX"
 var numEntries = 0;
@@ -183,11 +184,77 @@ async function storeLoopAsync()
     }
 }
 
+interface Progress {
+    guid?: string;
+    index?: number;
+    completed?: number;
+    numSteps?: number;
+    lastUsed?: number;
+}
+
+
 export async function initAsync(): Promise<void> {
     progressContainer = await cachedStore.createContainerAsync("progress")
+    userProgressContainer = await cachedStore.createContainerAsync("userprogress")
     
     /* async */ storeLoopAsync();
     
+    core.addRoute("POST", "*user", "progress", async (req: core.ApiRequest) => {
+        core.meOnly(req);        
+        if (req.status != 200) return;
+        
+        await userProgressContainer.updateAsync(req.rootId, async(v) => {
+            let oldData = v["progress"] || {}
+            
+            for (let id of Object.keys(req.body)) {
+                var oldProgress = <Progress>oldData[id] || <Progress>{};
+                var progress = <Progress>req.body[id];
+                if (oldProgress.index === undefined || oldProgress.index <= progress.index) {
+                    if (progress.guid) oldProgress.guid = td.orEmpty(progress.guid);
+                    oldProgress.index = core.orZero(progress.index);
+                    if (progress.completed && (oldProgress.completed === undefined || oldProgress.completed > progress.completed))
+                        oldProgress.completed = core.orZero(progress.completed);
+                    oldProgress.numSteps = core.orZero(progress.numSteps);
+                    oldProgress.lastUsed = core.orZero(progress.lastUsed);
+                }
+                oldData[id] = oldProgress;
+            }
+            
+            // TODO maybe put something wiser here
+            if (JSON.stringify(oldData).length > 100000)
+                oldData = {}
+            
+            v["progress"] = oldData;             
+        })
+        
+        req.response = {};
+    });
+    
+    core.addRoute("GET", "*user", "progress", async(req: core.ApiRequest) => {
+        // TODO special permission?
+        let data = await userProgressContainer.getAsync(req.rootId)
+        let items = []
+        if (data) {
+            let prog = data["progress"]
+            for (let id of Object.keys(prog)) {
+                let v = <Progress>prog[id];
+                items.push({
+                    kind: "progress",
+                    userid: req.rootId,
+                    progressid: id,
+                    guid: v.guid,
+                    index: v.index,
+                    completed: v.completed
+                })
+            }
+        }
+        req.response = {
+            kind: "list",
+            items: items,
+            continuation: null
+        }
+    })
+
     core.addRoute("POST", "progress", "", async(req) => {
         
         await core.throttleAsync(req, "progress", 20);
