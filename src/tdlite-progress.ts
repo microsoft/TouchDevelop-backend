@@ -41,6 +41,7 @@ local len = redis.call("LLEN", eltid)
 local maxlen = 50000
 local res = redis.call("LRANGE", eltid, 0, maxlen)
 if len < maxlen then
+  redis.call("DEL", eltid)
   redis.call("SREM", idxid, eltid)
 else
   redis.call("LTRIM", eltid, maxlen, len)
