@@ -1,0 +1,622 @@
+{% extends "_layouts/default.html" %}
+{% set title = "BBC micro:bit with Microsoft Touch Develop" %}
+{% set description = "BBC micro:bit with Microsoft Touch Develop" %}
+
+{% block headAdd %}
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <style>
+@font-face {
+  font-family: "TD Symbols";
+  src:url(data:application/x-font-woff;base64,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);
+}
+
+.symbol { font-family: "TD Symbols"; }
+@media screen {
+    body {
+      padding-top: 70px;
+    }
+}
+img.logo, img.avatar { margin-top: -10px; height:32px;}
+img.checker {
+background-image: url(https://az31353.vo.msecnd.net/c04/yiak.png);
+background-repeat: repeat;
+}
+div.listing
+{
+    color:Black;
+    border-style:none;
+    margin: 0px 0px 0px 0px;
+    font-size: 11pt;
+    font-family: Consolas, "Andale Mono WT" , "Andale Mono" , "Lucida Console" , "Lucida Sans Typewriter" , "DejaVu Sans Mono" , "Bitstream Vera Sans Mono" , "Liberation Mono" , "Nimbus Mono L" , Monaco, "Courier New" , Courier, monospace;
+    padding: 5px 5px 5px 5px;
+    background: #f8f8f8;
+    clear: both;
+    
+    white-space: pre-wrap; /* css-3 */
+    white-space: -moz-pre-wrap !important; /* Mozilla, since 1999 */
+    white-space: -pre-wrap; /* Opera 4-6 */
+    white-space: -o-pre-wrap; /* Opera 7 */
+    word-wrap: break-word; /* Internet Explorer 5.5+ */
+}
+div.listing A:link 
+{
+    color:#000020;
+    text-decoration: none;
+}
+div.listing A:visited 
+{
+    color:#000020;
+    text-decoration: none;
+}
+div.listing A:active
+{
+    color:#000080;
+    text-decoration: none;
+}
+div.listing A:hover 
+{
+    color:#000080;
+    text-decoration: underline; 
+}
+    </style>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<script src="https://az31353.vo.msecnd.net/c04/zjrd.js" type="text/javascript"></script>
+<script src="https://az31353.vo.msecnd.net/c04/bzmz.js" type="text/javascript"></script>
+
+    <style>
+        .light {
+            font-family: "Segoe UI Light", "Segoe UI", sans-serif;
+            font-weight: 100;
+        }
+        .top-buffer { 
+            padding-top:1.5em; 
+            margin-top:1.5em; 
+            padding-bottom:1.5em;
+            margin-bottom: 60px;
+        }
+        div.green-bar {
+            background: #eee;
+        }
+        .win-logo {
+            text-align: right;
+            margin-top: 15px;
+        }
+
+        .win-logo img {
+            height: 80px;
+        }
+
+        .screenshot {
+            margin-right: 4px;
+            margin-bottom:4px;
+            background-color:lightgray;
+        }
+
+        .sitemap {
+            text-align: center;
+        }
+
+        .sitemap-header,
+        .sitemap-entry {
+            display: block;
+            margin-bottom: 3px;
+            color: #333 !important;
+        }
+
+        a.sitemap-entry {
+            font-size: 16px;
+        }
+
+        a.sitemap-header {
+            font-weight: bold;
+        }
+
+        .progressBar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 0.3em;
+            overflow: hidden;
+        }
+
+        .progressDot {
+            background: purple;
+            width: 0.3em;
+            height: 0.3em;
+            position: absolute;
+            animation: moveProgressDot 3s infinite; /*CSSpref*/
+            -ms-animation: moveProgressDot 3s infinite;
+            -webkit-animation: moveProgressDot 3s infinite;
+            -moz-animation: moveProgressDot 3s infinite;
+            transform: translate(-11em, 0); /*CSSpref*/
+            -ms-transform: translate(-11em, 0);
+            -webkit-transform: translate(-11em, 0);
+            -moz-transform: translate(-11em, 0);
+        }
+
+        .progressDot-0 {
+            left: 7em;
+            animation-delay: 0.9s; /*CSSpref*/
+            -ms-animation-delay: 0.9s;
+            -webkit-animation-delay: 0.9s;
+            -moz-animation-delay: 0.9s;
+        }
+
+        .progressDot-1 {
+            left: 8em;
+            animation-delay: 0.6s; /*CSSpref*/
+            -ms-animation-delay: 0.6s;
+            -webkit-animation-delay: 0.6s;
+            -moz-animation-delay: 0.6s;
+        }
+
+        .progressDot-2 {
+            left: 9em;
+            animation-delay: 0.3s; /*CSSpref*/
+            -ms-animation-delay: 0.3s;
+            -webkit-animation-delay: 0.3s;
+            -moz-animation-delay: 0.3s;
+        }
+
+        .progressDot-3 {
+            left: 10em;
+            animation-delay: 0s; /*CSSpref*/
+            -ms-animation-delay: 0s;
+            -webkit-animation-delay: 0s;
+            -moz-animation-delay: 0s;
+        }
+
+        @keyframes moveProgressDot {
+            0% {
+                transform: translate(-11em, 0);
+            }
+
+            35% {
+                transform: translate(0, 0);
+            }
+
+            65% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(20em, 0);
+            }
+        }
+        /*CSSpref*/
+
+        @-ms-keyframes moveProgressDot {
+            0% {
+                -ms-transform: translate(-11em, 0);
+            }
+
+            35% {
+                -ms-transform: translate(0, 0);
+            }
+
+            65% {
+                -ms-transform: translate(0, 0);
+            }
+
+            100% {
+                -ms-transform: translate(20em, 0);
+            }
+        }
+
+        @-webkit-keyframes moveProgressDot {
+            0% {
+                -webkit-transform: translate(-11em, 0);
+            }
+
+            35% {
+                -webkit-transform: translate(0, 0);
+            }
+
+            65% {
+                -webkit-transform: translate(0, 0);
+            }
+
+            100% {
+                -webkit-transform: translate(20em, 0);
+            }
+        }
+
+        @-moz-keyframes moveProgressDot {
+            0% {
+                -moz-transform: translate(-11em, 0);
+            }
+
+            35% {
+                -moz-transform: translate(0, 0);
+            }
+
+            65% {
+                -moz-transform: translate(0, 0);
+            }
+
+            100% {
+                -moz-transform: translate(20em, 0);
+            }
+        }
+
+
+
+.symbol { font-family: "Segoe UI Symbol", inherit; }
+@media screen {
+    body {
+      padding-top: 50px;
+    }
+}
+img.logo, img.avatar { margin-top: -8px; height:32px;}
+img.checker {
+background-image: url(https://az31353.vo.msecnd.net/c04/yiak.png);
+background-repeat: repeat;
+}
+a.navbar-brand {
+  font-size: 25px;
+}
+
+.tech-img > img {
+  width: 100%;
+}
+
+.tech-img {
+text-align:center;
+}
+
+.partner {
+  display: inline-block;
+  width: 45%;
+  margin: 2%;
+  position:relative;
+}
+.partner img {
+  width: 100%;
+}
+
+.jumbotron h1 {
+  margin-top: 50px;
+}
+
+@media (max-width: 767px) {
+  .tech-img > img {
+    width: 50%;
+  }
+  .tech-box {
+    margin-bottom: 50px;
+  }
+  .partner {
+    width: 80%;
+    margin: 10%;
+  }
+}
+
+@media (min-width: 768px) {
+  .tech-box {
+    min-height: 280px;
+  }
+}
+
+.jumbotron .container {
+  position: relative;
+}
+
+.jumbotron {
+  margin-bottom: 60px;
+}
+
+.jumbotron .container > img {
+  float: left;
+  max-width: 400px;
+  max-height: 300px;
+  margin: 25px 30px 40px 0px;
+}
+
+.btn-more {
+  display: inline-block;
+  float: right;
+  margin: 10px 0;
+}
+.img-column {
+ margin-left:auto;
+ margin-right:auto;
+ max-width: 80%;
+}
+.img-counter {
+    width:2em;
+    height:2em;
+    vertical-align:middle;
+    display:inline-block;
+}
+    </style>
+{% endblock %}
+
+{% block body %}
+    <nav class="navbar navbar-default navbar-fixed-top hidden-print" role="navigation">
+        <div class="container">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="/">
+                    <img class="logo" src="https://az31353.vo.msecnd.net/c04/gttu.png" />
+                </a>
+            </div>
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav navbar-right">
+                <li><a href="https://www.touchdevelop.com/app/"><strong>launch editor</strong></a></li>
+                <li><a href="/docs">docs</a></li>
+                <li><a href="/blog">blog</a></li>
+                
+                <li><a href='https://www.touchdevelop.com/user/login' title='Touch Develop uses cloud services to synchronize your scripts across all your devices.'>sign in</a></li>
+
+              </ul>
+            </div><!-- /.navbar-collapse -->
+        </div><!-- /.container-fluid -->
+    </nav>
+
+    <div class="container">
+
+        <div class="row">
+            <div class="col-sm-8 col-sm-offset-2 col-md-8 col-md-offset-2 col-xs-offset-0 col-xs-12">
+                <h1 />
+                <div class="embed-responsive embed-responsive-16by9">
+                    <iframe class="embed-responsive-item" src="https://www.youtube.com/embed/Wuza5WXiMkc?autoplay=1"></iframe>
+                </div>
+            </div>
+        </div>
+        <div class='row'>
+            <div class='col-md-12'>
+                <h2>
+                    TouchDevelop and the BBC micro:bit
+                </h2>
+                <p>
+                    From its conception in 2011, the
+                    <a href="http://www.touchdevelop.com/">TouchDevelop</a>
+                    project has been about bringing the joy
+                    of learning to program
+                    modern devices such as smartphones and tablets, as well
+		    as laptops and desktops.
+                </p>
+                <div class="screenshot hidden-xs">
+                    <img src="https://az31353.vo.msecnd.net/c04/geqc.jpeg" width="400" align="right" />
+                </div>
+                <img class="center-block img-responsive visible-xs" src="https://az31353.vo.msecnd.net/c04/geqc.jpeg" />
+                <p>
+                    <strong>The TouchDevelop team is proud to be part of the 
+                    <a href="http://www.bbc.co.uk/mediacentre/mediapacks/microbit" target="_blank">BBC
+                    micro:bit</a> project.</strong>
+                    The micro:bit is a small wearable and programmable
+                    <a href="http://mbed.org/" target="_blank">mbed</a>-based device that
+                    <em>visibly</em> features a 5x5 LED display, accelerometer, compass,
+                    buttons, I/O pins, Micro USB plug, Bluetooth Low Energy antenna,
+                    ARM Cortex-M0 processor, and battery plug. 
+                </p>
+
+                <p>
+                    The micro:bit provides a fun introduction to programming and making – 
+                    switch on, program it to do something fun – wear it, customize it, 
+		    Just like
+                    Arduino, the micro:bit can be connected to and interact
+                    with sensors, displays, and other devices. 
+		    The first wave of micro:bits will land in UK schools this autumn, with every
+		    Year 7 student in the UK receving a micro:bit, for free.
+                </p><p>
+                    As a partner on the micro:bit project, our goals are to provide:
+                    (1) a browser-based <b>introductory programming experience</b> for students
+                    who have never programmed before;
+                    (2) an architecture that allows students to <b>dig deeper</b> to uncover
+                    the many capabilities of the micro:bit;
+                    (3) materials and a platform to <b>support teachers</b> with the micro:bit in
+                    their classrooms.
+                 </p>
+                  <p>Read on to see how we have enhanced TouchDevelop
+                    and are working with
+                    <a href="http://www.arm.com/" target="_blank">ARM</a>, 
+                    <a href="http://www.lancaster.ac.uk/" target="_blank">
+                    Lancaster University</a>,
+                    and <a href="http://www.computingatschool.org.uk/" target="_blank">Computing at School</a>
+                    to realize these goals. 
+            </div>
+        </div>
+
+        <div class='row'>
+                    <div class='col-xs-12 col-sm-9 col-md-6'>
+                        <h2>Languages, Editors, Compilers</h2>
+                        <p>
+                            We extended TouchDevelop to support a <em>progression</em> of languages with accompanying browser-based editors.
+                            The <b>Block Editor</b> provides an introduction
+                            to structured programming via blocks that can be
+                            snapped together. <b>TouchDevelop</b>
+                            introduces a statically-typed scripting language with
+                            syntax-directed editor. 
+                            <!--
+                            The <em>C++</em> language/editor features
+                            traditional character-based entry of programs.
+                                -->
+                        </p>
+                <div class='center-block'>
+                        <img class="img-responsive img-column" src="https://az31353.vo.msecnd.net/c04/qlgq.png" />
+                </div>
+                        <p>
+                            Browser-based <b>compilers</b> from the Block Editor to TouchDevelop and from TouchDevelop to C++
+                            automate the transition from a visual language to a text-based language, and then to the
+			    language (C++) of the mbed-based micro:bit.
+                            The first compiler allows a student to convert a Block Editor script into a TouchDevelop script with
+                            a single press of a button.
+                        </p>
+                       
+
+                    </div>
+
+                    <div class='col-xs-12 col-sm-9 col-md-6'>
+                        <h2>Coding with TouchDevelop</h2>
+                        <p>
+                            To go from the world of browser-based scripting languages
+                            to that of the micro:bit's
+                            <a href="http://www.arm.com/products/processors/cortex-m/cortex-m0.php" target="_blank">
+                                ARM Cortex-M0 Processor
+                            </a>,
+                            we defined a <b>subset of the TouchDevelop language</b> for programming the micro:bit.
+                            Here's an example of a TouchDevelop script that counts up as the user
+                            presses the A button:
+                            </p>
+                <div class='center-block'>
+                            <img class="img-responsive img-column" alt="TouchDevelop count program" src="https://az31353.vo.msecnd.net/c04/sgic.png" />
+               <!--             <img src="thinking.jpg" width="100" /> -->
+		</div>
+                            <p>
+                            The language subset contains:
+                            <b>while</b> and <b>for</b> loops;
+                            <b>if-then-else</b> conditional statement;
+                            <b>functions</b>;
+                            local and global <b>variables</b>;
+                            integer, boolean, string and image <b>types</b>;
+                            <b>operations</b> over values of the above types;
+                            user-defined <b>event handlers</b> and <b>libraries</b>.
+                        </p>
+                        
+
+                    </div>
+
+                </div>
+
+
+        <div class='row'>
+                <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
+                    <h2>
+                        Compile and Flash
+                    </h2>                    
+                    <p>
+                        When a student has her TouchDevelop script <img src="https://az31353.vo.msecnd.net/c04/seie.png" class="img-counter"/> ready,
+                        she can connect her micro:bit to a computer via a
+                        USB cable, so it appears as a mounted drive.
+		    </p><p>
+                        Compilation from TouchDevelop to the micro:bit proceeds into two steps.
+                        The first step (Compiler 1)
+                        compiles the TouchDevelop script to a C++ program <img src="https://az31353.vo.msecnd.net/c04/enmn.png" class="img-counter"/>, in the web browser.
+				    </p><p>
+                        This C++ program then is sent to ARM's mbed compiler service where the
+                        second compilation step (Compiler 2) takes place,
+                        compiling the C++ program into
+                        an ARM binary program <img alt="number 3" src="https://az31353.vo.msecnd.net/c04/yvco.png" class="img-counter"/>,
+                        which is sent back to the web browser.
+	            </p><p>
+                        The student is prompted to save the ARM binary program
+                        to a file, which she then
+                        simply drags to the micro:bit mounted drive, which
+                        flashes the micro:bit device 
+			<img alt="number 4" src="https://az31353.vo.msecnd.net/c04/amgj.png" class="img-counter" />
+			with the new program.
+                    </p>
+                </div>
+
+                <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
+		  <div class='center-block'>
+                    <img class="img-responsive img-column" alt="compilation toolchain" src="https://az31353.vo.msecnd.net/c04/aaat.png" /> 
+		  </div>
+                </div>
+
+            </div>
+
+
+    <div class='row'>
+            <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
+                <h2>Simulator: Test Your Code</h2>
+                <p>
+                    Before a student compiles her script for the micro:bit,
+                    she can run it using the <b>TouchDevelop micro:bit simulator</b>,
+                    all within the confines of a web browser. The simulator
+                    has support for the LED screen, buttons, as well as
+                    compass, accelerometer, and digital I/O pins.
+                </p>
+                <div class='content' align="center">
+                  <img src="https://az31353.vo.msecnd.net/c04/cxld.png" align="middle" width="200" />
+                  <img src="https://az31353.vo.msecnd.net/c04/aakr.png" width="100" />
+                </div>
+                <p>
+                    To run a student's TouchDevelop script in the web browser,
+                    TouchDevelop compiles it into JavaScript,
+                    the scripting language built into all web browsers.
+                </p>
+            </div>
+
+            <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
+                <h2>C++ and TouchDevelop Libraries</h2>
+                <p>
+                    The <b>C++ micro:bit library</b>, created at
+                    <a href="http://www.lancaster.ac.uk/" target="_blank">
+                        Lancaster University</a>,
+                    provides access to the hardware functions
+                    of the micro:bit, as well as a set of helper
+                    functions (such as displaying a number/image/string
+                    on the LED screen).
+                    The <b>TouchDevelop micro:bit library</b> mirrors the
+                    functions of the C++ library.
+                    When a TouchDevelop script is compiled to C++,
+                    the calls to TouchDevelop micro:bit functions
+                    are replaced with calls to the corresponding C++ functions.
+                </p>
+                <div class='center-block'>
+                <img class="img-responsive img-column" src="https://az31353.vo.msecnd.net/c04/wdgn.png" width="450"/>
+                </div>
+                    Above, see the mapping from
+                    the TouchDevelop "show number" function to its corresponding the C++ function. 
+            </div>
+
+        </div>
+
+        <div class='row'>
+                <div class='col-xs-12 col-sm-9 col-md-6'>
+                    <h2>Resources and Partnerships</h2>
+		<p>
+                    In addition to the technology stack described above,
+                    we also provide in-depth online resources for
+                    the Block Editor, TouchDevelop, the TouchDevelop micro:bit library,
+                    and other TouchDevelop resources.
+                    The TouchDevelop authoring experience allows for "literate
+                    programming" and the generation of HTML pages and tutorials that
+                    contain example code fragments. 
+		 </p><p>
+		    Working with master teachers from
+                    <a href="http://www.computingatschool.org.uk/" target="_blank">Computing at Schools</a> (CAS),
+		    we will create micro:bit activities using TouchDevelop,
+		    mapped to the UK CS curriculum for year 7 students.
+		  </p>
+                </div>
+
+                <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
+                    <h2>Events</h2>
+		    <p>
+		      The TouchDevelop team has run learning events for many years and
+		      already has engaged in the UK, running micro:bit workshops at the
+		      2015 CAS conference.   We will be part of the BBC's
+		      <a href="http://www.bbc.co.uk/programmes/articles/1n782BnBGChcwqW45FBmgFB/make-it-digital-tour" target="_blank" >Make It Digital Tour</a>,
+		      and plan to work with CAS to bring the micro:bit to their teachers in the fall. We also
+		      will be hosting a Virtual micro:bit Conference featuring professors, CAS master teachers, and
+		      students.
+		    <p></p>
+		      Over the summer, we will be podcasting micro:bit activities for teachers and students around
+		      the UK. 
+		    </p>
+                </div>
+            </div>
+    <div class="row">
+            <div class="col-md-12 text-center">
+                 <a href="http://microbit.co.uk" target="_blank">The BBC micro:bit website</a>|
+                 <a href="http://research.microsoft.com/microbit" target="_blank">Microsoft Research micro:bit website</a>|
+                 <a href="http://www.kodugamelab.com/bbc-microbit/" target="_blank">Kodu Game Lab micro:bit website</a>
+		</div>
+    </div>
+{% endblock %}
