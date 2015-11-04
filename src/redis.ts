@@ -91,13 +91,13 @@ export class Client
     }
 
     /**
-     * Returns the set cardinality (number of elements) of the set stored at key.
+     * Returns the elements of the set stored at key.
      */
-    public async smembersAsync(key: string) : Promise<JsonObject>
+    public async smembersAsync(key: string) : Promise<string[]>
     {
         let members: JsonObject;
         members = await this.sendCommand1Async("smembers", key);
-        return members;
+        return <string[]>members;
     }
 
     /**

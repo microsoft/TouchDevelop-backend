@@ -24,7 +24,15 @@ export class Job {
 }
 
 var lastCheck = 0;
+var lastPoke = 0;
 var jobRunning: Job;
+
+export function seemsAlive():boolean
+{
+    if (restify.server().inShutdownMode)
+        return false;        
+    return (Date.now() - lastPoke) < 20000;
+}
 
 export function poke()
 {   
@@ -34,6 +42,7 @@ export function poke()
     }
     
     let now = Date.now();
+    lastPoke = now;
     if (!lastCheck) lastCheck = now;
     let delta = now - lastCheck 
     if (delta < td.randomRange(20000, 60000))

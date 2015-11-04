@@ -50,6 +50,7 @@ import * as tdliteRouting from "./tdlite-routing"
 import * as tdliteStatus from "./tdlite-status"
 import * as tdliteLegacy from "./tdlite-legacy"
 import * as tdliteCounters from "./tdlite-counters"
+import * as tdliteProgress from "./tdlite-progress"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -225,6 +226,7 @@ async function initSubsystems() : Promise<void>
     await tdliteImport.initAsync();
     await tdliteWorkspace.initAsync();
     await tdliteCppCompiler.initAsync();
+    await tdliteProgress.initAsync();
     if (core.fullTD) {
         await tdliteLegacy.initAsync();
     }    
