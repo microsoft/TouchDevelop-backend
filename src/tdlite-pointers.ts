@@ -674,6 +674,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         if (msg != "") {
             pubdata["templatename"] = "templates/official-s";
         }
+        pubdata["templatename"] = pubdata["templatename"].replace(/-s$/, "")
         let templText = await getTemplateTextAsync(pubdata["templatename"] + templateSuffix, lang);
         if (msg == "" && templText.length < 100) {
             msg = templText;
