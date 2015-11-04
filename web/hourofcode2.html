@@ -1,0 +1,125 @@
+{% extends "_layouts/default.html" %}
+{% set title = "Hour of Code™ with Microsoft Touch Develop" %}
+{% set description = "Hour of Code™ with Microsoft Touch Develop" %}
+
+{% block headAdd %}
+    <style>
+body { padding-top: 70px; }
+img.logo { margin-top: -5px; width:32px;}
+video.responsive { width:100%; }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+            <div class="container-fluid">
+                <!-- Brand and toggle get grouped for better mobile display -->
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="#">
+                        <img class="logo" src="https://az31353.vo.msecnd.net/c04/ongw.png" />
+                    </a>
+                    <p class="navbar-text hidden-xs">Hour of Code™ with Microsoft Touch Develop</p>
+                    <p class="navbar-text visible-xs hidden-sm hidden-md hidden-lg">Hour of Code™ <small>w. Touch Develop</small></p>
+                </div>
+                <!-- Collect the nav links, forms, and other content for toggling -->
+                <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                    <ul class="nav navbar-nav navbar-right">
+                        <li><a href="#tutorials">Tutorials</a></li>
+                        <li><a href="/docs/hourofcodeeducatornotes">Educator notes</a></li>
+                        <li><a href="/docs/beyondanhour">Beyond an hour</a></li>
+                    </ul>
+                </div><!-- /.navbar-collapse -->
+            </div><!-- /.container-fluid -->
+        </nav>
+
+        <div class="jumbotron">
+            <!-- <h1 class="hidden-xs visible-sm hidden-md visible-lg text-center">Hour of Code™ <small>with TouchDevelop</small></h1>
+            <h2 class="visible-xs hidden-sm visible-md hidden-lg text-center">Hour of Code™ <small>with TouchDevelop</small></h2> -->
+            <div class="row">
+                <div class="col-lg-offset-2 col-lg-8 col-md-8 col-md-offset-2 col-sm-12 col-xs-12">
+                    <video class="responsive" controls="controls" poster="https://lexmediaservice3.blob.core.windows.net/hoc/HOCTrailerPoster.jpg">
+                        <source type="video/mp4" src="https://lexmediaservice3.blob.core.windows.net/asset-8a43e1f7-9fc6-4c88-b43c-0c64a341b7b5/HOCTrailer.mp4?sv=2012-02-12&sr=c&si=3b2ecd60-71d8-4dd2-9eda-5d1a1bbf0c0b&sig=8416ZnD9ryS8R%2BBlgw9AQWRiKxuVJ75tsd2DR82zp4I%3D&se=2114-12-04T06%3A19%3A03Z" />
+                    </video>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-offset-2 col-lg-4 col-md-offset-1 col-md-6 col-sm-7 col-xs-12">
+                    <small class="text-muted">
+                        The 'Hour of Code'™ is a nationwide initiative by <a href="http://csedweek.org">Computer Science Education Week</a> and <a href="http://code.org">Code.org</a> to introduce millions of students to one hour of computer science and computer programming.
+                    </small>
+                </div>
+                <div class="col-lg-offset-1 col-lg-2 col-md-3 col-sm-3 col-xs-12">
+                        <a href="/app/#hub:follow:codingjetpackjumper" class="btn btn-info btn-lg text-right">LET'S GET STARTED</a>
+                    <p>
+                        <a href="http://aka.ms/HoCEventTrainingVideo" target="_blank" class="btn btn-default btn-xs">training</a> 
+                        <a href="http://aka.ms/how2customize" target="_blank" class="btn btn-default btn-xs">customize</a>                        
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div id="tutorials" class="row">
+            <div class='col-xs-12 col-sm-12 col-md-12 col-lg-12'>
+            </div>
+        </div>
+        <h2>more tutorials...</h2>
+        <div class="row">
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-muted" href="/app/#hub:follow:monsterslicertutorial">
+                    <h2 class="text-center">monster slicer</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/dwhkdiwe' alt='screenshot' />
+                </a>
+            </div>
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-danger" href="/app/#hub:follow:jumpingbirdtutorial">
+                    <h2 class="text-center">jumping bird</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/cpfimuwo' alt='screenshot' />
+                </a>
+            </div>
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-primary" href="/app/#hub:new:turtle:hourofcode">
+                    <h2 class="text-center">turtle drawings</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/pwrqfgvr' alt='screenshot' />
+                </a>
+            </div>
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-danger" href="/app/#hub:follow:donttapthetiletutorial">
+                    <h2 class="text-center">don't tap the tile</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/xkovmsrs' alt='screenshot' />
+                </a>
+            </div>
+        </div>
+        <div class="row">
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-warning" href="/app/#hub:follow:bearquesttutorial">
+                    <h2 class="text-center">bear quest</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/kvkgnoql' alt='screenshot' />
+                </a>
+            </div>
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-muted" href="/app/#hub:follow:pixelarttutorial">
+                    <h2 class="text-center">pixel art</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/eyaoibxe' alt='screenshot' />
+                </a>
+            </div>
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-danger" href="/app/#hub:new:fallingrocks:hourofcode">
+                    <h2 class="text-center">falling rocks</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/dkjikzvn' alt='screenshot' />
+                </a>
+            </div>
+            <div class='col-xs-12 col-sm-6 col-md-3 col-lg-3'>
+                <a class="text-success" href="/app/#hub:new:popper:hourofcode">
+                    <h2 class="text-center">bubble popper</h2>
+                    <img class="img-responsive thumbnail" src='https://az31353.vo.msecnd.net/pub/rigzqzdx' alt='screenshot' />
+                </a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
