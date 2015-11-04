@@ -380,7 +380,7 @@ export async function initAsync() : Promise<void>
     });
     core.addRoute("POST", "scripts", "", async (req3: core.ApiRequest) => {
         await core.canPostAsync(req3, "direct-script");
-        if (req3.status == 200 && orEmpty(req3.body["text"]).length > 100000) {
+        if (req3.status == 200 && orEmpty(req3.body["text"]).length > 200000) {
             req3.status = httpCode._413RequestEntityTooLarge;
         }
 
