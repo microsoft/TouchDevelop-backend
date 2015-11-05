@@ -7,6 +7,8 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as zlib from 'zlib';
 import * as path from 'path';
+import * as crypto from 'crypto';
+import * as tdshell from './tdshell';
 
 var isConsole = false;
 
@@ -26,12 +28,30 @@ export interface DeploymentInstructions {
     error?: string;
 }
 
-
-function mkReq(path: string)
+async function sendAsync(path: string, data: any = null)
 {
-    var r = td.createRequest(target + path);
-    r.setHeader("accept-encoding", "gzip");
-    return r;
+    path = path.replace(/^\/+/, "")
+    
+    if (!/^https:/.test(target)) {
+        return await tdshell.sendEncryptedAsync(target, path, data);
+    }
+    
+    let r = td.createRequest(target + "/" + path);        
+    
+    r.setHeader("accept-encoding", "gzip");    
+    if (data) {
+        var buf = new Buffer(JSON.stringify(data), "utf8");
+        var gzipped: Buffer = zlib.gzipSync(buf);
+        console.log("upload " + buf.length + " bytes, compressed " + gzipped.length)
+        r.setMethod("post");
+        r.setContentAsBuffer(gzipped);
+        r.setContentType("application/json;charset=utf8")
+        r.setHeader("content-encoding", "gzip");
+    }    
+
+    let res = await r.sendAsync();
+    console.log(`${path}: ${res.statusCode() }`)
+    return res
 }
 
 function buildInstructions(testopt = {}) {
@@ -68,17 +88,7 @@ var target:string;
 
 async function deployAsync()
 {
-    var ins = buildInstructions()
-    var buf = new Buffer(JSON.stringify(ins), "utf8");
-    var gzipped:Buffer = zlib.gzipSync(buf);
-    console.log("upload " + buf.length + " bytes, compressed " + gzipped.length)
-    let r = mkReq("/deploy")
-    r.setMethod("post");
-    r.setContentAsBuffer(gzipped);
-    r.setContentType("application/json;charset=utf8")    
-    r.setHeader("content-encoding", "gzip");    
-    var resp = await r.sendAsync();
-    console.log(resp.statusCode());
+    var resp = await sendAsync("/deploy", buildInstructions())
 }
 
 function showLogs(msgs: td.LogMessage[], skipcat = "") {
@@ -114,19 +124,19 @@ function showLogs(msgs: td.LogMessage[], skipcat = "") {
 
 async function shellAsync()
 {
-    var resp = await mkReq("/combinedlogs").sendAsync();
+    var resp = await sendAsync("/combinedlogs");
     showLogs(resp.contentAsJson()["logs"], "shell");    
 }
 
 async function statsAsync()
 {
-    var resp = await mkReq("/stats").sendAsync();
+    var resp = await sendAsync("/stats");
     console.log(resp.contentAsJson());    
 }
 
 async function logAsync()
 {
-    var resp = await mkReq("/info/applog").sendAsync();
+    var resp = await sendAsync("/info/applog");
     for (let w of resp.contentAsJson()["workers"]) {
         console.log("---------", w.worker)
         if (w.body.applog)
@@ -136,12 +146,22 @@ async function logAsync()
 
 async function getconfigCoreAsync()
 {
-    var resp = await mkReq("/getconfig").sendAsync();
+    var resp = await sendAsync("/getconfig");
     var x = {}
     for (let s of resp.contentAsJson()["AppSettings"]) {
         x[s.Name] = s.Value;
     }
     return x    
+}
+
+async function workerAsync(args:string[])
+{
+    let resp = await sendAsync("worker", {
+        path: args[0],
+        method: args[1] == null ? "GET" : "POST",
+        body: args[1]
+    })
+    console.log(resp.contentAsJson())
 }
 
 async function getconfigAsync()
@@ -169,25 +189,18 @@ async function setconfigAsync(args: string[]) {
         js = JSON.parse(fs.readFileSync(args[0], "utf8"))
     }
     
-    var req = await mkReq("/setconfig");
+    
     var rr = { AppSettings: [] }
     for (let k of Object.keys(js)) {
         rr.AppSettings.push({ Name: k, Value: js[k] })
     }
-    req.setContentAsJson(rr);
-    req.setMethod("post");
-    var r = await req.sendAsync();
-    console.log(r.statusCode())
+    await sendAsync("/setconfig", rr);
     await getconfigAsync();
 }
 
 async function restartAsync()
 {
-    var req = await mkReq("/setconfig");
-    req.setContentAsJson({});
-    req.setMethod("post");
-    var r = await req.sendAsync();
-    console.log(r.statusCode())
+    await sendAsync("/setconfig", {});    
 }
 
 function main() {
@@ -208,6 +221,7 @@ function main() {
         "restart               restart worker (poke the config)": restartAsync,
         "getenv                fetch current environment config": getconfigAsync,
         "setenv file|VAR=val   set current environment config": setconfigAsync,
+        "worker PATH [DATA]    forward to one worker": workerAsync,
     }
 
     for (let n of Object.keys(cmds)) {
