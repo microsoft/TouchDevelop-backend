@@ -314,7 +314,9 @@ export async function initAsync() : Promise<void>
             return;
         }
         let grps1 = apiRequest1.userinfo.json["groups"];
-        let hasGlobalList1 = core.callerHasPermission(apiRequest1, "global-list");
+        let hasGlobalList = core.callerHasPermission(apiRequest1, "global-list");
+        
+        if (core.fullTD) hasGlobalList = true;
 
         let field = "publicationid";
         let store = groups;
@@ -322,7 +324,7 @@ export async function initAsync() : Promise<void>
             field = "userid";
             store = tdliteUsers.users;
         }
-        if ( ! hasGlobalList1) {
+        if ( ! hasGlobalList) {
             fetchResult1.items = td.arrayToJson(asArray(fetchResult1.items).filter(elt => grps1.hasOwnProperty(elt["pub"]["publicationid"])));
         }
         let pubs = await core.followPubIdsAsync(fetchResult1.items, field, store.kind);

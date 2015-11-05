@@ -40,6 +40,7 @@ export async function initAsync()
         }
     });
     
+    // TODO this stuff should be migrated and done from here directly, not forwarded to noderunner
     core.addRoute("POST", "deploy", "*", async(req) => {
         if (!core.checkPermission(req, "azure-deploy")) return;
         
