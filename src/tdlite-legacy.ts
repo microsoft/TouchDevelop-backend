@@ -126,45 +126,46 @@ export async function initAsync()
     });
     
     core.addRoute("POST", "migrationtoken", "", async(req) => {
-        let tok = td.orEmpty(req.body["access_token"])        
+        let tok = td.orEmpty(req.body["access_token"])
         if (!tok || !core.fullTD) {
             req.status = httpCode._400BadRequest;
             return;
         }
-        
+
         let q = td.createRequest("https://api.touchdevelop.com/me?access_token=" + encodeURIComponent(tok))
         let resp = await q.sendAsync()
         let json = resp.contentAsJson()
-        if (!json) { 
+        if (!json) {
             req.status = httpCode._403Forbidden;
             return;
         }
-        
+
         let uid = json["id"]
         let userjson = await tdliteUsers.getAsync(uid);
         if (!userjson) {
-            userjson = <IUser> await tdliteImport.reimportPub(uid, "user");
+            userjson = <IUser>await tdliteImport.reimportPub(uid, "user");
             if (!userjson) {
                 req.status = httpCode._424FailedDependency;
                 return;
-            }    
+            }
         }
         
         if (userjson["login"]) {
             req.status = httpCode._409Conflict;
             return;            
         }
-        
-        userjson = await tdliteUsers.updateAsync(uid, async(v) => {            
-            if (!v.migrationtoken) {
-                v.migrationtoken = "1" + uid + "." + td.createRandomId(32);
-            }
-        })
-        
+
+        if (!userjson.migrationtoken)
+            userjson = await tdliteUsers.updateAsync(uid, async(v) => {
+                if (!v.migrationtoken) {
+                    v.migrationtoken = "1" + uid + "." + td.createRandomId(32);
+                }
+            })
+
         req.response = {
             userid: uid,
             migrationtoken: userjson.migrationtoken
-        }        
+        }
     })
     
     restify.server().post("/oauth/legacycallback", async(req, res) => {
