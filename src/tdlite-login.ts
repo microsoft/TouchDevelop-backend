@@ -837,6 +837,11 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
     }
     let token = withDefault(rreq.header("x-td-access-token"), td.toString(req.queryOptions["access_token"]));
     if (token != null && token != "null" && token != "undefined") {
+        if (token.length > 100) {
+            // this is to prompt migration client-side
+            req.status = 442;
+            return;
+        }
         let tokenJs = (<JsonObject>null);
         if (td.startsWith(token, "0") && token.length < 100) {
             let value = await core.redisClient.getAsync("tok:" + token);
