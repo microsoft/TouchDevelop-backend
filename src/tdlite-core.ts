@@ -40,10 +40,12 @@ export var hasHttps: boolean = false;
 export var httpCode = restify.http();
 export var myChannel: string = "";
 export var myHost: string = "";
-export var nonSelfRedirect: string = "";
+var nonSelfRedirect: string = "";
 export var pubsContainer: cachedStore.Container;
 export var redisClient: redis.Client;
 export var self: string = "";
+export var selfAliases: string[] = [];
+export var allAliases: string[] = [];
 export var settingsPermissions: JsonObject;
 export var tableClient: azureTable.Client;
 var throttleDisabled: boolean = false;
@@ -765,6 +767,12 @@ export function orFalse(s: boolean) : boolean
 
 export var htmlQuote = tdliteDocs.htmlQuote;
 
+export function isMyHost(host: string) {
+    if (!host) return false;
+    host = "://" + host.toLowerCase() + "/"
+    return allAliases.some(a => a.indexOf(host) >= 0);
+}
+
 export function handleBasicAuth(req: restify.Request, res: restify.Response) : void
 {
     if (res.finished()) {
@@ -772,8 +780,8 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response) : v
     }
     setHtmlHeaders(res);
     handleHttps(req, res);
-    if (nonSelfRedirect != "" && ! res.finished()) {
-        if (req.header("host").toLowerCase() != myHost) {
+    if (nonSelfRedirect != "" && !res.finished()) {
+        if (!isMyHost(req.header("host"))) {
             if (nonSelfRedirect == "soon") {
                 res.html(tdliteHtml.notFound_html, {
                     status: 404
@@ -1428,6 +1436,14 @@ export async function initAsync()
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
+    
+    let addSlash = n => n.replace(/\/*$/, "/");
+
+    self = addSlash(td.serverSetting("SELF", false).toLowerCase());
+    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
+    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));
+    selfAliases = orEmpty(td.serverSetting("SELF_ALIASES", true)).split(/[;,\s]+/).filter(s => !!s).map(addSlash);
+    allAliases = [self].concat(selfAliases);
 
     let creds = orEmpty(td.serverSetting("BASIC_CREDS", true));
     if (creds != "") {
@@ -1489,10 +1505,6 @@ export async function initFinalAsync()
     emptyRequest = buildApiRequest("/api");
     adminRequest = buildApiRequest("/api");
     adminRequest.userinfo.json = <any> { "groups": {} };
-
-    self = td.serverSetting("SELF", false).toLowerCase();
-    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
-    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));
 }
 
 export function removeDerivedProperties(body: JsonObject) : JsonObject

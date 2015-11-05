@@ -265,6 +265,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             relid = js["releaseid"];
         }
     }
+    logger.debug(`relid=${relid} fn='${fn}'`)
     if (relid != "") {
         if (fn == "" && relid == "2519967637668242448-920d9e58.a88e.4fa8.bcd1.9be5ba29da9f-workerjs") {
             let s = await tdlitePointers.simplePointerCacheAsync("/worker.js", "") || "";
@@ -309,6 +310,10 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 result1 = text;
                 return result1;
             });
+        }
+        else if (false && /\.manifest$/.test(fn)) {
+            let manifest = "CACHE MANIFEST\r\nNETWORK:\r\n*\r\n# " +td.createRandomId(10) + "\r\n"
+            res.sendText(manifest, "text/cache-manifest");            
         }
         else if (fn == "error.html" || fn == "browsers.html") {
             await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async (text2: string) => {

@@ -181,7 +181,7 @@ export class LoginSession
     
     public async accessTokenRedirectAsync(req:restify.Request)
     {
-        accessTokenRedirect(req.response, await this.generateRedirectUrlAsync());
+        accessTokenRedirect(req, await this.generateRedirectUrlAsync());
     }
 }
 
@@ -248,6 +248,7 @@ export async function initAsync(): Promise<void> {
     serverAuth.init({
         makeJwt: async(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) => {
             let url2 = await loginFederatedAsync(profile, oauthReq);
+            /*
             let stripped = stripCookie(url2);
             let jsb2 = ({ "headers": {} });
             if (stripped.cookie) {
@@ -255,6 +256,10 @@ export async function initAsync(): Promise<void> {
             }
             jsb2["http redirect"] = stripped.url;
             return jsb2;
+            */
+            return {
+                "http redirect": url2
+            }
         },
         getData: async(key: string) => {
             let value: string;
@@ -267,7 +272,8 @@ export async function initAsync(): Promise<void> {
         },
         federationMaster: orEmpty(td.serverSetting("AUTH_FEDERATION_MASTER", true)),
         federationTargets: orEmpty(td.serverSetting("AUTH_FEDERATION_TARGETS", true)),
-        self: td.serverSetting("SELF", false).replace(/\/$/g, ""),
+        self: core.self.replace(/\/$/g, ""),
+        allowedRedirects: core.selfAliases,
         requestEmail: true,
         redirectOnError: "/#loginerror"
     });
@@ -304,13 +310,25 @@ export async function initAsync(): Promise<void> {
     });
     restify.server().get("/oauth/dialog", async(req: restify.Request, res: restify.Response) => {
         let session = await LoginSession.loadAsync(req.query()["td_session"]);
+        
+        if (session && session.federatedUserInfo) {
+            logger.debug(`pref:${session.federatedUserInfo.redirectPrefix} host:${req.header("host")}`)
+            let match = /^(https?:\/\/(.*?)\/).*/.exec(session.federatedUserInfo.redirectPrefix)
+            if (match && match[2].toLowerCase() != req.header("host").toLowerCase() &&
+                core.isMyHost(match[2]))
+            {
+                res.redirect(httpCode._302MovedTemporarily, match[1].replace(/\/$/, "") + req.url())
+                return;
+            }
+        }
+        
         if (!session) {
             session = new LoginSession();
             session.state = cachedStore.freshShortId(16);
         }    
         if (session.userid == "") {
             serverAuth.validateOauthParameters(req, res);
-        }
+        }        
         core.handleBasicAuth(req, res);
         await createKidUserWhenUsernamePresentAsync(req, session, res);
         if (!res.finished()) {
@@ -360,7 +378,7 @@ export async function initAsync(): Promise<void> {
             }
             req3.response = ({});
             req3.headers = {};
-            let s4 = wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971");
+            let s4 = wrapAccessTokenCookie("logout", req3.headers).replace(/Dec 9999/g, "Dec 1971");
             req3.headers["Set-Cookie"] = s4;
         }
         else {
@@ -376,8 +394,8 @@ export async function initAsync(): Promise<void> {
             if (tok.cookie) {
                 if (req7.headers == null) {
                     req7.headers = {};
-                }
-                req7.headers["Set-Cookie"] = wrapAccessTokenCookie(tok.cookie);
+                }                
+                req7.headers["Set-Cookie"] = wrapAccessTokenCookie(tok.cookie, req7.headers);
             }
             else {
                 assert(false, "no cookie in token");
@@ -419,14 +437,20 @@ export function tokenString(token: core.Token) : string
     return customToken;
 }
 
-function wrapAccessTokenCookie(cookie: string): string 
+function wrapAccessTokenCookie(cookie: string, headers: td.StringMap): string 
 {
     let value = "TD_ACCESS_TOKEN2=" + cookie + "; ";
     if (core.hasHttps)
         value += "Secure; "
     value += "HttpOnly; Path=/; "
-    if (!/localhost:/.test(core.self))
-        value += "Domain=" + core.self.replace(/\/$/g, "").replace(/.*\//g, "").replace(/:\d+$/, "") + "; "
+    if (!/localhost:/.test(core.self)) {
+        let host:string = headers['host'] || core.myHost
+        host = host.toLowerCase()
+        if (!core.isMyHost(host))
+            host = core.myHost;
+        host = host.replace(/:\d+$/, "")
+        value += "Domain=" + host + "; "
+    }
     value += "Expires=" + new Date(Date.now() + 365 * 24 * 3600 * 1000).toString();    
     return value;
 }
@@ -606,7 +630,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         let redirectUri = await getRedirectUrlAsync(user2, req);
         await session.saveAsync();        
 
-        let tok = stripCookie(redirectUri);
+        let tok = stripCookie(redirectUri, req.headers());
         if (tok.cookie != "") {
             res.setHeader("Set-Cookie", tok.cookie);
         }
@@ -649,7 +673,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
                 else {
                     logger.tick("Login@code");
-                    accessTokenRedirect(res, await getRedirectUrlAsync(userJson["id"], req));
+                    accessTokenRedirect(req, await getRedirectUrlAsync(userJson["id"], req));
                 }
             }
             else if (kind == "activationcode") {
@@ -804,16 +828,17 @@ async function getLoginHtmlAsync(inner: string, lang: string) : Promise<string>
 }
 
 
-function accessTokenRedirect(res: restify.Response, url2: string) : void
+function accessTokenRedirect(req: restify.Request, url2: string) : void
 {
-    let tok = stripCookie(url2);
+    let res = req.response
+    let tok = stripCookie(url2, req.headers());
     if (tok.cookie != "") {
         res.setHeader("Set-Cookie", tok.cookie);
     }
     res.redirect(303, tok.url);
 }
 
-function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
+function stripCookie(url2: string, headers: td.StringMap) : tdliteUsers.IRedirectAndCookie
 {
     let cook: string;
     let coll = (/&td_cookie=([\w.]+)$/.exec(url2) || []);
@@ -821,7 +846,7 @@ function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
     cook = "";
     if (cookie != null) {
         url2 = url2.substr(0, url2.length - coll[0].length);
-        cook = wrapAccessTokenCookie(cookie);
+        cook = wrapAccessTokenCookie(cookie, headers);
     }
     return {
         url: url2,

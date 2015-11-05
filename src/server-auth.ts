@@ -275,6 +275,7 @@ export interface IInitOptions {
     federationMaster?: string;
     federationTargets?: string;
     self?: string;
+    allowedRedirects?: string[];
     requestEmail?: boolean;
     getProviderTemplate?: GetProviderTemplate;
     errorCallback?: ErrorCallback;
@@ -294,6 +295,13 @@ export interface IUserInfo {
 export function init(options_: IInitOptions = {}) : void
 {
     globalOptions = options_;
+    
+    let redirs = globalOptions.allowedRedirects || []; 
+    redirs.push("http://localhost:")
+    redirs.push(globalOptions.self)
+    redirs = redirs.map(s => /[\/:]$/.test(s) ? s : s + "/")
+    globalOptions.allowedRedirects = redirs 
+    
     if (globalOptions.errorCallback == null) {
         globalOptions.errorCallback = async (res: restify.Response, msg: string) => {
             if (!globalOptions.redirectOnError) {
@@ -884,8 +892,8 @@ export function validateOauthParameters(req: restify.Request, res: restify.Respo
     }
     else {
         let url = orEmpty(clientOauth.redirect_uri);
-        if ( ! (td.startsWith(url, globalOptions.self) || td.startsWith(url, "http://localhost:"))) {
-            res.sendError(400, "invalid redirect_uri; expecting it to start with " + globalOptions.self + " or http://localhost");
+        if (!globalOptions.allowedRedirects.some(s => td.startsWith(url, s))) {            
+            res.sendError(400, "invalid redirect_uri; expecting it to start with one of " + globalOptions.allowedRedirects.join(", "));
         }
         if (orEmpty(clientOauth.client_id) == "no-cookie" && url != globalOptions.self + "/oauth/gettokencallback") {
             res.sendError(400, "invalid no-cookie redirect_uri; expecting it to start with " + globalOptions.self);
