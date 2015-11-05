@@ -39,6 +39,30 @@ export async function initAsync()
             await importDoctopicsAsync(req4);
         }
     });
+    
+    core.addRoute("POST", "deploy", "*", async(req) => {
+        if (!core.checkPermission(req, "azure-deploy")) return;
+        
+        let response = await tdshell.sendEncryptedAsync(td.serverSetting("TDC_ENDPOINT"), "worker", {
+            method: "POST",
+            url: "/deploy/" + req.verb,
+            body: req.body
+        })
+                        
+        let resp = {
+            code: response.statusCode(),
+            headers: {},
+            resp: null
+        }
+        
+        if (response.contentAsJson())
+            resp = <any>response.contentAsJson();
+        
+        if (!resp.resp)
+            req.status = httpCode._400BadRequest;
+        else
+            req.response = resp.resp;        
+    })
 }
 
 export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: string) : Promise<void>
@@ -92,7 +116,7 @@ export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
             totalResp = (<JsonObject>null);
             canCache = false;
         }
-        logger.debug(`v=${ver}, cache=${canCache} api=${api} hd=${JSON.stringify(headers) }`);                                 
+        logger.debug(`v=${ver}, cache=${canCache} api=${api} hd=${headers["x-touchdevelop-relid"]}`);                                 
         if (canCache && headers["x-touchdevelop-relid"] == ver) {            
             let jsb = {
                 version: ver,
