@@ -16,6 +16,7 @@ import * as core from "./tdlite-core"
 import * as tdliteScripts from "./tdlite-scripts"
 import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteImport from "./tdlite-import"
+import * as tdshell from "./tdshell"
 
 var orEmpty = td.orEmpty;
 
@@ -38,6 +39,31 @@ export async function initAsync()
             await importDoctopicsAsync(req4);
         }
     });
+    
+    // TODO this stuff should be migrated and done from here directly, not forwarded to noderunner
+    core.addRoute("POST", "deploy", "*", async(req) => {
+        if (!core.checkPermission(req, "azure-deploy")) return;
+        
+        let response = await tdshell.sendEncryptedAsync(td.serverSetting("TDC_ENDPOINT"), "worker", {
+            method: "POST",
+            url: "/deploy/" + req.verb,
+            body: req.body
+        })
+                        
+        let resp = {
+            code: response.statusCode(),
+            headers: {},
+            resp: null
+        }
+        
+        if (response.contentAsJson())
+            resp = <any>response.contentAsJson();
+        
+        if (!resp.resp)
+            req.status = httpCode._400BadRequest;
+        else
+            req.response = resp.resp;        
+    })
 }
 
 export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: string) : Promise<void>
@@ -53,44 +79,55 @@ export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: str
 
 export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
 {
-    let resp: JsonObject;
+    let totalResp: JsonObject;
     let js = (<JsonObject>null);
-    let canCache = /^[\w\/]+$/.test(api);
+    let canCache = /^[\w\/\-]+$/.test(api);
     if (canCache) {
         js = await cacheCompiler.getAsync(api);
     }
     let ver = await core.getCloudRelidAsync(false);
+    logger.debug(`cache=${js ? js["version"] : "none"}`)
     if (js != null && js["version"] == ver) {
-        resp = js["resp"];
+        totalResp = js["resp"];
     }
     else {
-        let url = td.serverSetting("TDC_ENDPOINT", false).replace(/-tdevmgmt-.*/g, "") + api + "?access_token=" + td.serverSetting("TDC_AUTH_KEY", false);
-        let request = td.createRequest(url);        
-        let response = await request.sendAsync();
-        logger.debug(`cloud compiler: ${api} -> ${response.statusCode()}`);
-        if (response.statusCode() == 200) {
-            if (td.startsWith(response.header("content-type"), "application/json")) {
-                resp = response.contentAsJson();
+        let response = await tdshell.sendEncryptedAsync(td.serverSetting("TDC_ENDPOINT"), "worker", {
+            method: "GET",
+            url: "/" + api
+        })
+        let resp = response.contentAsJson()
+        if (!resp)
+            resp = {
+                code: response.statusCode(),
+                headers: {},
+                resp: null
+            }
+        logger.debug(`cloud compiler: ${api} -> ${resp["code"]}`);
+        let respData = resp["resp"] 
+        let headers = resp["headers"] || {}
+        if (respData) {
+            if (td.startsWith(headers["content-type"] || "", "application/json")) {
+                totalResp = JSON.parse(respData);
             }
             else {
-                resp = response.content();
+                totalResp = respData;
             }
         }
         else {
-            resp = (<JsonObject>null);
+            totalResp = (<JsonObject>null);
             canCache = false;
         }
-        logger.debug(JSON.stringify(td.arrayToJson(response.headerNames())));
-        if (canCache && response.header("X-TouchDevelop-RelID") == ver) {
-            let jsb = {};
-            jsb["version"] = ver;
-            if (resp != null) {
-                jsb["resp"] = resp;
-            }
+        logger.debug(`v=${ver}, cache=${canCache} api=${api} hd=${headers["x-touchdevelop-relid"]}`);                                 
+        if (canCache && headers["x-touchdevelop-relid"] == ver) {            
+            let jsb = {
+                version: ver,
+                resp: totalResp
+            };
             await cacheCompiler.justInsertAsync(api, jsb);
+            logger.debug("insert cache")
         }
     }
-    return resp;
+    return totalResp;
 }
 
 /**
@@ -101,7 +138,7 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
     let cfg = {};
     let clientConfig = tdliteReleases.clientConfigForRelease(rel);
     clientConfig.doNothingText = core.fullTD ? "..." : "add code here"
-    cfg["TDC_AUTH_KEY"] = td.serverSetting("TDC_AUTH_KEY", false);
+    cfg["TDC_AUTH_KEY"] = "";
     cfg["TDC_ACCESS_TOKEN"] = td.serverSetting("TDC_ACCESS_TOKEN", false);
     cfg["TDC_LITE_STORAGE"] = tdliteReleases.appContainerUrl().replace(/\/[^\/]+$/g, "");
     cfg["TDC_API_ENDPOINT"] = clientConfig.rootUrl.replace(/(test|stage|live)/, "www") + "/api/";
@@ -112,7 +149,7 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
         jsSrc = jsSrc + "process.env." + k + " = " + JSON.stringify(cfg[k]) + ";\n";
     }
     jsSrc = jsSrc + "require(\"./noderunner.js\");\n";
-    let jsb = {
+    let deployData = {
         "files": [ {
             "path": "script/compiled.js",
             "content": jsSrc
@@ -123,22 +160,18 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
     };
     let file = {};        
     if (false) {
-        logger.debug("cloud JS: " + JSON.stringify(td.clone(jsb), null, 2));
+        logger.debug("cloud JS: " + JSON.stringify(deployData, null, 2));
     }
+    
+    let endpoint = td.serverSetting("TDC_ENDPOINT")
 
-    let request = td.createRequest(td.serverSetting("TDC_ENDPOINT", false) + "deploy");
-    request.setMethod("post");
-    request.setContentAsJson(td.clone(jsb));
-    let response = await request.sendAsync();
-    logger.info("cloud deploy: " + response);
+    let response = await tdshell.sendEncryptedAsync(endpoint, "deploy", deployData);
+    logger.info("cloud deploy: " + response.toString());
 
-    let requestcfg = td.createRequest(td.serverSetting("TDC_ENDPOINT", false) + "setconfig");
-    requestcfg.setMethod("post");
-    requestcfg.setContentAsJson({
+    let response2 = await tdshell.sendEncryptedAsync(endpoint, "setconfig", {
         AppSettings: [{ Name: "TD_RESTART_INTERVAL", Value: "900" }]
-    });    
-    let response2 = await requestcfg.sendAsync();
-    logger.info("cloud deploy cfg: " + response2);
+    })
+    logger.info("cloud deploy cfg: " + response2.toString());
 
     // ### give it time to come up and reindex docs
     // TODO enable this back

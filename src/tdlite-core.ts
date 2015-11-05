@@ -464,6 +464,12 @@ export interface IResolveOptions {
     anonSearch?: boolean;
 }
 
+export function checkRelexedGlobalList(req:ApiRequest)
+{
+    if (fullTD) return req.status == 200;
+    return checkPermission(req, "global-list")
+}
+
 export async function setResolveAsync(store: indexedStore.Store, resolutionCallback: ResolutionCallback, options_: IResolveOptions = {}) : Promise<void>
 {
     if (options_.anonList) {
@@ -486,8 +492,8 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
     addRoute("GET", plural, "", async (req1: ApiRequest) => {
         let q = orEmpty(req1.queryOptions["q"]);
         if (q == "") {
-            if ( ! options_.anonList) {
-                checkPermission(req1, "global-list");
+            if (!options_.anonList) {
+                checkRelexedGlobalList(req1);                
             }
             if (req1.status == 200) {
                 await anyListAsync(store, req1, "all", "all");
@@ -495,7 +501,7 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
         }
         else {
             if ( ! options_.anonSearch) {
-                checkPermission(req1, "global-list");
+                checkRelexedGlobalList(req1);
             }
             if (req1.status == 200) {
                 await executeSearchAsync(store.kind, q, req1);
