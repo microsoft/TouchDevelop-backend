@@ -206,10 +206,10 @@ async function importFromPubloggerAsync(req: core.ApiRequest) : Promise<void>
         let apiRequest = await importOneAnythingAsync(v);
         if (apiRequest.status == 200 && searchable.indexOf(v["kind"]) >= 0) {
             let pub = await core.getPubAsync(v["id"], v["kind"]);
-            if (v) {
-                await search.scanAndSearchAsync(v, { skipScan: true })
-                let tick = "New_" + v["kind"]
-                if (v["kind"] == "script" && v["pub"] && v["pub"]["ishidden"])
+            if (pub) {
+                await search.scanAndSearchAsync(pub, { skipScan: true })
+                let tick = "New_" + pub["kind"]
+                if (pub["kind"] == "script" && pub["pub"] && pub["pub"]["ishidden"])
                     tick += "_hidden"
                 logger.tick(tick)
             }
