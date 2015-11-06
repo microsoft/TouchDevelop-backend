@@ -756,6 +756,8 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
 
 function getFacebookId(u: IUser)
 {
+    if (!core.fullTD) return null
+    
     let logins = [u.login]
     if (u.altLogins)
         logins = logins.concat(u.altLogins);
@@ -903,7 +905,7 @@ export async function createNewUserAsync(username: string, email: string, profil
         userjs.awaiting = awaiting;
     }
     
-    // enable picture by default
+    // enable picture by default    
     let fbid = getFacebookId(userjs)
     if (fbid) userjs.picturePrefix = "fb:" + fbid;
     
