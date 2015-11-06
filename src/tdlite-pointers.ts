@@ -546,6 +546,15 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     }
 }
 
+async function lookupScreenshotIdAsync(pub: {}) {
+    let text = await tdliteScripts.getScriptTextAsync(pub["id"]);
+    if (text && text["text"]) {
+        let m = /^var screenshot : Picture[^]*?url =.*?msecnd\.net\/pub\/([a-z]+)/m.exec(text["text"])
+        if (m) return core.currClientConfig.primaryCdnUrl + "/thumb1/" + m[1]
+    }
+    return "";
+}
+
 async function renderScriptPageAsync(scriptjson: {}, v: {}, lang:string)
 {    
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, core.emptyRequest);
@@ -554,7 +563,8 @@ async function renderScriptPageAsync(scriptjson: {}, v: {}, lang:string)
         templ = "templates/tutorial";
     else if (/#docs/i.test(pub["description"]))
         templ = "templates/docscript";
-    pub["templatename"] = templ; 
+    pub["templatename"] = templ;
+    pub["screenshoturl"] = await lookupScreenshotIdAsync(pub); 
     await renderFinalAsync(pub, v, lang);
 }
 
