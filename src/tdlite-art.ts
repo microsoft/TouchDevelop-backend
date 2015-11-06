@@ -129,8 +129,17 @@ export async function initAsync() : Promise<void>
     await initScreenshotsAsync();
 }
 
-async function initScreenshotsAsync() : Promise<void>
+export async function getPubScreenshotsAsync(pubid: string, num:number)
 {
+    let req = core.buildApiRequest("/api")
+    req.queryOptions = { count: num.toString() }
+    let res = await core.fetchAndResolveAsync(screenshots, req, "publicationid", pubid)
+    return res.items;
+}
+
+async function initScreenshotsAsync(): Promise<void>
+{
+    core.anyListAsync
     screenshots = await indexedStore.createStoreAsync(core.pubsContainer, "screenshot");
     core.registerPubKind({
         store: screenshots,

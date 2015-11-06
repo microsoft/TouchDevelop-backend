@@ -558,11 +558,20 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
 }
 
 async function lookupScreenshotIdAsync(pub: {}) {
+    let pref = core.currClientConfig.primaryCdnUrl + "/thumb1/"
     let text = await tdliteScripts.getScriptTextAsync(pub["id"]);
     if (text && text["text"]) {
         let m = /^var screenshot : Picture[^]*?url =.*?msecnd\.net\/pub\/([a-z]+)/m.exec(text["text"])
-        if (m) return core.currClientConfig.primaryCdnUrl + "/thumb1/" + m[1]
+        if (m) return pref + m[1]
     }
+    let id = pub["iconArtId"]
+    if (id) return pref + id;
+    
+    let ss = await tdliteArt.getPubScreenshotsAsync(pub["id"], 1)
+    if (ss[0]) {
+        return pref.replace("thumb1", "pub") + ss[0]["id"]
+    }
+    
     return "";
 }
 
