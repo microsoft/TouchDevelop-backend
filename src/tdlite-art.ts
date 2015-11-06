@@ -369,8 +369,11 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
             await core.generateIdAsync(jsb, 8);
             let filename = jsb["id"];
             if (arttype == "blob" || arttype == "text") {
-                let s = orEmpty(jsb["pub"]["name"]).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+/g, "").replace(/-+$/g, "");
-                filename = filename + "/" + withDefault(s, "file") + "." + ext;
+                let s = orEmpty(jsb["pub"]["name"]).replace(/[^a-zA-Z0-9\._]+/g, "-").replace(/^-+/g, "").replace(/-+$/g, "");
+                s = withDefault(s, "file")
+                if (!s.endsWith("." + ext))
+                    s += "." + ext
+                filename = filename + "/" + s;
             }
             jsb["filename"] = filename;
             let result = await artContainer.createGzippedBlockBlobFromBufferAsync(filename, buf, {
