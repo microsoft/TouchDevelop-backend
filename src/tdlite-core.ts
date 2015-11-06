@@ -1513,9 +1513,10 @@ export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<
     let users = await followPubIdsAsync(entities, "userid", "");
     coll2 = (<JsonBuilder[]>[]);
     for (let i = 0; i < entities.length; i++) {
-        let userJs:any = users[i];
+        let userJs = users[i];
         let root = td.clone(entities[i]);
         coll2.push(root);
+        let userTop = <tdliteUsers.IUser>(userJs || {});
         if (userJs != null) {
             root["*userid"] = userJs;
             userJs = userJs["pub"];
@@ -1525,9 +1526,9 @@ export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<
         let pub = root["pub"];
         pub["id"] = root["id"];
         pub["kind"] = root["kind"];
-        pub["userhaspicture"] = userJs.haspicture;
-        pub["username"] = userJs.name;
-        pub["userscore"] = userJs.score;
+        pub["userhaspicture"] = !!userTop.picturePrefix;        
+        pub["username"] = userJs["name"];
+        pub["userscore"] = userJs["score"];
         if ( ! fullTD) {
             pub["userplatform"] = [];
         }

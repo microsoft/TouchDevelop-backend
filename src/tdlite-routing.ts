@@ -96,6 +96,7 @@ async function performSingleRequestAsync(apiRequest: core.ApiRequest) : Promise<
         }
     }
     if (apiRequest.status == 200 && apiRequest.method == "POST" && typeof apiRequest.body != "object") {
+        logger.info("bad request, " + typeof apiRequest.body)
         apiRequest.status = httpCode._400BadRequest;        
     }
     if (apiRequest.status == 200) {
