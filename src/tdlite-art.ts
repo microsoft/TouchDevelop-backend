@@ -154,7 +154,7 @@ async function initScreenshotsAsync(): Promise<void>
         byUserid: true,
         byPublicationid: true
     });
-    core.addRoute("POST", "screenshots", "", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "*pub", "screenshots", async (req: core.ApiRequest) => {
         await core.canPostAsync(req, "screenshot");
         if (req.status == 200) {
             await postScreenshotAsync(req);
