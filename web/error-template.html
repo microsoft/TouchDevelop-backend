@@ -3,26 +3,38 @@
 {% set description = "@name@: @body@" %}
 
 {% block body %}
-
-
-    <div class="container">
-
+<style>
+   .jumbotron .message {
+       font-size:14px;
+   }
+   .jumbotron {
+       background: #fcf8e3;
+   }
+   .lead {
+       margin-top: 2em;
+   }
+</style>
+<div class="container">
     <div class="row">
         <div class="col-xs-12">
 
-        <h1 dir="auto">Houston, we have a problem</h1>
-        
-        <h2 dir="auto">@name@</h2>
-        
-        <p dir="auto">@body@</p>
-        
-        <p dir="auto">
-            Go back to <a href="/">touchdevelop.com</a> or <a href="/contact">contact us</a>.
-        </p>
-        
+            <div class='jumbotron bg-warning'>
+
+                <h1 dir="auto">Houston, we have a problem.</h1>
+                
+                <h2 dir="auto">@name@</h2>
+
+                <p dir="auto" class='lead'>
+                    You can go back to <a href="/">touchdevelop.com</a> or <a href="/contact">contact us</a>.
+                </p>
+
+                <p dir="auto" class='message'>@body@</p>
+
+            </div>
+
         </div>
     </div>
-    
-    </div>
+
+</div>
 
 {% endblock %}
