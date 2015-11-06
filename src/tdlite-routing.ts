@@ -239,6 +239,9 @@ function sendResponse(apiRequest: core.ApiRequest, req: restify.Request, res: re
             res.sendCustomError(httpCode._402PaymentRequired, "Your account is not authorized to perform this operation.");
         }
         else {
+            if (apiRequest.status < 310 && apiRequest.headers != null && apiRequest.headers.hasOwnProperty("location")) {
+                res.setHeader("location", apiRequest.headers["location"]);
+            }            
             res.sendError(apiRequest.status, "");
         }
     }

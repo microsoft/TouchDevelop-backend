@@ -16,6 +16,7 @@ import * as restify from "./restify"
 import * as core from "./tdlite-core"
 import * as audit from "./tdlite-audit"
 import * as tdliteTdCompiler from "./tdlite-tdcompiler"
+import * as tdlitePointers from "./tdlite-pointers"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -265,7 +266,11 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         }
     }
     if (relid != "") {
-        if (fn == "") {
+        if (fn == "" && relid == "2519967637668242448-920d9e58.a88e.4fa8.bcd1.9be5ba29da9f-workerjs") {
+            let s = await tdlitePointers.simplePointerCacheAsync("/worker.js", "") || "";
+            res.sendText(s, "application/javascript");            
+        }
+        else if (fn == "") {
             await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async (text: string) => {
                 let result: string;
                 let ver = "";
@@ -295,8 +300,8 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return result;
             });
         }
-        else if (fn == "app.manifest") {
-            await rewriteAndCacheAsync(rel, relid, fn, "text/cache-manifest", res, async (text: string) => {
+        else if (/\.manifest$/.test(fn)) {
+            await rewriteAndCacheAsync(rel, relid, "app.manifest", "text/cache-manifest", res, async (text: string) => {
                 let result1: string;
                 text = td.replaceAll(text, "../../../", core.currClientConfig.primaryCdnUrl + "/");
                 text = td.replaceAll(text, "./", core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
