@@ -644,6 +644,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             if (td.startsWith(fn, "u/")) {
                 v.redirect = fn.replace(/^u\//g, "/usercontent/");
             }
+            else if (core.fullTD && fn.startsWith("blog/")) {
+                v.redirect = fn.replace(/^blog/, "/docs")
+            }
             else if (td.startsWith(fn, "preview/")) {
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
                 await renderFinalAsync(pubdata, v, lang);
