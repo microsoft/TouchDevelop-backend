@@ -314,7 +314,6 @@ async function getHtmlArtAsync(templid: string) {
 
 async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
 {
-    logger.debug(`get template ${templatename} ${lang}`)
     let r: string;
     let id = pathToPtr(templatename.replace(/:.*/g, ""));
     let entry3 = (<JsonObject>null);
@@ -547,6 +546,28 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     }
 }
 
+async function lookupScreenshotIdAsync(pub: {}) {
+    let text = await tdliteScripts.getScriptTextAsync(pub["id"]);
+    if (text && text["text"]) {
+        let m = /^var screenshot : Picture[^]*?url =.*?msecnd\.net\/pub\/([a-z]+)/m.exec(text["text"])
+        if (m) return core.currClientConfig.primaryCdnUrl + "/thumb1/" + m[1]
+    }
+    return "";
+}
+
+async function renderScriptPageAsync(scriptjson: {}, v: {}, lang:string)
+{    
+    let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, core.emptyRequest);
+    let templ = "templates/script"
+    if (/#stepByStep/i.test(pub["description"]))
+        templ = "templates/tutorial";
+    else if (/#docs/i.test(pub["description"]))
+        templ = "templates/docscript";
+    pub["templatename"] = templ;
+    pub["screenshoturl"] = await lookupScreenshotIdAsync(pub); 
+    await renderFinalAsync(pub, v, lang);
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
     let lang = await handleLanguageAsync(req, res, true);
@@ -571,8 +592,10 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     id = id + lang;
 
     await rewriteAndCachePointerAsync(id, res, async (v: JsonBuilder) => {
-        let pubdata = {};        
-        let msg = "";
+        let pubdata = {};
+        let errorAsync = async(msg: string) => {
+            await pointerErrorAsync(msg, v, lang)
+        } 
         v["redirect"] = "";
         v["text"] = "";
         v["error"] = false;
@@ -582,59 +605,37 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         if (existing == null && /@[a-z][a-z]$/.test(id)) {
             existing = await core.getPubAsync(id.replace(/@..$/g, ""), "pointer");
         }
-        if (existing == null) {
-            if (false && td.startsWith(fn, "docs/")) {
-                /*
-                let docid = fn.replace(/^docs\//g, "");
-                let doctopic = doctopicsByTopicid[docid];
-                if (doctopic != null) {
-                    pubdata = td.clone(doctopic);
-                    let html = topicList(doctopic, "", "");
-                    pubdata["topiclist"] = html;
-                    let resp = await tdliteTdCompiler.queryCloudCompilerAsync(fn);
-                    if (resp != null) {
-                        pubdata["body"] = resp["prettyDocs"];
-                    }
-                    else {
-                        msg = "Rendering docs failed";
-                    }
-                }
-                else {
-                    msg = "No such doctopic";
-                }
-                */
-            }
-            else if (td.startsWith(fn, "u/")) {
+        
+        
+        if (existing == null) {          
+            if (td.startsWith(fn, "u/")) {
                 v["redirect"] = fn.replace(/^u\//g, "/usercontent/");
-                return;
             }
             else if (td.startsWith(fn, "preview/")) {
-                let docid1 = fn.replace(/^preview\//g, "");
-                await renderScriptAsync(docid1, v, pubdata);
-                msg = pubdata["msg"];
-                if (pubdata["done"]) {
-                    return;
-                }
+                await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
+                await renderFinalAsync(pubdata, v, lang);
             }
             else if (/^[a-z]+$/.test(fn)) {
                 let entry = await core.pubsContainer.getAsync(fn);
                 if (entry == null || withDefault(entry["kind"], "reserved") == "reserved") {
-                    msg = "No such publication";
+                    await errorAsync("No such publication");
                 }
-                else {
-                    v["redirect"] = "/app/#pub:" + entry["id"];
-                    return;
+                else {                    
+                    if (core.fullTD && entry["kind"] == "script") {
+                        await renderScriptPageAsync(entry, v, lang)
+                    } else {
+                        v["redirect"] = "/app/#pub:" + entry["id"];
+                    }    
                 }
             }
             else {
-                msg = "No such pointer";
+                await errorAsync("No such pointer");
             }
         }
         else {
             let ptr = PubPointer.createFromJson(existing["pub"]);
             if (ptr.redirect) {
                 v["redirect"] = ptr.redirect;
-                return;
             } else if (ptr.artid) {
                 let cont = orEmpty(ptr.artcontainer);
                 cont = "";
@@ -642,17 +643,12 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     cont = "pub";
                 }
                 v["redirect"] = core.currClientConfig.primaryCdnUrl + "/" + cont + "/" + ptr.artid;
-                return;
             } else if (ptr.htmlartid) {
                 v["text"] = await getHtmlArtAsync(ptr.htmlartid);
-                return;
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
-                msg = pubdata["msg"];
-                if (pubdata["done"]) {
-                    return;
-                }
+                
                 let path = ptr.parentpath;
                 let breadcrumb = ptr.breadcrumbtitle;
                 let sep = "&nbsp;&nbsp;»&nbsp; ";
@@ -667,49 +663,55 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 }
                 breadcrumb = "<a href=\"/home\">Home</a>" + sep + breadcrumb;
                 pubdata["breadcrumb"] = breadcrumb;
+                
+                await renderFinalAsync(pubdata, v, lang);
             }
-        }
-
-        pubdata["css"] = tdliteTdCompiler.doctopicsCss;
-        pubdata["rootUrl"] = core.currClientConfig.rootUrl;
-        if (msg != "") {
-            pubdata["templatename"] = "templates/official-s";
-        }
-        if (core.fullTD && pubdata["templatename"])
-            pubdata["templatename"] = pubdata["templatename"].replace(/-s$/, "");
-        let templText = await getTemplateTextAsync(pubdata["templatename"] + templateSuffix, lang);
-        if (msg == "" && templText.length < 100) {
-            msg = templText;
-        }
-        if (templText.length < 100) {
-            v["text"] = msg;
-            v["version"] = "no-cache";
-        }
-        else {
-            if (msg != "") {
-                if (false) {
-                    v["version"] = "no-cache";
-                }
-                v["expiration"] = await core.nowSecondsAsync() + 5 * 60;
-                if (td.startsWith(msg, "No such ")) {
-                    pubdata["name"] = "Sorry, the page you were looking for doesn’t exist";
-                    v["status"] = 404;
-                }
-                else {
-                    pubdata["name"] = "Whoops, something went wrong.";
-                    v["status"] = 500;
-                }
-                pubdata["body"] = core.htmlQuote("Error message: " + msg);
-                v["error"] = true;
-                let text = await simplePointerCacheAsync("error-template", lang);
-                if (text.length > 100) {
-                    templText = text;
-                }
-            }
-            console.log(pubdata)
-            v["text"] = await tdliteDocs.formatAsync(templText, pubdata);
         }
     });
+}
+
+async function renderFinalAsync(pubdata: {}, v: {}, lang: string) {
+    if (pubdata["msg"]) {
+        await pointerErrorAsync(pubdata["msg"], v, lang);
+        return;
+    }
+    if (pubdata["done"]) {
+        return;
+    }
+
+    pubdata["css"] = tdliteTdCompiler.doctopicsCss;
+    pubdata["rootUrl"] = core.currClientConfig.rootUrl;
+    if (core.fullTD)
+        pubdata["templatename"] = pubdata["templatename"].replace(/-s$/, "")
+    if (!pubdata["body"]) pubdata["body"] = "";
+
+    let templText = await getTemplateTextAsync(pubdata["templatename"] + templateSuffix, lang);
+    if (templText.length < 100) {
+        await pointerErrorAsync(templText, v, lang)
+        return;
+    }
+    v["text"] = await tdliteDocs.formatAsync(templText, pubdata);
+}
+
+async function pointerErrorAsync(msg: string, v: JsonBuilder, lang: string) {
+    let pubdata = {}
+    v["expiration"] = await core.nowSecondsAsync() + 5 * 60;
+    if (td.startsWith(msg, "No such ")) {
+        pubdata["name"] = "Sorry, the page you were looking for doesn’t exist";
+        v["status"] = 404;
+    }
+    else {
+        pubdata["name"] = "Whoops, something went wrong.";
+        v["status"] = 500;
+    }
+    pubdata["body"] = core.htmlQuote("Error message: " + msg);
+    v["error"] = true;
+    let text = await simplePointerCacheAsync("error-template", lang);
+    if (text.length > 100) {
+        v["text"] = await tdliteDocs.formatAsync(text, pubdata);
+    } else {
+        v["text"] = core.htmlQuote(msg + "; and also for /error-template: " + text)
+    }
 }
 
 function hasPtrPermission(req: core.ApiRequest, currptr: string) : boolean

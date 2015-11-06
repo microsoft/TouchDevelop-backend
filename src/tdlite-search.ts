@@ -175,9 +175,8 @@ export async function initAsync() : Promise<void>
             await executeSearchAsync("web", orEmpty(req.queryOptions["q"]), req);
         }
     });
-    core.addRoute("GET", "search", "", async (req: core.ApiRequest) => {
-        // this may be a bit too much to ask
-        core.checkPermission(req, "global-list");
+    core.addRoute("GET", "search", "", async (req: core.ApiRequest) => {        
+        core.checkRelexedGlobalList(req);        
         if (req.status == 200) {
             await executeSearchAsync("", orEmpty(req.queryOptions["q"]), req);
         }

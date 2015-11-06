@@ -1,0 +1,49 @@
+{% extends "_layouts/default.html" %}
+{% set title = "@name@ by @username@ /@id@" %}
+{% set description = "Created with Touch Develop" %}
+
+{% block body %}
+<style>
+	.head {
+		width: 3em;
+		height: 3em;
+	}
+</style>
+<div class='container'>
+	<div class="jumbotron">
+		<div class="row">
+			<div class="col-xs-12 col-sm-6 col-md-7 col-lg-8">
+				<h2>@name@</h2>
+				<h3>by 
+				<img alt='Picture of @username@' src='/api/@userid@/picture?type=large' class='head img-rounded'/>
+				@username@
+			</h3>
+				<p>@description@</p>
+			</div>
+
+			<div class="hidden-xs col-sm-6 col-md-5 col-lg-4">
+				<img class="img-responsive img-thumbnail" src='@screenshoturl@' />
+			</div>
+
+		</div>
+
+		{% block buttons %}
+		<div class="row top-buffer">
+			<div class="cols-xs-12 col-sm-offset-6 col-sm-6 col-md-offset-7 col-md-5 col-lg-offset-8 col-lg-4">
+				<a class="btn btn-lg btn-success btn-block" id="runLink" href="/app/#landing:@id@">run</a>
+			</div>
+		</div>
+
+		<div class="row" style="margin-top:1em;">
+			<div class="col-xs-6 col-sm-offset-6 col-sm-3 col-md-offset-7 col-md-3 col-lg-offset-8 col-lg-2">
+				<a class="btn btn-sm btn-default btn-block" href="/app/#pub:@id@">edit <span class="hidden-xs">in TouchDevelop</span></a>
+			</div>
+			<div class="col-xs-6 col-sm-3 col-md-2 col-lg-2">
+				<a class="btn btn-sm btn-default btn-block" href="/app/#list:topics:topic:tutorials:overview">create new</a>
+			</div>
+		</div>
+		{% endblock %}
+
+	</div>
+</div>
+{% endblock %}

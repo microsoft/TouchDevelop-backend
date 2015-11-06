@@ -508,6 +508,13 @@ export async function initAsync() : Promise<void>
             req5.response = jsb;
         }
     });
+    
+    core.addRoute("GET", "*user", "picture", async(req)=>{
+        req.status = httpCode._302MovedTemporarily;
+        req.headers = {
+            "location": "https://az820584.vo.msecnd.net/pub/xaxrrvvd"
+        }
+    })
 
     core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;

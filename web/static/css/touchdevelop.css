@@ -1,0 +1,78 @@
+.md-tutorial { font-size: 1.0em; line-height: 1.4em; }
+.parse-error, .decl { margin-bottom: 1em; }
+.parse-error, .error { color: #d00; }
+.hint { color: #444; }
+.errorNumber { color: #aaa; }
+.kw, .keyword { font-weight: bold; color: black; }
+.kbm { display:inline-block;} .kbm svg { height: 1em; vertical-align: middle; margin-left: 0.2em; }
+.kbm svg > path.biton { fill:#000; } .kbm svg > path.bitoff { fill:#ccc; }
+.code-highlight { border: 1px dashed gray; font-weight:bold; }
+.comment { color:#444; font-style:italic; }
+.greyed { color:#444; } .greyer { color: #555; }
+.api-kind { border: 1px dotted #BBB; padding: 0.4em; clear: both; font-size: 1.2em; margin-bottom: 0.6em; }
+.md-snippet { border: 1px dotted #bbb; padding: 0.4em 0; clear: both; line-height: 1.3em; page-break-inside:avoid; }
+.md-snippet .signature { padding:0em 0.2em 0em 0.2em; }
+.md-snippet .name { font-weight: bold;}
+.md-img { margin:0.5em; clear:both; width:100%; text-align:center; position:relative; }
+.md-img-inner { position:relative; display:inline-block; width:100%; }
+.md-img .caption { font-size:0.8em; }
+.md-img img { max-height: 100%; max-width: 100%; width:auto;}
+.md-box { page-break-inside: avoid; }
+.md-box-header, .md-box-header-print { font-weight: bold; font-size: 1.2em; }
+.md-box, .md-box-landscape, .md-box-portrait { margin-left: 2em;  margin-bottom:0.5em; border: 1px solid #555; border-left-width: 0.5em; padding: 1em; }
+.md-box-avatar { margin-bottom:0.5em; } 
+.md-box-avatar-img { width:4em; display:inline-block; vertical-align:top;} 
+.phone .md-box-avatar-img { width:3em; } 
+.md-box-avatar-body { position:relative; padding:0em 0.5em 0em 0.5em; color:#000; background:#eeeeee; margin-left:1.5em; display:inline-block; width: calc(100% - 7em); } .phone .md-box-avatar-body { width: calc(100% - 6em); } .md-box-avatar-body:after { top: 1.1em; left: -1.5em; bottom: auto; border-width: 0px 1.5em 0.7em 0; border-color: transparent #eeeeee; content: ''; position: absolute; border-style: solid; display: block; width: 0; }
+.md-box-card { border: solid 1px black; background: inherit; margin-left:inherit; min-height:4em;}
+a.md-api-entry-link, .api-kind a { text-decoration: none; }
+.api-desc { color: black; font-size: 0.8em; }
+.signature { font-size: 1.3em; }
+.md-api-entry { color: black; border: 1px dotted #BBB; padding: 0.6em 1em 0.5em 1em; margin: 0.5em 0; }
+.md-api-header { font-size: 1.4em; margin-bottom: 1em; }
+.md-api-header .signature { margin-bottom: 0.4em; }
+.md-api-header .sig-parameter { display:inline-block; margin-left: 4em; }
+.md-para { margin-top: 1em; margin-bottom: 1em; }
+.block .md-para { margin: 0; }
+span.stringLiteral { word-break: break-all; }
+div.stringLiteral { white-space:pre-wrap; }
+.picLiteral { height:1em; vertical-align: bottom;}
+.md-warning { background-color:lightyellow; border-left:solid 0.25em red; padding:0.5em; margin-left:2em;}
+div.md-video-link { position: relative; }
+div.md-video-link > img { width: calc(100% - 1em); }
+div.md-video-link > svg { position: absolute;left:0em; bottom: 0em; width:25%; } 
+@media print { div.md-video-link > svg { display:none; }  }
+@media print { a.md-external-link:link:after, a.md-external-link:visited:after { content: ' (' attr(href) ') '; font-size: 80%; } }
+svg.video-play { width: calc(100% - 1em); background-size:cover; background-repeat:no-repeat;}
+.nopara .md-para { margin:0; }
+.symbol { font-family: "TD Symbols", inherit; }
+.placeholder { font-size: 0.7em; padding: 0.2em; border: 1px dotted gray; }
+.md-comment, .md-comment h1, .md-comment h2, .md-comment h3, .md-comment h4 { display: inline-block; margin:0; }
+code { font-size: 1.0em; font-family: Calibri, "Helvetica Neue", HelveticaNeue, Helvetica, Arial, "TD Symbols", sans-serif; border: 1px dotted #bbb; padding: 0em 0.2em 0.1em 0.2em; white-space:nowrap; }
+code.md-ui { border: 2px solid #777; padding-left:0.2em; padding-right:0.2em; white-space:nowrap; }
+.block { margin-left: 1em; }
+.stmt { border-left: 0.2em solid #aaa; margin-top: 0.2em; }
+.line { margin-left: 0.4em; }
+.tutorial-step { font-size: 1.7em; }
+.tutorial-step .md-comment { font-size: 0.6em; }
+.decl > .stmt { border: none; }
+.print-big { font-size: 1.5em; }
+.md-tutorial a {
+	font-weight: bold;
+}
+body { 
+	font-family: "Helvetica Neue", HelveticaNeue, Helvetica, Arial, "TD Symbols", sans-serif; 
+}
+
+@media print { 
+	#MicrosoftTranslatorWidget { display: none; } 
+	.body, .inner, .primary-content__inner, .md-tutorial { margin:0; padding:0; } 
+	.md-box-screen { display:none; }
+	a { color:black; }
+	.md-tutorial a:link:after, .md-tutorial a:visited:after  { content:" (" attr(href) ") "; } 
+}
+@page { 
+	size: auto; 
+	margin: 1cm 1cm 1cm 1cm;
+}
+

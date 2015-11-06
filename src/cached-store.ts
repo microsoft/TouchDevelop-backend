@@ -401,7 +401,8 @@ export class Container
      */
     public async justInsertAsync(name: string, data_: JsonBuilder) : Promise<void>
     {
-        data_["__version"] = 1;
+        let ver = await redisClient.cachedTimeAsync();
+        data_["__version"] = ver;
         let text = JSON.stringify(data_);
         if (this.blob != null) {
             let result = await this.blob.createBlockBlobFromTextAsync(name, text, {
@@ -411,7 +412,7 @@ export class Container
             });
             let ok = result.succeded();
         }
-        await this.saveCacheAsync(name, text, 1);
+        await this.saveCacheAsync(name, text, ver);
     }
 
     private saveMemCache(name: string, val: string) : void
