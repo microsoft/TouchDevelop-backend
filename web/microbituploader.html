@@ -1,0 +1,68 @@
+{% extends "_layouts/default.html" %}
+{% set title = "Microsoft Uploader for BBC micro:bit" %}
+{% set description = "Microsoft Uploader for BBC micro:bit" %}
+
+{% block body %}
+<!--
+http://aka.ms/CollageTutorialVideo2
+http://aka.ms/ConditionalsTutorial1Video1
+http://aka.ms/EventsTutorial1Video1
+-->
+<style>
+.jumbotron > img {
+  float: left;
+  max-width: 400px;
+  max-height: 300px;
+  margin: 25px 30px 40px 0px;
+}    
+    </style>
+      <div class='container'>
+    <div class='jumbotron'>
+                <img class='visible-md visible-lg' src="/static/images/microbit.uploader.screenshot.png" />
+
+                <div class='content'>
+                <h1>Uploader for micro:bit
+                </h1>
+                <p>
+                    Tired of drag and dropping .hex files to your <a href="/microbit">BBC micro:bit</a>? Use the <b>uploader</b> to automate it!
+                </p>
+                <p>
+                    <small>
+        <b>Freely</b> available on <b>Windows</b>.
+                    </small>
+                </p>                
+                <p class="text-right">
+                    <a href="/static/uploader/Microsoft.Uploader.Microbit.zip" target="blank" class="btn btn-success btn-lg">Download (v0.6)</a>
+                </p>
+                </div>
+      </div>
+    </div>
+
+    <div class='container'>
+        <div class="row">
+            <div class="col-md-6 col-xs-12">
+                <h2>How does it work?</h2>
+                <img class="pull-right" src="/static/images/microbit.uploader.uploading.png"/>
+                <p>
+                    The <b>uploader</b> monitors your <b>Downloads</b> folder looking for any <code>.hex</code> file being download. 
+                    When it detects a new .hex file, the <b>uploader</b> tries to copy it to any connected BBC micro:bit (it copies it to the <code>MICROBIT</code> drive).
+                    That's it!
+                </p>
+            </div>
+            <div class="col-md-6 col-xs-12">
+                <h2>System Requirements</h2>
+                <ul>
+                    <li>Windows XP or later</li>
+                    <li>.NET runtime 2.0 or higher</li>
+                    <li>Browser: this application will work for any web browser that is supported by the BBC micro:bit</li>
+                </ul>
+                <h2>Installation Instructions</h2>
+                <ul>
+                    <li>Download the <a href="/static/uploader/Microsoft.Uploader.Microbit.zip" target="blank">Microsoft.Uploader.Microbit.zip</code> file to your local computer.</li>
+                    <li>Unzip the .zip file and copy the <code>Microsoft.Uploader.exe</code> file to your desktop.</li>
+                    <li>Launch the <code>Microsoft.Uploader.exe</code> file before working on your BBC micro:bit</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+{% endblock %}
