@@ -248,6 +248,7 @@ export async function initAsync(): Promise<void> {
     serverAuth.init({
         makeJwt: async(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) => {
             let url2 = await loginFederatedAsync(profile, oauthReq);
+            /*
             let stripped = stripCookie(url2);
             let jsb2 = ({ "headers": {} });
             if (stripped.cookie) {
@@ -255,6 +256,10 @@ export async function initAsync(): Promise<void> {
             }
             jsb2["http redirect"] = stripped.url;
             return jsb2;
+            */
+            return {
+                "http redirect": url2
+            }
         },
         getData: async(key: string) => {
             let value: string;
@@ -267,7 +272,7 @@ export async function initAsync(): Promise<void> {
         },
         federationMaster: orEmpty(td.serverSetting("AUTH_FEDERATION_MASTER", true)),
         federationTargets: orEmpty(td.serverSetting("AUTH_FEDERATION_TARGETS", true)),
-        self: td.serverSetting("SELF", false).replace(/\/$/g, ""),
+        self: core.self.replace(/\/$/g, ""),
         requestEmail: true,
         redirectOnError: "/#loginerror"
     });
