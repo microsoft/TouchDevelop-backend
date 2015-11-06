@@ -52,7 +52,7 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 228;
+export var rewriteVersion: number = 229;
 
 var settingsCache = {};
 var lastSettingsVersion = "";

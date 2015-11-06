@@ -546,6 +546,18 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     }
 }
 
+async function renderScriptPageAsync(scriptjson: {}, v: {}, lang:string)
+{    
+    let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, core.emptyRequest);
+    let templ = "templates/script"
+    if (/#stepByStep/i.test(pub["description"]))
+        templ = "templates/tutorial";
+    else if (/#docs/i.test(pub["description"]))
+        templ = "templates/docscript";
+    pub["templatename"] = templ; 
+    await renderFinalAsync(pub, v, lang);
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
     let lang = await handleLanguageAsync(req, res, true);
@@ -599,10 +611,11 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     await errorAsync("No such publication");
                 }
                 else {                    
-                    //if (core.fullTD && entry["kind"] == "script") {
-                    //    await renderScriptPageAsync(entry, v, pubdata)
-                    //}
-                    v["redirect"] = "/app/#pub:" + entry["id"];
+                    if (core.fullTD && entry["kind"] == "script") {
+                        await renderScriptPageAsync(entry, v, lang)
+                    } else {
+                        v["redirect"] = "/app/#pub:" + entry["id"];
+                    }    
                 }
             }
             else {
@@ -660,6 +673,7 @@ async function renderFinalAsync(pubdata: {}, v: {}, lang: string) {
     pubdata["rootUrl"] = core.currClientConfig.rootUrl;
     if (core.fullTD)
         pubdata["templatename"] = pubdata["templatename"].replace(/-s$/, "")
+    if (!pubdata["body"]) pubdata["body"] = "";
 
     let templText = await getTemplateTextAsync(pubdata["templatename"] + templateSuffix, lang);
     if (templText.length < 100) {
