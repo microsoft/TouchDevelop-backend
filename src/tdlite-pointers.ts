@@ -45,8 +45,7 @@ export class PubPointer
     @td.json public htmlartid: string = "";
     @td.json public redirect: string = "";
     @td.json public description: string = "";
-    @td.json public comments: number = 0;
-    @td.json public artcontainer: string = "";
+    @td.json public comments: number = 0;    
     @td.json public parentpath: string = "";
     @td.json public scriptname: string = "";
     @td.json public scriptdescription: string = "";
@@ -662,12 +661,12 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             if (ptr.redirect) {
                 v.redirect = ptr.redirect;
             } else if (ptr.artid) {
-                let cont = orEmpty(ptr.artcontainer);
-                cont = "";
-                if (!tdliteArt.hasThumbContainer(cont)) {
-                    cont = "pub";
+                let artobj = await core.getPubAsync(ptr.artid, "art")
+                if (!artobj) {
+                    await errorAsync("No such art: /" + ptr.artid)
+                } else {
+                    v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                 }
-                v.redirect = core.currClientConfig.primaryCdnUrl + "/" + cont + "/" + ptr.artid;
             } else if (ptr.htmlartid) {
                 v.text = await getHtmlArtAsync(ptr.htmlartid);
             } else {
