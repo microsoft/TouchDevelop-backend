@@ -1,0 +1,28 @@
+{% extends "_layouts/default.html" %}
+{% set title = "@name@" %}
+{% set description = "@name@: @body@" %}
+
+{% block body %}
+
+
+    <div class="container">
+
+    <div class="row">
+        <div class="col-xs-12">
+
+        <h1 dir="auto">Houston, we have a problem</h1>
+        
+        <h2 dir="auto">@name@</h2>
+        
+        <p dir="auto">@body@</p>
+        
+        <p dir="auto">
+            Go back to <a href="/">touchdevelop.com</a> or <a href="/contact">contact us</a>.
+        </p>
+        
+        </div>
+    </div>
+    
+    </div>
+
+{% endblock %}

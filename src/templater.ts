@@ -231,6 +231,7 @@ async function serveAsync() {
         let lst = getFiles().filter(f => !/^\/(_layouts|_includes|static)\//.test(f))
         lst.sort()
         for (let fn of lst) {
+            fn = fn.replace(/\.html$/, "")
             hrefs += `<a style="font-size:20px;line-height:1.5em" href="${fn}">${fn}</a><br>\n`
         }
         res.html(hrefs)
@@ -238,6 +239,8 @@ async function serveAsync() {
     s.routeRegex("GET", "/.*", async(req, res) => {
         let fn = req.url().replace(/\?.*/, "");
         if (/^(\/[\w][\w\.\-]+)+$/.test(fn)) {
+            if (fs.existsSync("web" + fn + ".html"))
+                fn += ".html"
             if (fs.existsSync("web" + fn)) {
                 if (/^\/static\//.test(fn)) {
                     res.sendBuffer(fs.readFileSync("web" + fn),
@@ -267,7 +270,7 @@ async function main() {
     let cmd = process.argv[2];
     if (cmd == "serve")
         await serveAsync();
-    else if (cmd == "upload")
+    else if (cmd == "upload" || cmd == "push")
             await uploadAsync();    
     else
         console.log("bad usage")
