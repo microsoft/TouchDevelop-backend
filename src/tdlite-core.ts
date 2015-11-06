@@ -57,7 +57,7 @@ export var rewriteVersion: number = 233;
 var settingsCache = {};
 var lastSettingsVersion = "";
 var settingsCleanups: (() => void)[] = [];
-export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations"]
+export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations", "ticks"]
 
 export class IdObject
     extends td.JsonRecord
@@ -247,6 +247,7 @@ export class ClientConfig
     @td.json public anonToken: string = "";
     @td.json public primaryCdnUrl: string = "";
     @td.json public altCdnUrls: string[];
+    @td.json public tickFilter: JsonObject;
     @td.json public doNothingText: string;
     static createFromJson(o:JsonObject) { let r = new ClientConfig(); r.fromJson(o); return r; }
 }
@@ -1482,6 +1483,7 @@ export async function initFinalAsync()
         currClientConfig.altCdnUrls.push("https://az31353.vo.msecnd.net")
     }
     currClientConfig.anonToken = basicCreds;
+    
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();
     });
@@ -1493,6 +1495,8 @@ export async function initFinalAsync()
     self = td.serverSetting("SELF", false).toLowerCase();
     myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
     nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));
+    
+    await refreshSettingsAsync();
 }
 
 export function removeDerivedProperties(body: JsonObject) : JsonObject
@@ -1635,6 +1639,9 @@ export async function refreshSettingsAsync(): Promise<void> {
     for (let f of settingsCleanups) {
         f();
     }
+    
+    if (currClientConfig)
+        currClientConfig.tickFilter = (getSettings("ticks") || {})["ticks"];
 
     let entry2 = getSettings("settings") || { permissions: {} };
     let permMap = td.clone(entry2["permissions"]);
