@@ -105,7 +105,7 @@ export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
         logger.debug(`cloud compiler: ${api} -> ${resp["code"]}`);
         let respData = resp["resp"] 
         let headers = resp["headers"] || {}
-        if (respData) {
+        if (respData && resp["code"] == 200) {
             if (td.startsWith(headers["content-type"] || "", "application/json")) {
                 totalResp = JSON.parse(respData);
             }
