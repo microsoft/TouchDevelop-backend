@@ -983,7 +983,7 @@ export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passI
 
 export async function handleEmailVerificationAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
-    let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
+    let lang = await tdlitePointers.handleLanguageAsync(req);
     let coll = (/^\/verify\/([a-z]+)\/([a-z]+)/.exec(req.url()) || []);
     let userJs = await getAsync(coll[1]);
     let msg = "";

@@ -47,6 +47,7 @@ async function performBatchedRequestAsync(inpReq: JsonBuilder, req: core.ApiRequ
     apiRequest.method = core.withDefault(inpReq["method"], "GET").toUpperCase();
     apiRequest.userid = req.userid;
     apiRequest.userinfo = req.userinfo;
+    apiRequest.restifyReq = req.restifyReq;
 
     apiRequest.isUpgrade = req.isUpgrade;
     if ( ! allowPost) {
@@ -201,6 +202,7 @@ export async function performRoutingAsync(req: restify.Request, res: restify.Res
     let apiRequest = core.buildApiRequest(req.url());
     apiRequest.method = req.method();
     apiRequest.body = req.bodyAsJson();
+    apiRequest.restifyReq = req;
     await tdliteLogin.validateTokenAsync(apiRequest, req);
     if (apiRequest.userid == "") {
         apiRequest.throttleIp = core.sha256(req.remoteIp());

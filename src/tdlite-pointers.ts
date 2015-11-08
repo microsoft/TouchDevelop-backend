@@ -189,6 +189,24 @@ export async function initAsync() : Promise<void>
             req2.response = ({});
         }
     });
+    
+    restify.server().get("/:userid/oauth", async(req, res) => {
+        let lang = await handleLanguageAsync(req);
+        let uid = req.param("userid")
+        let user = await tdliteUsers.getAsync(uid)
+        
+        if (!user) {
+            let tmp = await errorHtmlAsync("User account not found", "No such user: /" + uid, lang)
+            res.html(tmp, { status: httpCode._404NotFound })
+        } else {
+            let text = await simplePointerCacheAsync("templates/oauth", lang)
+            text = await tdliteDocs.formatAsync(text, {
+                id: uid,
+                name: user.pub.name
+            })
+            res.html(text)
+        }        
+    })    
 }
 
 export function pathToPtr(fn: string) : string
@@ -601,7 +619,7 @@ interface CachedPage {
 
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
-    let lang = await handleLanguageAsync(req, res, true);
+    let lang = await handleLanguageAsync(req);
     let fn = req.url().replace(/\?.*/g, "").replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
     if (fn == "") {
         fn = "home";
@@ -729,25 +747,31 @@ async function renderFinalAsync(pubdata: {}, v: CachedPage, lang: string) {
     v.text = await tdliteDocs.formatAsync(templText, pubdata);
 }
 
-async function pointerErrorAsync(msg: string, v: CachedPage, lang: string) {
-    let pubdata = {}
-    v.expiration = await core.nowSecondsAsync() + 5 * 60;
-    if (td.startsWith(msg, "No such ")) {
-        pubdata["name"] = "Sorry, the page you were looking for doesn’t exist";
-        v.status = 404;
+async function errorHtmlAsync(header: string, info: string, lang:string)
+{
+    let pubdata = {
+        name: header,
+        body: core.htmlQuote(info)
     }
-    else {
-        pubdata["name"] = "Whoops, something went wrong.";
-        v.status = 500;
-    }
-    pubdata["body"] = core.htmlQuote("Error message: " + msg);
-    v.error = true;
+    
     let text = await simplePointerCacheAsync("error-template", lang);
     if (text.length > 100) {
-        v.text = await tdliteDocs.formatAsync(text, pubdata);
+        return await tdliteDocs.formatAsync(text, pubdata);
     } else {
-        v.text = core.htmlQuote(msg + "; and also for /error-template: " + text)
+        return core.htmlQuote(header + "; " + info + "; and also for /error-template: " + text)
     }
+}
+
+async function pointerErrorAsync(msg: string, v: CachedPage, lang: string) {
+    v.expiration = await core.nowSecondsAsync() + 5 * 60;
+    let header = "Whoops, something went wrong.";
+    v.status = 500;
+    if (td.startsWith(msg, "No such ")) {
+        header = "Sorry, the page you were looking for doesn’t exist";
+        v.status = 404;
+    }
+    v.error = true;
+    v.text = await errorHtmlAsync(header, "Error message: " + msg, lang);
 }
 
 function hasPtrPermission(req: core.ApiRequest, currptr: string) : boolean
@@ -819,9 +843,10 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
 }
 
 
-export async function handleLanguageAsync(req: restify.Request, res: restify.Response, setCookie: boolean) : Promise<string>
+export async function handleLanguageAsync(req: restify.Request) : Promise<string>
 {
-    let lang2: string;
+    if (!req) return "";
+    
     await core.refreshSettingsAsync();
     let lang = core.serviceSettings.defaultLang;
     for (let s of orEmpty(req.header("Accept-Language")).split(",")) {
@@ -835,15 +860,6 @@ export async function handleLanguageAsync(req: restify.Request, res: restify.Res
     if (core.serviceSettings.langs.hasOwnProperty(cookieLang)) {
         lang = cookieLang;
     }
-    else {
-        // Cookie conflicts with access token cookie
-        if (false) {
-            if (setCookie) {
-                let value = "TD_LANG=" + lang + "; Secure; Path=/; " + "Domain=" + core.self.replace(/\/$/g, "").replace(/.*\//g, "") + "; Expires=Fri, 31 Dec 9999 23:59:59 GMT";
-                res.setHeader("Set-Cookie", value);
-            }
-        }
-    }
     if (lang == core.serviceSettings.defaultLang) {
         lang = "";
     }
@@ -851,7 +867,6 @@ export async function handleLanguageAsync(req: restify.Request, res: restify.Res
         lang = "@" + lang;
     }
     return lang;
-    return lang2;
 }
 
 export async function simplePointerCacheAsync(urlPath: string, lang: string) : Promise<string>

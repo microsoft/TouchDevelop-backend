@@ -32,7 +32,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
         result = "";
         return result;
     });
-    let body = pubdata["body"].replace(/<div class='md-para'>\s*<\/div>/g, "");
+    let body = (pubdata["body"] || "").replace(/<div class='md-para'>\s*<\/div>/g, "");
     let s = body.replace(/^\s*<div[^<>]*md-tutorial[^<>]*>/g, "");
     if (s != body) {
         body = s.replace(/<\/div>\s*$/g, "");

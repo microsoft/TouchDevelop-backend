@@ -174,6 +174,7 @@ export class ApiRequest
     public headers: td.StringMap;
     public userinfo: ApireqUserInfo;
     public isCached: boolean = false;
+    public restifyReq: restify.Request;
     
     public rootUser(): IUser
     {
