@@ -96,6 +96,15 @@ async function performSingleRequestAsync(apiRequest: core.ApiRequest) : Promise<
             apiRequest.root = apiRequest.userid;
         }
     }
+    
+    // the web app sometimes posts JSON without setting proper content type
+    if (typeof apiRequest.body == "string") {
+        try {
+            apiRequest.body = JSON.parse(<string>apiRequest.body)
+        } catch (e) {
+        }
+    }
+    
     if (apiRequest.status == 200 && apiRequest.method == "POST" && typeof apiRequest.body != "object") {
         logger.info("bad request, " + typeof apiRequest.body)
         apiRequest.status = httpCode._400BadRequest;        
@@ -234,6 +243,9 @@ export async function performRoutingAsync(req: restify.Request, res: restify.Res
 
 function sendResponse(apiRequest: core.ApiRequest, req: restify.Request, res: restify.Response) : void
 {
+    if (res.finished())
+        return;
+    
     if (apiRequest.status != 200) {
         if (apiRequest.status == httpCode._401Unauthorized) {
             res.sendError(httpCode._403Forbidden, "Invalid or missing ?access_token=...");
