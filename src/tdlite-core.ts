@@ -206,7 +206,10 @@ export class Token
     @td.json public reason: string = "";
     @td.json public cookie: string = "";
     @td.json public version: number = 0;
-    static createFromJson(o:JsonObject) { let r = new Token(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new Token(); r.fromJson(o); return r; }
+    public asString() {
+        return "0" + this.PartitionKey + "." + this.RowKey;
+    }
 }
 
 export interface IToken {
@@ -1157,7 +1160,6 @@ export function setHtmlHeaders(res: restify.Response) : void
 
 export function encrypt(val: string, keyid: string) : string
 {
-    let s2: string;
     if (! val) {
         return val;
     }
@@ -1176,7 +1178,6 @@ export function encrypt(val: string, keyid: string) : string
     let cipherFinal = ivCipher.final();
     let s = Buffer.concat([enciphered, cipherFinal]).toString("base64");
     return "EnC$" + keyid + "$" + iv.toString("base64") + "$" + s;
-    return s2;
 }
 
 export function sha256bin(key: string)

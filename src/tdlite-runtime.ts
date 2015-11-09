@@ -12,6 +12,7 @@ type JsonBuilder = td.JsonBuilder;
 import * as core from "./tdlite-core"
 import * as microsoftTranslator from "./microsoft-translator"
 import * as jwt from "./server-auth"
+import * as tdliteLogin from "./tdlite-login"
 
 var orEmpty = td.orEmpty;
 
@@ -72,51 +73,52 @@ export async function initAsync()
     
     if (!core.fullTD) return;
         
-    let signKey = core.sha256bin(td.serverSetting("REVISION_SERVICE_SECRET")) 
+    let encKey = core.sha256bin(core.tokenSecret + ":revision");         
     
     core.addRoute("POST", "*user", "storage", async(req) => {
         let now = await core.nowSecondsAsync()
+        let pref = "EnC.REVISIONTOKEN"
         
         if (req.argument == "access_token") {
-            core.meOnly(req);
-            if (req.status != 200) return;
+            if (req.rootId != req.userid) {
+                req.status = httpCode._402PaymentRequired;
+                return;
+            }
 
-            let tok = jwt.createJwtHS256({
-                iat: now,
-                iss: "TouchDevelop",
-                aud: "Revision Service",
-                sub: req.rootId
-            }, signKey)
+            let tok = req.userinfo.token.asString()
+            let enc = core.encrypt(tok, "REVISIONTOKEN")
+
+            assert(tok != enc)
+
+            enc = enc.replace(/\$/g, ".").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
 
             req.response = {
-                access_token: tok
+                access_token: enc.slice(pref.length)
             }
         } else if (req.argument == "validate_token") {
-            // don't really need to authenticate
-            if (false && req.body["secret"] !== td.serverSetting("REVISION_SERVICE_SECRET"))
+            if (req.body["secret"] !== td.serverSetting("REVISION_SERVICE_SECRET")) {
                 req.status = httpCode._402PaymentRequired;
-            else {
-                let tok = jwt.decodeJwtVerify(td.toString(req.body["access_token"]), "HS256", signKey)
+            } else {
+                let enc = td.toString(pref + req.body["access_token"]).replace(/\./g, "$").replace(/-/g, "+").replace(/_/g, "/")
+                let dec = core.decrypt(enc)
+                let err = ""
                 let resp = {
                     valid: false,
                     expired: false
                 }
-                let err = undefined
-                if (!tok)
-                    err = "Token signature invalid"
-                else if (tok.sub != req.rootId)
-                    err = "Token for different user"
-                else if (tok.aud != "Revision Service")
-                    err = "Token not for revision service"
-                else if (now - tok.iat > 24 * 3600 * 365) {
-                    resp.expired = true
-                    resp.valid = true
-                    err = "Token expired"    
+                if (dec != enc) {
+                    let tok = await tdliteLogin.lookupTokenAsync(dec)
+                    if (!tok) {
+                        err = "No such token"
+                    } else if (tok.PartitionKey != req.rootId) {
+                        err = "Wrong user"
+                    } else {
+                        resp.valid = true;
+                    }
                 } else {
-                    resp.valid = true
+                    err = "Cannot decrypt token"
                 }
-
-                req.response = resp
+                req.response = resp;
                 if (err)
                     req.response["error"] = err
             }
