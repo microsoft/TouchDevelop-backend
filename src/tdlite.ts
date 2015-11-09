@@ -167,14 +167,17 @@ async function _initAsync() : Promise<void>
             if ( ! res4.finished() && req4.method() != "GET") {
                 res4.sendError(httpCode._405MethodNotAllowed, "");
             }
-            if ( ! res4.finished()) {
-                if (td.startsWith(req4.url(), "/app/")) {
+            if (!res4.finished()) {
+                let url = req4.url();
+                if (url.startsWith("/app/authorize")) {
+                    await tdlitePointers.servePointerAsync(req4, res4);
+                } else if (url.startsWith("/app/")) {
                     await tdliteReleases.serveReleaseAsync(req4, res4);
                 }
-                else if (td.startsWith(req4.url(), "/favicon.ico")) {
+                else if (url.startsWith("/favicon.ico")) {
                     res4.sendBuffer(await tdliteReleases.getFaviconAsync(), "image/x-icon");
                 }
-                else if (td.startsWith(req4.url(), "/verify/")) {
+                else if (url.startsWith("/verify/")) {
                     await tdliteUsers.handleEmailVerificationAsync(req4, res4);
                 }
                 else {

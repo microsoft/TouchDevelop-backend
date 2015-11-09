@@ -241,4 +241,27 @@ export async function initAsync()
             }
         }
     })
+    
+    core.addRoute("POST", "*user", "jwt", async(req) => {
+        core.meOnly(req)
+        if (req.status != 200) return;
+        let now = await core.nowSecondsAsync();
+        let tok: jwt.JwtPayload = {
+            iss: "touchdevelop-usersign",
+            sub: "u-" + req.userid + "@touchdevelop.com",
+            iat: now,
+            jti: td.createRandomId(10),
+            aud: core.withDefault(req.body["aud"], "Anything"),
+        }
+        let jtok = jwt.createJwtRS256(tok, td.serverSetting("TOKEN_SIGN_PRIV_KEY"))
+        req.response = {
+            jwt: jtok
+        }
+    })
+    
+    core.addRoute("GET", "jwt", "info", async(req) => {
+        req.response = {
+            RS256: td.serverSetting("TOKEN_SIGN_PUB_KEY") 
+        }
+    })
 }

@@ -839,6 +839,18 @@ export function createJwtHS256(payload: JwtPayload, shakey:Buffer)
     return data + "." + base64urlEncode(hash.digest())    
 }
 
+export function createJwtRS256(payload: JwtPayload, rsakey:string)
+{
+    let hd = {
+        "alg": "RS256",
+        "typ": "JWT"
+    }
+    let enc = s => base64urlEncode(new Buffer(JSON.stringify(s), "utf8"))
+    let data = enc(hd) + "." + enc(payload)
+    let hash = crypto.createSign("RSA-SHA256")
+    hash.update(new Buffer(data, "utf8"))    
+    return data + "." + base64urlEncode(<any>hash.sign(rsakey, null))    
+}
 
 export function decodeJwtVerify(jwt: string, alg:string, key: any): JwtPayload {
     if (!jwt) return null;
