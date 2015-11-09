@@ -1430,6 +1430,9 @@ export async function initAsync()
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
+    self = td.serverSetting("SELF", false).toLowerCase();
+    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
+    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));    
 
     let creds = orEmpty(td.serverSetting("BASIC_CREDS", true));
     if (creds != "") {
@@ -1493,10 +1496,6 @@ export async function initFinalAsync()
     adminRequest = buildApiRequest("/api");
     adminRequest.userinfo.json = <any> { "groups": {} };
 
-    self = td.serverSetting("SELF", false).toLowerCase();
-    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
-    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));
-    
     await refreshSettingsAsync();
 }
 
