@@ -95,11 +95,15 @@ function prepareRequest(pictureUrl: string, options: IOptimizeOptions) : JsonBui
     if (resizeStrategy != "" && resizeStrategy != "none") {
         let resize = {};
         resize["strategy"] = resizeStrategy;
-        if (options.width) {
-            resize["width"] = options.width;
-        }
-        if (options.height) {
-            resize["height"] = options.height;
+        if (resizeStrategy == "square") {
+            resize["size"] = options.width || options.height || 100;
+        } else {
+            if (options.width) {
+                resize["width"] = options.width;
+            }
+            if (options.height) {
+                resize["height"] = options.height;
+            }
         }
         payload["resize"] = resize;
     }

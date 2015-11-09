@@ -299,7 +299,7 @@ export async function initAsync(): Promise<void> {
         core.handleBasicAuth(req1, res1);
         if (!res1.finished()) {
             let links = serverAuth.providerLinks(req1.query());
-            let lang2 = await tdlitePointers.handleLanguageAsync(req1, res1, true);
+            let lang2 = await tdlitePointers.handleLanguageAsync(req1);
             let html = await getLoginHtmlAsync("providers", lang2);
             for (let k of Object.keys(links)) {
                 html = td.replaceAll(html, "@" + k + "-url@", links[k]);
@@ -615,7 +615,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         if (tok.cookie != "") {
             res.setHeader("Set-Cookie", tok.cookie);
         }
-        let lang = await tdlitePointers.handleLanguageAsync(req, res, false);
+        let lang = await tdlitePointers.handleLanguageAsync(req);
         let html = td.replaceAll(await getLoginHtmlAsync("usercreated", lang), "@URL@", tok.url);
         html = td.replaceAll(html, "@USERID@", session.userid);
         html = td.replaceAll(html, "@PASSWORD@", session.pass);
@@ -628,7 +628,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
 async function loginHandleCodeAsync(accessCode: string, res: restify.Response, req: restify.Request, session: LoginSession) : Promise<void>
 {
     let passId = core.normalizeAndHash(accessCode);
-    let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
+    let lang = await tdlitePointers.handleLanguageAsync(req);
     let msg = "";
     if (passId == "" || accessCode == "kid") {
     }
@@ -713,7 +713,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             for (let i = 0; i < session.passwords.length; i++) {
                 links = links + "<button type=\"button\" class=\"button provider\" href=\"#\" onclick=\"passwordok(" + i + ")\">" + session.passwords[i] + "</button><br/>\n";
             }
-            let lang2 = await tdlitePointers.handleLanguageAsync(req, res, true);
+            let lang2 = await tdlitePointers.handleLanguageAsync(req);
             inner = td.replaceAll(td.replaceAll(await getLoginHtmlAsync("newuser", lang2), "@PASSWORDS@", links), "@SESSION@", session.state);
             core.setHtmlHeaders(res);
             res.html(td.replaceAll(inner, "@MSG@", msg));

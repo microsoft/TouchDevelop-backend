@@ -2,12 +2,7 @@
 {% set title = "Microsoft Touch Develop - CCGA" %}
 {% set description = "Creative Coding Through Games And Apps!" %}
 
-{% block body %}
-<!--
-http://aka.ms/CollageTutorialVideo2
-http://aka.ms/ConditionalsTutorial1Video1
-http://aka.ms/EventsTutorial1Video1
--->
+{% block headAdd %}
 <style>
 .jumbotron > img {
   float: left;
@@ -15,8 +10,11 @@ http://aka.ms/EventsTutorial1Video1
   max-height: 300px;
   margin: 25px 30px 40px 0px;
 }    
-    </style>
-      <div class='container'>
+</style>
+{% endblock %}
+
+{% block body %}
+<div class='container'>
     <div class='jumbotron'>
                 <img class='visible-md visible-lg' src="/static/images/gkcw.png" />
 
@@ -29,7 +27,7 @@ http://aka.ms/EventsTutorial1Video1
                 </p>
                 <p>
                     <small>
-        <b>Freely</b> available on <b>iOS</b>, <b>Android</b>, <b>Windows</b>, <b>Mac</b> or <b>Linux</b>.
+        <b>Freely</b> available on <b>iOS</b>, <b>Android</b>, <b>Windows</b>, <b>Mac</b>, <b>Chrome Books</b> or <b>Linux</b>.
                     </small>
                 </p>
                 <p class="text-right">

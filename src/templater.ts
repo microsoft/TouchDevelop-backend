@@ -161,9 +161,24 @@ async function uploadRedirectAsync(fn: string) {
         throw new Error("bad URL: " + url + " in " + fn)
     }
     let curr = await getPtrAsync(path);
+    let artid = ""
+    let target = url
+    
+    if (/^\/static\//.test(url)) {
+        await td.sleepAsync(1);
+        let task = uploadPromises[url]
+        if (!task) {
+            throw new Error("redirection: " + fn + " -> " + url + ": art not found")
+        }
+        let bloburl = await task
+        let m = /\/pub\/([a-z]+)/.exec(bloburl)
+        url = ""
+        artid = m[1]
+        target = "art:" + artid
+    }
 
-    if (curr && curr["redirect"] == url) {
-        console.log(`${fn}: already set to ${url}`)
+    if (curr && (curr["redirect"] || "") == url && (curr["artid"] || "") == artid) {
+        console.log(`${fn}: already set to ${target}`)
         return
     }
 
@@ -171,10 +186,11 @@ async function uploadRedirectAsync(fn: string) {
     req.setMethod("post")
     req.setContentAsJson({
         path: path,
-        redirect: url
+        redirect: url,
+        artid: artid
     })
     let resp = await req.sendAsync();
-    console.log(`${fn}: ${url} -> ${resp.statusCode() }`)
+    console.log(`${fn}: ${target} -> ${resp.statusCode()}`)
 }
 
 async function uploadFileAsync(fn: string) {

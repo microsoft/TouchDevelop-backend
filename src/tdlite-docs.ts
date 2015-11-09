@@ -32,7 +32,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
         result = "";
         return result;
     });
-    let body = pubdata["body"].replace(/<div class='md-para'>\s*<\/div>/g, "");
+    let body = (pubdata["body"] || "").replace(/<div class='md-para'>\s*<\/div>/g, "");
     let s = body.replace(/^\s*<div[^<>]*md-tutorial[^<>]*>/g, "");
     if (s != body) {
         body = s.replace(/<\/div>\s*$/g, "");
@@ -99,7 +99,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
                 }
                 sectjs["body"] = orEmpty(sectjs["body"] + accum);
             }
-            expanded = td.replaceFn(sectTempl, /@([a-zA-Z0-9_]+)@/g, (elt1: string[]) => {
+            expanded = td.replaceFn(sectTempl, /@(\w+)@/g, (elt1: string[]) => {
                 let result1: string;
                 let key = elt1[1];
                 result1 = orEmpty(sectjs[key]);
@@ -112,11 +112,13 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
         sinks[target] = orEmpty(sinks[target]) + expanded;
     }
     td.jsonCopyFrom(pubdata, td.clone(sinks));
-    let expanded1 = td.replaceFn(templ, /@([a-zA-Z0-9_]+)@/g, (elt2: string[]) => {
-        let result2: string;
-        let key1 = elt2[1];
-        result2 = orEmpty(pubdata[key1]);
-        return result2;
+    let expanded1 = td.replaceFn(templ, /@(\w+)(:\w+)?@/g, (mtch: string[]) => {
+        let val = orEmpty(pubdata[mtch[1]]);
+        if (mtch[2] == ":hide") {
+            if (val.trim()) return "";
+            else return "display:none;"
+        }        
+        return val;
     });
     return expanded1;
 }

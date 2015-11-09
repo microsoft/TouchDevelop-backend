@@ -45,12 +45,12 @@ export class PubPointer
     @td.json public htmlartid: string = "";
     @td.json public redirect: string = "";
     @td.json public description: string = "";
-    @td.json public comments: number = 0;
-    @td.json public artcontainer: string = "";
+    @td.json public comments: number = 0;    
     @td.json public parentpath: string = "";
     @td.json public scriptname: string = "";
     @td.json public scriptdescription: string = "";
     @td.json public breadcrumbtitle: string = "";
+    @td.json public customtick: string = "";
     static createFromJson(o:JsonObject) { let r = new PubPointer(); r.fromJson(o); return r; }
 }
 
@@ -90,7 +90,7 @@ export async function initAsync() : Promise<void>
             let ptr1 = new PubPointer();
             ptr1.path = orEmpty(body["path"]).replace(/^\/+/g, "");
             ptr1.id = pathToPtr(ptr1.path);
-            if (!!orEmpty(body["htmlartid"]) && !core.checkPermission(req, "post-raw"))
+            if (!checkPostPointerPermissions(req))
                 return;
             let matches = (/^usercontent\/([a-z]+)$/.exec(ptr1.path) || []);
             if (matches[1] == null) {
@@ -189,6 +189,24 @@ export async function initAsync() : Promise<void>
             req2.response = ({});
         }
     });
+    
+    restify.server().get("/:userid/oauth", async(req, res) => {
+        let lang = await handleLanguageAsync(req);
+        let uid = req.param("userid")
+        let user = await tdliteUsers.getAsync(uid)
+        
+        if (!user) {
+            let tmp = await errorHtmlAsync("User account not found", "No such user: /" + uid, lang)
+            res.html(tmp, { status: httpCode._404NotFound })
+        } else {
+            let text = await simplePointerCacheAsync("templates/oauth", lang)
+            text = await tdliteDocs.formatAsync(text, {
+                id: uid,
+                name: user.pub.name
+            })
+            res.html(text)
+        }        
+    })    
 }
 
 export function pathToPtr(fn: string) : string
@@ -210,7 +228,7 @@ async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body:
             pub[k] = empty[k];
         }
     }
-    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid"]);
+    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid", "customtick"]);
     pub["parentpath"] = "";
     pub["scriptname"] = "";
     pub["scriptdescription"] = "";
@@ -268,6 +286,14 @@ async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body:
     }
 }
 
+async function checkPostPointerPermissions(req: core.ApiRequest) {
+    if (req.body["htmlartid"])
+        core.checkPermission(req, "post-raw");
+    if (req.body["customtick"])
+        core.checkPermission(req, "operator");
+    return req.status == 200;
+}
+
 async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     if (req.userid == req.rootPub["pub"]["userid"]) {
     }
@@ -277,10 +303,11 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
             req.status = httpCode._402PaymentRequired;
         }
     }
+    
+    if (!checkPostPointerPermissions(req))
+        return;
+    
     if (req.status == 200) {
-        if (!!orEmpty(req.body["htmlartid"]) && !core.checkPermission(req, "post-raw"))
-            return;
-
         let bld = await search.updateAndUpsertAsync(core.pubsContainer, req, async(entry: JsonBuilder) => {
             await setPointerPropsAsync(req, entry, req.body);
         });
@@ -404,7 +431,7 @@ function fixupTDHtml(html: string): string
     return html; 
 }
 
-async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: JsonBuilder): Promise<void> {
+async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonBuilder): Promise<void> {
     pubdata["done"] = false;
     pubdata["templatename"] = "";
     pubdata["msg"] = "";
@@ -420,7 +447,7 @@ async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: Json
 
     if (raw == "html") {
         let entry = await tdliteScripts.getScriptTextAsync(scriptjs["id"]);
-        v["text"] = entry["text"];
+        v.text = entry["text"];
         pubdata["done"] = true;
         return;
     }
@@ -480,10 +507,10 @@ async function renderScriptAsync(scriptid: string, v: JsonBuilder, pubdata: Json
 }
 
 
-async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite:td.Action1<JsonBuilder>) : Promise<void>
+async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite:td.Action1<CachedPage>) : Promise<void>
 {
     let path = "ptrcache/" + core.myChannel + "/" + id;
-    let entry2 = await tdliteReleases.cacheRewritten.getAsync(path);
+    let cachedPage = <CachedPage> await tdliteReleases.cacheRewritten.getAsync(path);
     let ver = await core.getCloudRelidAsync(true);
 
     let event = "ServePtr";
@@ -494,7 +521,8 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     else if (td.startsWith(id, "ptr-preview-")) {
         cat = "preview";
     }
-    if (entry2 == null || entry2["version"] != ver || core.orZero(entry2["expiration"]) > 0 && entry2["expiration"] < await core.nowSecondsAsync()) {
+    if (cachedPage == null || cachedPage.version != ver ||
+        (core.orZero(cachedPage.expiration) > 0 && cachedPage.expiration < await core.nowSecondsAsync())) {
         let lock = await core.acquireCacheLockAsync(path);
         if (lock == "") {
             await rewriteAndCachePointerAsync(id, res, rewrite);
@@ -503,17 +531,18 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
 
         await tdliteTdCompiler.cacheCloudCompilerDataAsync(ver);
 
-        let jsb = {};
-        jsb["contentType"] = "text/html";
-        jsb["version"] = ver;
-        jsb["expiration"] = await core.nowSecondsAsync() + td.randomRange(2000, 3600);
-        jsb["status"] = 200;
-        await rewrite(jsb);
-        entry2 = td.clone(jsb);
+        cachedPage = {
+            contentType: "text/html",
+            version: ver,
+            expiration: await core.nowSecondsAsync() + td.randomRange(2000, 3600),
+            status: 200,
+            error: false,
+        };
+        await rewrite(cachedPage);
 
-        if (jsb["version"] == ver) {
+        if (cachedPage.version == ver) {
             await tdliteReleases.cacheRewritten.updateAsync(path, async (entry: JsonBuilder) => {
-                core.copyJson(entry2, entry);
+                core.copyJson(cachedPage, entry);
             });
         }
         await core.releaseCacheLockAsync(lock);
@@ -523,19 +552,16 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     if (res.finished()) {
         return;
     }
-    let redir = orEmpty(entry2["redirect"]);
+    let redir = orEmpty(cachedPage.redirect);
     if (redir == "") {
-        let status0 = core.orZero(entry2["status"]);
+        let status0 = core.orZero(cachedPage.status);
         if (status0 == 0) {
             status0 = 200;
         }
-        if (false) {
-            res.setHeader("X-TDlite-cache", event);
-        }
-        res.sendText(entry2["text"], entry2["contentType"], {
+        res.sendText(cachedPage.text, cachedPage.contentType, {
             status: status0
         });
-        if (core.orFalse(entry2["error"])) {
+        if (core.orFalse(cachedPage.error)) {
             cat = "error";
         }
         logger.debug("serve ptr2: " + event + " " + cat + " " + path);
@@ -544,18 +570,30 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     else {
         res.redirect(302, redir);
     }
+    
+    if (cachedPage.customtick)
+        logger.tick(cachedPage.customtick)
 }
 
 async function lookupScreenshotIdAsync(pub: {}) {
+    let pref = core.currClientConfig.primaryCdnUrl + "/thumb1/"
     let text = await tdliteScripts.getScriptTextAsync(pub["id"]);
     if (text && text["text"]) {
         let m = /^var screenshot : Picture[^]*?url =.*?msecnd\.net\/pub\/([a-z]+)/m.exec(text["text"])
-        if (m) return core.currClientConfig.primaryCdnUrl + "/thumb1/" + m[1]
+        if (m) return pref + m[1]
     }
+    let id = pub["iconArtId"]
+    if (id) return pref + id;
+    
+    let ss = await tdliteArt.getPubScreenshotsAsync(pub["id"], 1)
+    if (ss[0]) {
+        return pref.replace("thumb1", "pub") + ss[0]["id"]
+    }
+    
     return "";
 }
 
-async function renderScriptPageAsync(scriptjson: {}, v: {}, lang:string)
+async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang:string)
 {    
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, core.emptyRequest);
     let templ = "templates/script"
@@ -568,9 +606,20 @@ async function renderScriptPageAsync(scriptjson: {}, v: {}, lang:string)
     await renderFinalAsync(pub, v, lang);
 }
 
+interface CachedPage {
+    contentType: string;
+    version: string;
+    redirect?: string;
+    text?: string;
+    error: boolean;
+    customtick?: string;
+    status: number;
+    expiration: number;
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
-    let lang = await handleLanguageAsync(req, res, true);
+    let lang = await handleLanguageAsync(req);
     let fn = req.url().replace(/\?.*/g, "").replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
     if (fn == "") {
         fn = "home";
@@ -591,25 +640,30 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     }
     id = id + lang;
 
-    await rewriteAndCachePointerAsync(id, res, async (v: JsonBuilder) => {
+    await rewriteAndCachePointerAsync(id, res, async (v: CachedPage) => {
         let pubdata = {};
         let errorAsync = async(msg: string) => {
             await pointerErrorAsync(msg, v, lang)
         } 
-        v["redirect"] = "";
-        v["text"] = "";
-        v["error"] = false;
+        v.redirect = "";
+        v.text = "";
+        v.error = false;
+        v.customtick = null;
         pubdata["webpath"] = fn;
         pubdata["ptrid"] = id;
         let existing = await core.getPubAsync(id, "pointer");
         if (existing == null && /@[a-z][a-z]$/.test(id)) {
             existing = await core.getPubAsync(id.replace(/@..$/g, ""), "pointer");
         }
-        
+        if (existing)
+            v.customtick = existing["pub"]["customtick"]
         
         if (existing == null) {          
             if (td.startsWith(fn, "u/")) {
-                v["redirect"] = fn.replace(/^u\//g, "/usercontent/");
+                v.redirect = fn.replace(/^u\//g, "/usercontent/");
+            }
+            else if (core.fullTD && fn.startsWith("blog/")) {
+                v.redirect = fn.replace(/^blog/, "/docs")
             }
             else if (td.startsWith(fn, "preview/")) {
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
@@ -624,7 +678,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     if (core.fullTD && entry["kind"] == "script") {
                         await renderScriptPageAsync(entry, v, lang)
                     } else {
-                        v["redirect"] = "/app/#pub:" + entry["id"];
+                        v.redirect = "/app/#pub:" + entry["id"];
                     }    
                 }
             }
@@ -635,16 +689,16 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         else {
             let ptr = PubPointer.createFromJson(existing["pub"]);
             if (ptr.redirect) {
-                v["redirect"] = ptr.redirect;
+                v.redirect = ptr.redirect;
             } else if (ptr.artid) {
-                let cont = orEmpty(ptr.artcontainer);
-                cont = "";
-                if (!tdliteArt.hasThumbContainer(cont)) {
-                    cont = "pub";
+                let artobj = await core.getPubAsync(ptr.artid, "art")
+                if (!artobj) {
+                    await errorAsync("No such art: /" + ptr.artid)
+                } else {
+                    v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                 }
-                v["redirect"] = core.currClientConfig.primaryCdnUrl + "/" + cont + "/" + ptr.artid;
             } else if (ptr.htmlartid) {
-                v["text"] = await getHtmlArtAsync(ptr.htmlartid);
+                v.text = await getHtmlArtAsync(ptr.htmlartid);
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
@@ -670,7 +724,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     });
 }
 
-async function renderFinalAsync(pubdata: {}, v: {}, lang: string) {
+async function renderFinalAsync(pubdata: {}, v: CachedPage, lang: string) {
     if (pubdata["msg"]) {
         await pointerErrorAsync(pubdata["msg"], v, lang);
         return;
@@ -690,33 +744,38 @@ async function renderFinalAsync(pubdata: {}, v: {}, lang: string) {
         await pointerErrorAsync(templText, v, lang)
         return;
     }
-    v["text"] = await tdliteDocs.formatAsync(templText, pubdata);
+    v.text = await tdliteDocs.formatAsync(templText, pubdata);
 }
 
-async function pointerErrorAsync(msg: string, v: JsonBuilder, lang: string) {
-    let pubdata = {}
-    v["expiration"] = await core.nowSecondsAsync() + 5 * 60;
-    if (td.startsWith(msg, "No such ")) {
-        pubdata["name"] = "Sorry, the page you were looking for doesn’t exist";
-        v["status"] = 404;
+async function errorHtmlAsync(header: string, info: string, lang:string)
+{
+    let pubdata = {
+        name: header,
+        body: core.htmlQuote(info)
     }
-    else {
-        pubdata["name"] = "Whoops, something went wrong.";
-        v["status"] = 500;
-    }
-    pubdata["body"] = core.htmlQuote("Error message: " + msg);
-    v["error"] = true;
+    
     let text = await simplePointerCacheAsync("error-template", lang);
     if (text.length > 100) {
-        v["text"] = await tdliteDocs.formatAsync(text, pubdata);
+        return await tdliteDocs.formatAsync(text, pubdata);
     } else {
-        v["text"] = core.htmlQuote(msg + "; and also for /error-template: " + text)
+        return core.htmlQuote(header + "; " + info + "; and also for /error-template: " + text)
     }
+}
+
+async function pointerErrorAsync(msg: string, v: CachedPage, lang: string) {
+    v.expiration = await core.nowSecondsAsync() + 5 * 60;
+    let header = "Whoops, something went wrong.";
+    v.status = 500;
+    if (td.startsWith(msg, "No such ")) {
+        header = "Sorry, the page you were looking for doesn’t exist";
+        v.status = 404;
+    }
+    v.error = true;
+    v.text = await errorHtmlAsync(header, "Error message: " + msg, lang);
 }
 
 function hasPtrPermission(req: core.ApiRequest, currptr: string) : boolean
 {
-    let b2: boolean;
     currptr = currptr.replace(/@..$/g, "");
     while (currptr != "") {
         if (core.callerHasPermission(req, "write-" + currptr)) {
@@ -733,7 +792,6 @@ function hasPtrPermission(req: core.ApiRequest, currptr: string) : boolean
         }
     }
     return false;
-    return b2;
 }
 
 
@@ -785,9 +843,10 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
 }
 
 
-export async function handleLanguageAsync(req: restify.Request, res: restify.Response, setCookie: boolean) : Promise<string>
+export async function handleLanguageAsync(req: restify.Request) : Promise<string>
 {
-    let lang2: string;
+    if (!req) return "";
+    
     await core.refreshSettingsAsync();
     let lang = core.serviceSettings.defaultLang;
     for (let s of orEmpty(req.header("Accept-Language")).split(",")) {
@@ -801,15 +860,6 @@ export async function handleLanguageAsync(req: restify.Request, res: restify.Res
     if (core.serviceSettings.langs.hasOwnProperty(cookieLang)) {
         lang = cookieLang;
     }
-    else {
-        // Cookie conflicts with access token cookie
-        if (false) {
-            if (setCookie) {
-                let value = "TD_LANG=" + lang + "; Secure; Path=/; " + "Domain=" + core.self.replace(/\/$/g, "").replace(/.*\//g, "") + "; Expires=Fri, 31 Dec 9999 23:59:59 GMT";
-                res.setHeader("Set-Cookie", value);
-            }
-        }
-    }
     if (lang == core.serviceSettings.defaultLang) {
         lang = "";
     }
@@ -817,7 +867,6 @@ export async function handleLanguageAsync(req: restify.Request, res: restify.Res
         lang = "@" + lang;
     }
     return lang;
-    return lang2;
 }
 
 export async function simplePointerCacheAsync(urlPath: string, lang: string) : Promise<string>

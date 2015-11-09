@@ -18,23 +18,23 @@ var httpCode = core.httpCode;
 
 export async function initAsync()
 {
-    core.addRoute("POST", "ticks", "", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "ticks", "", async(req: core.ApiRequest) => {
+        await core.throttleAsync(req, "ticks", 30); 
+        if (req.status != 200) return;
         let js = req.body["sessionEvents"];
         if (js != null) {
+            let allowed = core.currClientConfig.tickFilter || {}
             for (let evName of Object.keys(js)) {
-                if (td.startsWith(evName, "browser.")) {
-                    logger.tick(td.replaceAll(evName, "browser.", "NewWebApp@"));
-                }
-                else if (/^(calcEdit|coreRun)(\|.*)?$/.test(evName)) {
-                    let jsb = {};
-                    jsb["repeat"] = td.clamp(0, 100, js[evName]);
-                    logger.customTick(evName.replace(/\|.*/g, ""), td.clone(jsb));
+                let tickName = evName.replace(/\|.*/, "")
+                if (allowed.hasOwnProperty(tickName)) {
+                    logger.customTick("app_" + tickName, {
+                        repeat: td.clamp(0, 100, js[evName])
+                    });
                 }
             }
         }
-        req.response = ({});
-    }
-    , {
+        req.response = {};
+    }, {
         noSizeCheck: true
     });
 }

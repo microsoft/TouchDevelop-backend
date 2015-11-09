@@ -161,7 +161,7 @@ export async function initAsync() : Promise<void>
 {
     disableSearch = orEmpty(td.serverSetting("DISABLE_SEARCH", true)) == "true";
     core.executeSearchAsync = executeSearchAsync;
-
+    
     await initAcsAsync();
 
     azureSearch.init({
@@ -398,10 +398,11 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
 }
 
 async function initAcsAsync() : Promise<void>
-{
-    if (false && core.hasSetting("ACS_PASSWORD")) {
+{    
+    if (core.fullTD && core.hasSetting("ACS_PASSWORD")) {
         acsCallbackToken = core.sha256(core.tokenSecret + ":acs");
-        acsCallbackUrl = core.self + "api/acscallback?token=" + acsCallbackToken + "&anon_token=" + encodeURIComponent(core.basicCreds);
+        let selfx = td.serverSetting("ACS_SELF", true) || core.self;        
+        acsCallbackUrl = selfx + "api/acscallback?token=" + acsCallbackToken + "&anon_token=" + encodeURIComponent(core.basicCreds);
         await acs.initAsync();
     }
     core.addRoute("POST", "acscallback", "", async (req: core.ApiRequest) => {
@@ -411,28 +412,31 @@ async function initAcsAsync() : Promise<void>
             for (let stat of results) {
                 if (stat["Status"] == "3000") {
                     let pubid = stat["Id"];
+                        await core.pubsContainer.updateAsync(pubid, async(entry: JsonBuilder) => {
+                            let curr = entry["acsJobId"]
+                            if (curr) curr += "," + jobid;
+                            else curr = jobid;
+                            entry["acsJobId"] = curr;
+                            if (!stat["Safe"]) {
+                                entry["acsFlag"] = stat;    
+                            }
+                    });
+                    
                     if (stat["Safe"]) {
                         logger.debug("acsok: " + JSON.stringify(stat, null, 2));
-                        await core.pubsContainer.updateAsync(pubid, async (entry: JsonBuilder) => {
-                            entry["acsJobId"] = jobid;
-                        });
                     }
                     else {
                         logger.info("acsflag: " + JSON.stringify(stat, null, 2));
-                        await core.pubsContainer.updateAsync(pubid, async (entry1: JsonBuilder) => {
-                            entry1["acsFlag"] = stat;
-                            entry1["acsJobId"] = jobid;
-                        });
                         let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
                         if (uid != "") {
                             await core.setReqUserIdAsync(req, uid);
                             req.rootPub = await core.pubsContainer.getAsync(pubid);
                             if (core.isGoodEntry(req.rootPub)) {
-                                let jsb = {};
-                                jsb["text"] = "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"]);
-                                req.body = td.clone(jsb);
+                                req.body = {
+                                    text: "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"])
+                                }
                                 req.rootId = pubid;
-                                await tdliteAbuse.postAbusereportAsync(req);
+                                await tdliteAbuse.postAbusereportAsync(req, jobid);
                             }
                         }
                     }
@@ -441,7 +445,7 @@ async function initAcsAsync() : Promise<void>
                     logger.warning("bad results from ACS: " + JSON.stringify(req.body, null, 2));
                 }
             }
-            req.response = ({});
+            req.response = {};
         }
         else {
             logger.debug("acs, wrong token: " + JSON.stringify(req.queryOptions));

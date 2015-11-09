@@ -259,7 +259,7 @@ async function deletePubRecAsync(delEntry: JsonObject) : Promise<void>
     }
 }
 
-export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
+export async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promise<void>
 {
     let baseKind = req.rootPub["kind"];
     if ( ! canHaveAbuseReport(baseKind)) {
@@ -278,6 +278,8 @@ export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
         report.publicationuserid = getAuthor(pub);
         let jsb = {};
         jsb["pub"] = report.toJson();
+        if (acsInfo)
+            jsb["acsInfo"] = acsInfo;
         await core.generateIdAsync(jsb, 10);
         await abuseReports.insertAsync(jsb);
         await core.pubsContainer.updateAsync(report.publicationid, async (entry: JsonBuilder) => {

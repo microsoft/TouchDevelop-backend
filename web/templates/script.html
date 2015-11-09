@@ -5,8 +5,8 @@
 {% block body %}
 <style>
 	.head {
-		width: 3em;
-		height: 3em;
+		max-width: 3em;
+		max-height: 3em;
 	}
 </style>
 <div class='container'>
@@ -21,7 +21,7 @@
 				<p>@description@</p>
 			</div>
 
-			<div class="hidden-xs col-sm-6 col-md-5 col-lg-4">
+			<div class="hidden-xs col-sm-6 col-md-5 col-lg-4" style="@screenshoturl:hide@">
 				<img class="img-responsive img-thumbnail" src='@screenshoturl@' />
 			</div>
 
