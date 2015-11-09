@@ -4,6 +4,7 @@
 
 import * as td from './td';
 import * as assert from 'assert';
+import * as crypto from 'crypto';
 import * as querystring from 'querystring';
 
 type JsonObject = td.JsonObject;
@@ -413,7 +414,7 @@ export function addAzureAdClientOnly(options_: IProviderOptions = {}) : void
     }
     , async (req1: restify.Request, p1: OauthRequest) => {
         let profile: JsonObject;        
-        let payload = decodeJwtVerify(req1.bodyAsJson()["id_token"], azureKey);
+        let payload = decodeJwtVerify(req1.bodyAsJson()["id_token"], "RS256", azureKey);
         if (payload["nonce"] == p1.nonce) {
             profile = payload;
         }
@@ -798,7 +799,12 @@ export function base64urlDecode(s: string): Buffer
     return new Buffer(s.replace(/-/g, '+').replace(/_/g, '/'), "base64");
 }
 
-function decodeJwt(jwt: string): JsonObject {
+export function base64urlEncode(buf: Buffer): string
+{
+    return buf.toString("base64").replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, "")
+}
+
+function decodeJwt(jwt: string): JwtPayload {
     if (!jwt) return null;
     let elts = jwt.split('.');
     if (elts.length != 3) return null;
@@ -810,8 +816,67 @@ function decodeJwt(jwt: string): JsonObject {
     }
 }
 
-function decodeJwtVerify(jwt: string, key: string): JsonObject {
-    throw new Error("TODO: implement RSA checking")
+export interface JwtPayload {
+    jti?: string; // JWT ID
+    iss?: string; // issuer
+    sub?: string; // subject
+    aud?: string; // audience
+    iat?: number; // issued at
+    nbf?: number; // not-before
+    exp?: number; // expiration time
+}
+
+export function createJwtHS256(payload: JwtPayload, shakey:Buffer)
+{
+    let hd = {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+    let enc = s => base64urlEncode(new Buffer(JSON.stringify(s), "utf8"))
+    let data = enc(hd) + "." + enc(payload)
+    let hash = crypto.createHmac("sha256", shakey)
+    hash.update(new Buffer(data, "utf8"))
+    return data + "." + base64urlEncode(hash.digest())    
+}
+
+
+export function decodeJwtVerify(jwt: string, alg:string, key: any): JwtPayload {
+    if (!jwt) return null;
+    let elts = jwt.split('.');
+    if (elts.length != 3) return null;
+    let hd = null
+    let payload: JwtPayload = null
+    try {
+        hd = JSON.parse(base64urlDecode(elts[0]).toString("utf8"));
+        payload = JSON.parse(base64urlDecode(elts[1]).toString("utf8"));
+    } catch (e) {
+        return null;
+    }
+
+    if (hd["typ"] !== "JWT") return null;
+    if (hd["alg"] !== alg) return null;
+
+    let data = elts[0] + "." + elts[1]
+    if (hd["alg"] == "HS256") {
+        if (!Buffer.isBuffer(key))
+            throw new Error("Bad key");            
+        let hash = crypto.createHmac("sha256", key)
+        hash.update(new Buffer(data, "utf8"))
+        if (base64urlEncode(hash.digest()) !== elts[2]) {
+            return null;
+        }
+        return payload;
+    } else if (hd["alg"] == "RS256") {
+        if (typeof key != "string")
+            throw new Error("Bad key");
+        let verify = crypto.createVerify("RSA-SHA256");
+        verify.update(data)
+        if (!verify.verify(key, <any>base64urlDecode(elts[2])))
+            return null;
+        return payload;
+    } else {
+        return null;
+    }
 }    
 
 async function oauthLoginAsync(req: restify.Request, res: restify.Response) : Promise<void>

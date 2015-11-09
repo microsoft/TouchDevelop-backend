@@ -1177,15 +1177,20 @@ export function encrypt(val: string, keyid: string) : string
     return s2;
 }
 
+export function sha256bin(key: string)
+{
+    let hash = crypto.createHash("sha256");
+    hash.update(key);
+    return hash.digest();
+}
+
 export function prepEncryptionKey(keyid: string) : Buffer
 {
     let key = orEmpty(td.serverSetting("ENCKEY_" + keyid, true));
     if (key == "") {
         return null;
     }
-    let hash = crypto.createHash("sha256");
-    hash.update(key);
-    return hash.digest();
+    return sha256bin(key);
 }
 
 export function decrypt(val: string) : string
