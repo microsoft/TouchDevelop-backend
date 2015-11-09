@@ -1,0 +1,29 @@
+{% extends "_layouts/default.html" %}
+{% set title = "Authorization for script by @name@ /@id@" %}
+{% set description = "OAuth page" %}
+
+{% block body %}
+<div class='container'>
+	
+    <h1>authorization for script of @name@ finished</h1>
+    <p>
+        You can close this page. 
+        The Touch Develop script should resume in a different tab or window.
+    </p>
+    <script type="text/javascript">
+        window.openUrl = "#";
+        window.addEventListener("load", function() {
+            var a = window.localStorage["oauth_redirect"];
+            var b = [];
+            var now = new Date().getTime();
+            if (a)
+                JSON.parse(a).forEach(function (e) {
+                    if (now - e.time < 10 * 60 * 1000) b.push(e); // remove anything older than 10 minutes
+                });        
+            b.push({ redirect_url: window.location.href, time: now, user_id: '@id@' });
+            window.localStorage.setItem("oauth_redirect", JSON.stringify(b));
+            setTimeout(window.close, 3000);
+        });
+    </script>
+</div>
+{% endblock %}

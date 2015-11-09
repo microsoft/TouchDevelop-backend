@@ -13,6 +13,7 @@ var asArray = td.asArray;
 import * as azureBlobStorage from "./azure-blob-storage"
 import * as parallel from "./parallel"
 import * as restify from "./restify"
+import * as kraken from "./kraken"
 import * as cachedStore from "./cached-store"
 import * as indexedStore from "./indexed-store"
 import * as wordPassword from "./word-password"
@@ -35,9 +36,74 @@ var httpCode = core.httpCode;
 
 export var users: indexedStore.Store;
 export var passcodesContainer: cachedStore.Container;
+export var userpicContainer: azureBlobStorage.Container;
 var emailKeyid: string = "EMAIL";
 var settingsOptionsJson = tdliteData.settingsOptionsJson;
 var useSendgrid: boolean = false;
+
+interface PicSize {
+    id: number;
+    type: string;
+    fbtype?: string;
+    
+    width: number;
+    height: number;
+    resizeStrategy: string;
+    quality: number;
+}
+
+var picSizes:PicSize[] = [
+    {
+        type: "original",
+        fbtype: "large",
+        id: 0,
+        width: 0,
+        height: 0,
+        resizeStrategy: "",
+        quality: 0
+    },
+    {
+        type: "square",
+        id: 1,
+        width: 50,
+        height: 50,
+        resizeStrategy: "square",
+        quality: 85
+    },
+    {
+        type: "squarenormal",
+        fbtype: "normal",
+        id: 2,
+        width: 96,
+        height: 96,
+        resizeStrategy: "square",
+        quality: 85
+    },
+    {
+        type: "small",
+        id: 3,
+        width: 50,
+        height: 0,
+        resizeStrategy: "landscape",
+        quality: 85
+    },
+    {
+        type: "normal",
+        id: 4,
+        width: 100,
+        height: 0,
+        resizeStrategy: "landscape",
+        quality: 85
+    },
+    {
+        type: "large",
+        id: 5,
+        width: 200,
+        height: 0,
+        resizeStrategy: "landscape",
+        quality: 70
+    },
+];
 
 export interface IUser {
     id: string;
@@ -55,6 +121,7 @@ export interface IUser {
     nopublish: boolean;
     lastlogin: number; // seconds since epoch
     awaiting: boolean; // awaiting admission to the system
+    picturePrefix: string;
     groups: td.SMap<number>;
     owngroups: td.SMap<number>;
     termsversion: string;
@@ -106,7 +173,7 @@ export class PubUserSettings
     @td.json public website: string = "";
     @td.json public notifications: boolean = false;
     @td.json public notifications2: string = "";
-    @td.json public picturelinkedtofacebook: string = "";
+    @td.json public picturelinkedtofacebook: boolean = false;
     @td.json public picture: string = "";
     @td.json public gender: string = "";
     @td.json public realname: string = "";
@@ -144,6 +211,8 @@ export async function initAsync() : Promise<void>
     passcodesContainer = await cachedStore.createContainerAsync("passcodes", {
         noCache: true
     });
+    
+    userpicContainer = await core.blobService.createContainerIfNotExistsAsync("pic", "hidden");
 
     users = await indexedStore.createStoreAsync(core.pubsContainer, "user");
     core.registerPubKind({
@@ -479,9 +548,15 @@ export async function initAsync() : Promise<void>
                 let settings = sett.toJson();                
                 core.setFields(settings, req4.body, ["aboutme", "culture", "editorMode", "emailfrequency", "emailnewsletter2", 
                     "gender", "howfound", "location", "nickname", "notifications", "notifications2", "occupation", "picture", 
-                    "picturelinkedtofacebook", "programmingknowledge", "realname", "school", "twitterhandle", "wallpaper", 
+                    "programmingknowledge", "realname", "school", "twitterhandle", "wallpaper", 
                     "website", "yearofbirth", "avatar"]);
                 applyUserSettings(entry, settings);
+                if (req4.body["picturelinkedtofacebook"]) {
+                    let id = getFacebookId(entry)
+                    if (id)
+                        entry.picturePrefix = "fb:" + id
+                    settings["picturelinkedtofacebook"] = true;
+                }
                 req4.response = settings;
             });
             await search.scanAndSearchAsync(bld);            
@@ -509,19 +584,84 @@ export async function initAsync() : Promise<void>
         }
     });
     
-    core.addRoute("GET", "*user", "picture", async(req)=>{
+    core.addRoute("POST", "*user", "picture", async(req) => {
+        core.meOnly(req);
+        if (req.status != 200) return;
+        if (req.body["contentType"] !== "image/jpeg") {
+            req.status = httpCode._415UnsupportedMediaType;
+            return;
+        }
+        let buf = new Buffer(req.body["content"], "base64");
+        if (buf.length > 100000) {
+            req.status = httpCode._413RequestEntityTooLarge;
+            return;
+        }
+        let picid = req.rootUser().id + "-" + td.createRandomId(6).toLowerCase();        
+        await userpicContainer.createBlockBlobFromBufferAsync(picid + "-0.jpg", buf, {
+            contentType: "image/jpeg",
+            cacheControl: "public, max-age=900"
+        });
+        await parallel.forJsonAsync(picSizes, async(desc) => {
+            if (!desc.resizeStrategy) return;
+            let srcurl = userpicContainer.url() + "/" + picid + "-0.jpg"
+            let tempThumbUrl = await kraken.optimizePictureUrlAsync(srcurl, {
+                width: desc.width,
+                height: desc.height,
+                resizeStrategy: desc.resizeStrategy,
+                lossy: true,
+                quality: desc.quality
+            });
+            if (tempThumbUrl != null) {
+                let result2 = await userpicContainer.createBlockBlobFromUrlAsync(picid + "-" + desc.id + ".jpg", tempThumbUrl, {
+                    forceNew: false,
+                    contentType: "image/jpeg",
+                    cacheControl: "public, max-age=900"
+                });
+                if (!result2.succeded()) {
+                    req.status = httpCode._424FailedDependency;
+                }
+            }
+            else {
+                logger.info("cannot resize: " + srcurl)
+                req.status = httpCode._422UnprocessableEntity;
+            }
+        });
+        if (req.status != 200) return;
+        
+        await updateAsync(req.rootId, async(v) => {
+            v.picturePrefix = "pf:" + picid
+        })
+        
+        req.response = {}
+        
+    }, { noSizeCheck: true })
+    
+    core.addRoute("DELETE", "*user", "picture", async(req) => {
+        core.meOnly(req);
+        if (req.status != 200) return;
+        await updateAsync(req.rootId, async(v) => {
+            v.picturePrefix = "";
+        })
+        req.response = {}
+    })
+    
+    core.addRoute("GET", "*user", "picture", async(req) => {
+        let u = req.rootUser()
+        let type = core.withDefault(req.queryOptions["type"], "original").toLowerCase()
+        let desc = picSizes.filter(d => d.type == type)[0]
+        if (!desc) desc = picSizes[0];
+        let url = "https://az820584.vo.msecnd.net/pub/xaxrrvvd" // shouldn't happen
+        let pref = u.picturePrefix
+        if (!pref) pref = "pf:wonm-qkudcd"
+        if (/^fb:/.test(pref))
+            url = "https://graph.facebook.com/v2.5/" + pref.slice(3) + "/picture?type=" + (desc.fbtype || desc.type)
+        else if (/^pf:/.test(pref))
+            url = core.currClientConfig.primaryCdnUrl + "/pic/" + pref.slice(3) + "-" + desc.id + ".jpg"        
         req.status = httpCode._302MovedTemporarily;
         req.headers = {
-            "location": "https://az820584.vo.msecnd.net/pub/xaxrrvvd"
+            "location": url
         }
     })
-
-    core.addRoute("POST", "*user", "progress", async (req: core.ApiRequest) => {
-        core.meOnly(req);
-        if (req.status == 200) {
-            req.response = {};
-        }
-    });
 
     core.addRoute("DELETE", "*user", "login", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
@@ -609,10 +749,24 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
             user.time = 0;
         }
         user.isadult = core.hasPermission(jsb, "adult");
+        user.haspicture = !!jsb.picturePrefix;
     }
     entities.items = td.arrayToJson(coll);
 }
 
+function getFacebookId(u: IUser)
+{
+    if (!core.fullTD) return null
+    
+    let logins = [u.login]
+    if (u.altLogins)
+        logins = logins.concat(u.altLogins);
+    for (let l of logins) {
+        let m = /fb\/(\d+)$/.exec(l);
+        if (m) return m[1];
+    }
+    return null
+}
 
 export async function buildSettingsAsync(userJson: IUser) : Promise<PubUserSettings>
 {
@@ -646,6 +800,9 @@ export async function buildSettingsAsync(userJson: IUser) : Promise<PubUserSetti
     }
     settings.permissions = "," + Object.keys(perms).join(",") + ",";
     settings.credit = core.orZero(userJson.credit);
+    settings.picturelinkedtofacebook = /^fb:/.test(userJson.picturePrefix)
+    if (!getFacebookId(userJson))
+        delete settings.picturelinkedtofacebook;
     return settings;
 }
 
@@ -747,6 +904,11 @@ export async function createNewUserAsync(username: string, email: string, profil
     if (awaiting) {
         userjs.awaiting = awaiting;
     }
+    
+    // enable picture by default    
+    let fbid = getFacebookId(userjs)
+    if (fbid) userjs.picturePrefix = "fb:" + fbid;
+    
     let dictionary = core.setBuilderIfMissing(userjs, "groups");
     let dictionary2 = core.setBuilderIfMissing(userjs, "owngroups");
     await core.generateIdAsync(userjs, core.fullTD ? 4 : 8);
@@ -821,7 +983,7 @@ export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passI
 
 export async function handleEmailVerificationAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
-    let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
+    let lang = await tdlitePointers.handleLanguageAsync(req);
     let coll = (/^\/verify\/([a-z]+)\/([a-z]+)/.exec(req.url()) || []);
     let userJs = await getAsync(coll[1]);
     let msg = "";

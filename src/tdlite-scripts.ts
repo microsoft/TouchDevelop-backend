@@ -493,6 +493,13 @@ export async function initAsync() : Promise<void>
             req6.status = httpCode._402PaymentRequired;
         }
     });
+    core.addRoute("GET", "*script", "scripts", async (req6: core.ApiRequest) => {
+        // TODO consumers?
+        req6.response = {
+            items: [],
+            continuation: null
+        }
+    });
     core.addRoute("GET", "*script", "canexportapp", async (req7: core.ApiRequest) => {
         req7.response = ({ canExport: false, reason: "App export not supported in Lite." });
     });

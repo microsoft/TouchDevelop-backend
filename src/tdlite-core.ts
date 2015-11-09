@@ -52,12 +52,12 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 230;
+export var rewriteVersion: number = 233;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
 var settingsCleanups: (() => void)[] = [];
-export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations"]
+export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations", "ticks"]
 
 export class IdObject
     extends td.JsonRecord
@@ -174,6 +174,7 @@ export class ApiRequest
     public headers: td.StringMap;
     public userinfo: ApireqUserInfo;
     public isCached: boolean = false;
+    public restifyReq: restify.Request;
     
     public rootUser(): IUser
     {
@@ -247,6 +248,7 @@ export class ClientConfig
     @td.json public anonToken: string = "";
     @td.json public primaryCdnUrl: string = "";
     @td.json public altCdnUrls: string[];
+    @td.json public tickFilter: JsonObject;
     @td.json public doNothingText: string;
     static createFromJson(o:JsonObject) { let r = new ClientConfig(); r.fromJson(o); return r; }
 }
@@ -1428,6 +1430,9 @@ export async function initAsync()
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
+    self = td.serverSetting("SELF", false).toLowerCase();
+    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
+    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));    
 
     let creds = orEmpty(td.serverSetting("BASIC_CREDS", true));
     if (creds != "") {
@@ -1482,6 +1487,7 @@ export async function initFinalAsync()
         currClientConfig.altCdnUrls.push("https://az31353.vo.msecnd.net")
     }
     currClientConfig.anonToken = basicCreds;
+    
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();
     });
@@ -1490,9 +1496,7 @@ export async function initFinalAsync()
     adminRequest = buildApiRequest("/api");
     adminRequest.userinfo.json = <any> { "groups": {} };
 
-    self = td.serverSetting("SELF", false).toLowerCase();
-    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
-    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));
+    await refreshSettingsAsync();
 }
 
 export function removeDerivedProperties(body: JsonObject) : JsonObject
@@ -1513,9 +1517,10 @@ export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<
     let users = await followPubIdsAsync(entities, "userid", "");
     coll2 = (<JsonBuilder[]>[]);
     for (let i = 0; i < entities.length; i++) {
-        let userJs:any = users[i];
+        let userJs = users[i];
         let root = td.clone(entities[i]);
         coll2.push(root);
+        let userTop = <tdliteUsers.IUser>(userJs || {});
         if (userJs != null) {
             root["*userid"] = userJs;
             userJs = userJs["pub"];
@@ -1525,9 +1530,9 @@ export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<
         let pub = root["pub"];
         pub["id"] = root["id"];
         pub["kind"] = root["kind"];
-        pub["userhaspicture"] = userJs.haspicture;
-        pub["username"] = userJs.name;
-        pub["userscore"] = userJs.score;
+        pub["userhaspicture"] = !!userTop.picturePrefix;        
+        pub["username"] = userJs["name"];
+        pub["userscore"] = userJs["score"];
         if ( ! fullTD) {
             pub["userplatform"] = [];
         }
@@ -1634,6 +1639,9 @@ export async function refreshSettingsAsync(): Promise<void> {
     for (let f of settingsCleanups) {
         f();
     }
+    
+    if (currClientConfig)
+        currClientConfig.tickFilter = (getSettings("ticks") || {})["ticks"];
 
     let entry2 = getSettings("settings") || { permissions: {} };
     let permMap = td.clone(entry2["permissions"]);

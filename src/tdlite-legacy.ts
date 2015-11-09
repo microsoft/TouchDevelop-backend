@@ -50,6 +50,9 @@ interface LegacySettings {
     YearOfBirth: number;
     FacebookId: string;
     Nickname: string;
+    PicturePrefix: string;
+    PictureLinkedToFacebook: boolean;
+    LastActiveTime: Date;
 }
 
 var legacyTable: azureTable.Client;
@@ -58,6 +61,7 @@ var settingsTable: azureTable.Table;
 var workspaceTable: azureTable.Table;
 var identityTable: azureTable.Table;
 var largeinstalledContainer: azureBlobStorage.Container;
+var userpicContainer: azureBlobStorage.Container;
 
 type IUser = tdliteUsers.IUser;
 
@@ -74,6 +78,7 @@ export async function initAsync()
     workspaceTable = legacyTable.getTable("svcUSRscripts");
     identityTable = legacyTable.getTable("svcUSRidentity");
     largeinstalledContainer = legacyBlob.getContainer("largeinstalled");
+    userpicContainer = legacyBlob.getContainer("pic");
     
     core.addRoute("POST", "*user", "importsettings", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
@@ -437,6 +442,8 @@ export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
     let res = await settingsTable.createQuery().partitionKeyIs(id).and("RowKey", "=", "$").fetchAllAsync()
     let code = 200;
     let loginid = "";
+    let lastTime = 0;
+    let picpref = "";
     if (res && res[0]) {
         let legacy = <LegacySettings>res[0];
         for (let k of normalFields) {
@@ -447,7 +454,26 @@ export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
         if (legacy.YearOfBirth) s.yearofbirth = legacy.YearOfBirth;
         if (legacy.FacebookId)
             loginid = "fb:" + legacy.FacebookId;
-        
+        if (legacy.LastActiveTime)
+            lastTime = Math.round(legacy.LastActiveTime.getTime() / 1000);
+        if (legacy.PictureLinkedToFacebook)
+            picpref = "fb:" + legacy.FacebookId;
+        else if (legacy.PicturePrefix) {
+            picpref = "pf:" + legacy.PicturePrefix;
+            logger.debug("download pic: " + legacy.PicturePrefix)
+            for (let i = 0; i <= 5; ++i) {
+                let fn = legacy.PicturePrefix + "-" + i
+                let pic = await userpicContainer.getBlobToBufferAsync(fn + ".jpeg", { justTry: true })
+                if (pic.succeded()) {
+                    await tdliteUsers.userpicContainer.createBlockBlobFromBufferAsync(fn + ".jpg", pic.buffer(), {
+                        contentType: "image/jpeg",
+                        cacheControl: "public, max-age=3600"                        
+                    })
+                } else {
+                    logger.info("failpic: " + fn + " : " + pic.error())
+                }
+            }
+        }
     } else {
         code = 404;
     }
@@ -461,6 +487,10 @@ export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
             v["permissions"] = ",user,";
         if (loginid)
             v["legacyLogin"] = loginid;
+        if (lastTime && !v.lastlogin)
+            v.lastlogin = lastTime;
+        if (picpref)
+            v.picturePrefix = picpref;
     }, force)
 
     let ret = s.toJson();

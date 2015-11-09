@@ -129,8 +129,17 @@ export async function initAsync() : Promise<void>
     await initScreenshotsAsync();
 }
 
-async function initScreenshotsAsync() : Promise<void>
+export async function getPubScreenshotsAsync(pubid: string, num:number)
 {
+    let req = core.buildApiRequest("/api")
+    req.queryOptions = { count: num.toString() }
+    let res = await core.fetchAndResolveAsync(screenshots, req, "publicationid", pubid)
+    return res.items;
+}
+
+async function initScreenshotsAsync(): Promise<void>
+{
+    core.anyListAsync
     screenshots = await indexedStore.createStoreAsync(core.pubsContainer, "screenshot");
     core.registerPubKind({
         store: screenshots,
@@ -145,7 +154,7 @@ async function initScreenshotsAsync() : Promise<void>
         byUserid: true,
         byPublicationid: true
     });
-    core.addRoute("POST", "screenshots", "", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "*pub", "screenshots", async (req: core.ApiRequest) => {
         await core.canPostAsync(req, "screenshot");
         if (req.status == 200) {
             await postScreenshotAsync(req);
@@ -369,8 +378,11 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
             await core.generateIdAsync(jsb, 8);
             let filename = jsb["id"];
             if (arttype == "blob" || arttype == "text") {
-                let s = orEmpty(jsb["pub"]["name"]).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+/g, "").replace(/-+$/g, "");
-                filename = filename + "/" + withDefault(s, "file") + "." + ext;
+                let s = orEmpty(jsb["pub"]["name"]).replace(/[^a-zA-Z0-9\._]+/g, "-").replace(/^-+/g, "").replace(/-+$/g, "");
+                s = withDefault(s, "file")
+                if (!s.endsWith("." + ext))
+                    s += "." + ext
+                filename = filename + "/" + s;
             }
             jsb["filename"] = filename;
             let result = await artContainer.createGzippedBlockBlobFromBufferAsync(filename, buf, {
