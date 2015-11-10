@@ -620,7 +620,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         html = td.replaceAll(html, "@USERID@", session.userid);
         html = td.replaceAll(html, "@PASSWORD@", session.pass);
         html = td.replaceAll(html, "@NAME@", core.htmlQuote(tdUsername));
-        core.setHtmlHeaders(res);
+        core.setHtmlHeaders(req);
         res.html(html);
     }
 }
@@ -715,7 +715,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             }
             let lang2 = await tdlitePointers.handleLanguageAsync(req);
             inner = td.replaceAll(td.replaceAll(await getLoginHtmlAsync("newuser", lang2), "@PASSWORDS@", links), "@SESSION@", session.state);
-            core.setHtmlHeaders(res);
+            core.setHtmlHeaders(req);
             res.html(td.replaceAll(inner, "@MSG@", msg));
             return;
         }

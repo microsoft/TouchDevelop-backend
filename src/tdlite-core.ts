@@ -775,7 +775,7 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response) : v
     if (res.finished()) {
         return;
     }
-    setHtmlHeaders(res);
+    setHtmlHeaders(req);
     handleHttps(req, res);
     if (nonSelfRedirect != "" && ! res.finished()) {
         if (req.header("host").toLowerCase() != myHost) {
@@ -1156,9 +1156,11 @@ export function hasPermission(userjs: IUser, perm: string) : boolean
     return false;
 }
 
-export function setHtmlHeaders(res: restify.Response) : void
+export function setHtmlHeaders(req: restify.Request) : void
 {
-    res.setHeader("Cache-Control", "no-cache, no-store");
+    let res = req.response
+    if (!req.url().startsWith("/app/"))
+        res.setHeader("Cache-Control", "no-cache, no-store");    
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -1317,10 +1319,8 @@ export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject) 
 
 export function isAbuseSafe(elt: JsonObject) : boolean
 {
-    let b2: boolean;
     let b = orEmpty(elt["abuseStatus"]) != "active";
     return b;
-    return b2;
 }
 
 export function callerHasPermission(req: ApiRequest, perm: string) : boolean
