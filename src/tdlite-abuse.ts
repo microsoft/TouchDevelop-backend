@@ -126,8 +126,7 @@ export async function initAsync() : Promise<void>
             x = x + 1;
         }
         fetchResult.items = td.arrayToJson(coll);
-    }
-    , {
+    }, {
         byUserid: true,
         byPublicationid: true
     });
@@ -135,6 +134,39 @@ export async function initAsync() : Promise<void>
     core.addRoute("GET", "*user", "abuses", async (req: core.ApiRequest) => {
         await core.anyListAsync(abuseReports, req, "publicationuserid", req.rootId);
     });
+    
+    core.addRoute("POST", "art", "reshield", async (req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "operator")) return;
+        let store = indexedStore.storeByKind("art");
+        let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
+        let resp = {
+            continuation: lst.continuation,
+            itemCount: lst.items.length,
+            itemsReindexed: 0
+        }
+        await parallel.forJsonAsync(lst.items, async(e) => {
+            if (e["arttype"] != "picture") return;
+            
+            let sh = e["shieldinfo"]
+            if (sh) {
+                if (sh["acssafe"] == "1" || sh["webpurifysafe"] == "1") {
+                    // OK
+                } else if (sh["acssafe"] == "0") {
+                    resp.itemsReindexed++;
+                    let jobid = sh["acsjobid"] || ""
+                    await postAcsReport(e["id"], "Legacy ACS flag. " + jobid, jobid)                    
+                } else {
+                    sh = null;
+                }
+            }
+            
+            if (!sh) {
+                // TODO rescan ...
+            }            
+        }, 20)
+        req.response = resp;
+    });
+
     core.addRoute("POST", "*abusereport", "", async (req1: core.ApiRequest) => {
         let pub = req1.rootPub["pub"];
         await core.checkFacilitatorPermissionAsync(req1, pub["publicationuserid"]);
@@ -259,7 +291,7 @@ async function deletePubRecAsync(delEntry: JsonObject) : Promise<void>
     }
 }
 
-export async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promise<void>
+async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promise<void>
 {
     let baseKind = req.rootPub["kind"];
     if ( ! canHaveAbuseReport(baseKind)) {
@@ -447,25 +479,29 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     return res;
 }
 
-export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: core.IUser) {
-    let msg = scanText(body, core.hasPermission(userjson, "external-links"), false);
-    msg += scanText(desc, core.hasPermission(userjson, "external-links"), true);
-    if (!msg) return;
-    
+export async function postAcsReport(pubid: string, msg: string, acsInfo:string = null, req: core.ApiRequest = null) {
     let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
     if (uid != "") {
-        let req = core.buildApiRequest("/api/" + pubid + "/abuse")
+        if (!req)
+            req = core.buildApiRequest("/api/" + pubid + "/abuse");
         await core.setReqUserIdAsync(req, uid);
         req.rootPub = await core.pubsContainer.getAsync(pubid);
         if (core.isGoodEntry(req.rootPub)) {
-            let jsb = {
+            req.body = {
                 text: msg
             };
-            req.body = jsb;
             req.rootId = pubid;
-            await postAbusereportAsync(req);
+            await postAbusereportAsync(req, acsInfo);
         }
     }
+}
+
+export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: core.IUser) {
+    let msg = scanText(body, core.hasPermission(userjson, "external-links"), false);
+    msg += scanText(desc, core.hasPermission(userjson, "external-links"), true);
+    if (msg) {
+        await postAcsReport(pubid, msg);
+    }    
 }
 
 function testscanner()

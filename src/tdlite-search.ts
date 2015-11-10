@@ -447,18 +447,8 @@ async function initAcsAsync() : Promise<void>
                     }
                     else {
                         logger.info("acsflag: " + JSON.stringify(stat, null, 2));
-                        let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
-                        if (uid != "") {
-                            await core.setReqUserIdAsync(req, uid);
-                            req.rootPub = await core.pubsContainer.getAsync(pubid);
-                            if (core.isGoodEntry(req.rootPub)) {
-                                req.body = {
-                                    text: "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"])
-                                }
-                                req.rootId = pubid;
-                                await tdliteAbuse.postAbusereportAsync(req, jobid);
-                            }
-                        }
+                        let msg = "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"]); 
+                        await tdliteAbuse.postAcsReport(pubid, msg, jobid, req);                          
                     }
                 }
                 else {
