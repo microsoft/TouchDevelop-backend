@@ -223,23 +223,43 @@ export async function initAsync() : Promise<void>
     core.addRoute("GET", "admin", "countpubs", async(req) => {        
         if (!core.checkPermission(req, "root")) return;
         let store = indexedStore.storeByKind(req.argument);
-        
         let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
-        let numhidden = 0
-        for (let e of lst.items) {
-            if (e["pub"] && e["pub"]["ishidden"])
-                numhidden++;
-            else if (/^code/.test(e["login"]))
-                numhidden++;
+        let counters = {
+            total: 0,
+            hidden: 0,
+            loginCode: 0,
+            picture: 0,
+            noShield: 0,
+            safeArt: 0,
+            unsafeArt: 0,
+            unknownArt: 0,
+            continuation: lst.continuation
         }
-        req.response = {
-            continuation: lst.continuation,
-            itemCount: lst.items.length,            
-            hiddenItemCount: numhidden,
-        }           
+        for (let e of lst.items) {
+            counters.total++;
+            if (e["pub"] && e["pub"]["ishidden"])
+                counters.hidden++;
+            else if (/^code/.test(e["login"]))
+                counters.loginCode++;
+            else if (e["arttype"] == "picture") {
+                counters.picture++;
+                let sh =e["shieldinfo"] 
+                if (!sh) {
+                    counters.noShield++;
+                } else {
+                    if (sh["acssafe"] == "1" || sh["webpurifysafe"] == "1") {
+                        counters.safeArt++;
+                    } else if (sh["acssafe"] == "0") {
+                        counters.unsafeArt++;
+                    } else {
+                        counters.unknownArt++;
+                    }
+                }
+            }
+        }
+        req.response = counters
     })
 
-    
     core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");        
         if (req.status != 200) return;
