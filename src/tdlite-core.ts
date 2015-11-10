@@ -891,6 +891,13 @@ export function sha256(hashData: string) : string
 
 export function handleHttps(req: restify.Request, res: restify.Response) : void
 {
+    let redirs = orEmpty(td.serverSetting("HTTP_REDIRECTS", true)).split(/[,;]\s*/).filter(s => !!s)
+    let host = orEmpty(req.header("host")).toLowerCase();
+    if (redirs.indexOf(host) >= 0) {
+        res.redirect(302, self + req.url().slice(1));
+        return;
+    }
+    
     if (hasHttps && ! req.isSecure() && ! td.startsWith(req.serverUrl(), "http://localhost:")) {
         res.redirect(302, req.serverUrl().replace(/^http/g, "https") + req.url());
     }
