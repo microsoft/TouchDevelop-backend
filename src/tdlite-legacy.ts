@@ -366,8 +366,10 @@ async function importHeaderAsync(v: WorkspaceEntry) {
             script = tmp["text"];
     }
 
-    if (!script)
-        throw new Error("empty script")
+    if (!script) {
+        logger.error("empty script: " + v.ScriptId + " " + v.PartitionKey + " / " + v.RowKey);
+        return;
+    }
 
     let body: tdliteWorkspace.IPubBody = {
         guid: v.RowKey.slice(1).toLowerCase(),
