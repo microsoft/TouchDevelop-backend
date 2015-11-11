@@ -291,6 +291,10 @@ export async function initAsync(): Promise<void> {
     if (core.hasSetting("YAHOO_CLIENT_SECRET")) {
         serverAuth.addYahoo();
     }
+    if (core.hasSetting("GITHUB_CLIENT_SECRET")) {
+        serverAuth.addGitHub();
+    }
+
     restify.server().get("/user/logout", async(req: restify.Request, res: restify.Response) => {
         res.redirect(302, "/signout");
     });
@@ -620,7 +624,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         html = td.replaceAll(html, "@USERID@", session.userid);
         html = td.replaceAll(html, "@PASSWORD@", session.pass);
         html = td.replaceAll(html, "@NAME@", core.htmlQuote(tdUsername));
-        core.setHtmlHeaders(res);
+        core.setHtmlHeaders(req);
         res.html(html);
     }
 }
@@ -715,7 +719,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             }
             let lang2 = await tdlitePointers.handleLanguageAsync(req);
             inner = td.replaceAll(td.replaceAll(await getLoginHtmlAsync("newuser", lang2), "@PASSWORDS@", links), "@SESSION@", session.state);
-            core.setHtmlHeaders(res);
+            core.setHtmlHeaders(req);
             res.html(td.replaceAll(inner, "@MSG@", msg));
             return;
         }
@@ -834,6 +838,30 @@ function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
     }
 }
 
+export async function lookupTokenAsync(token: string):Promise<core.Token> {
+    let tokenJs: {} = null;
+    if (td.startsWith(token, "0") && token.length < 100) {
+        let value = await core.redisClient.getAsync("tok:" + token);
+        if (value == null || value == "") {
+            let coll = (/^0([a-z]+)\.([A-Za-z]+)$/.exec(token) || []);
+            if (coll.length > 1) {
+                tokenJs = await tokensTable.getEntityAsync(coll[1], coll[2]);
+                if (tokenJs != null) {
+                    await core.redisClient.setpxAsync("tok:" + token, JSON.stringify(tokenJs), 1000 * 1000);
+                }
+            }
+        }
+        else {
+            tokenJs = JSON.parse(value);
+        }
+    }
+    
+    if (tokenJs) {
+        return core.Token.createFromJson(tokenJs);
+    } else {
+        return <core.Token>null;
+    }
+}
 
 export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
 {
@@ -847,27 +875,13 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
             req.status = 442;
             return;
         }
-        let tokenJs = (<JsonObject>null);
-        if (td.startsWith(token, "0") && token.length < 100) {
-            let value = await core.redisClient.getAsync("tok:" + token);
-            if (value == null || value == "") {
-                let coll = (/^0([a-z]+)\.([A-Za-z]+)$/.exec(token) || []);
-                if (coll.length > 1) {
-                    tokenJs = await tokensTable.getEntityAsync(coll[1], coll[2]);
-                    if (tokenJs != null) {
-                        await core.redisClient.setpxAsync("tok:" + token, JSON.stringify(tokenJs), 1000 * 1000);
-                    }
-                }
-            }
-            else {
-                tokenJs = JSON.parse(value);
-            }
-        }
-        if (tokenJs == null) {
+        
+        let token2 = await lookupTokenAsync(token);
+     
+        if (token2 == null) {
             req.status = httpCode._401Unauthorized;
         }
         else {
-            let token2 = core.Token.createFromJson(tokenJs);
             if (core.orZero(token2.version) < 2) {
                 req.status = httpCode._401Unauthorized;
                 return;

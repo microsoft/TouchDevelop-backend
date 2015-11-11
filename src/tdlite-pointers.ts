@@ -595,7 +595,9 @@ async function lookupScreenshotIdAsync(pub: {}) {
 
 async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang:string)
 {    
-    let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, core.emptyRequest);
+    let req = core.buildApiRequest("/api")
+    req.rootId = scriptjson["id"];    // this is to make sure we show hidden scripts
+    let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, req);
     let templ = "templates/script"
     if (/#stepByStep/i.test(pub["description"]))
         templ = "templates/tutorial";

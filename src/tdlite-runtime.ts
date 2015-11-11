@@ -11,6 +11,8 @@ type JsonBuilder = td.JsonBuilder;
 
 import * as core from "./tdlite-core"
 import * as microsoftTranslator from "./microsoft-translator"
+import * as jwt from "./server-auth"
+import * as tdliteLogin from "./tdlite-login"
 
 var orEmpty = td.orEmpty;
 
@@ -68,6 +70,62 @@ export async function initAsync()
         }
         req.response = td.clone(jsb);
     });
+    
+    if (!core.fullTD) return;
+        
+    let encKey = core.sha256bin(core.tokenSecret + ":revision");         
+    
+    core.addRoute("POST", "*user", "storage", async(req) => {
+        let now = await core.nowSecondsAsync()
+        let pref = "EnC.REVISIONTOKEN"
+        
+        if (req.argument == "access_token") {
+            if (req.rootId != req.userid) {
+                req.status = httpCode._402PaymentRequired;
+                return;
+            }
+
+            let tok = req.userinfo.token.asString()
+            let enc = core.encrypt(tok, "REVISIONTOKEN")
+
+            assert(tok != enc)
+
+            enc = enc.replace(/\$/g, ".").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
+
+            req.response = {
+                access_token: enc.slice(pref.length)
+            }
+        } else if (req.argument == "validate_token") {
+            if (req.body["secret"] !== td.serverSetting("REVISION_SERVICE_SECRET")) {
+                req.status = httpCode._402PaymentRequired;
+            } else {
+                let enc = td.toString(pref + req.body["access_token"]).replace(/\./g, "$").replace(/-/g, "+").replace(/_/g, "/")
+                let dec = core.decrypt(enc)
+                let err = ""
+                let resp = {
+                    valid: false,
+                    expired: false
+                }
+                if (dec != enc) {
+                    let tok = await tdliteLogin.lookupTokenAsync(dec)
+                    if (!tok) {
+                        err = "No such token"
+                    } else if (tok.PartitionKey != req.rootId) {
+                        err = "Wrong user"
+                    } else {
+                        resp.valid = true;
+                    }
+                } else {
+                    err = "Cannot decrypt token"
+                }
+                req.response = resp;
+                if (err)
+                    req.response["error"] = err
+            }
+        } else {
+            req.status = httpCode._404NotFound;
+        }
+    })
     
     let forbiddenHeaders = {
         "content-length": 1,
@@ -181,6 +239,29 @@ export async function initAsync()
                 contentBase64: rtype == "base64" ? buf.toString("base64") : undefined,
                 contentText: rtype == "text" ? buf.toString("utf8") : undefined,
             }
+        }
+    })
+    
+    core.addRoute("POST", "*user", "jwt", async(req) => {
+        core.meOnly(req)
+        if (req.status != 200) return;
+        let now = await core.nowSecondsAsync();
+        let tok: jwt.JwtPayload = {
+            iss: "touchdevelop-usersign",
+            sub: "u-" + req.userid + "@touchdevelop.com",
+            iat: now,
+            jti: td.createRandomId(10),
+            aud: core.withDefault(req.body["aud"], "Anything"),
+        }
+        let jtok = jwt.createJwtRS256(tok, td.serverSetting("TOKEN_SIGN_PRIV_KEY"))
+        req.response = {
+            jwt: jtok
+        }
+    })
+    
+    core.addRoute("GET", "jwt", "info", async(req) => {
+        req.response = {
+            RS256: td.serverSetting("TOKEN_SIGN_PUB_KEY") 
         }
     })
 }

@@ -206,7 +206,10 @@ export class Token
     @td.json public reason: string = "";
     @td.json public cookie: string = "";
     @td.json public version: number = 0;
-    static createFromJson(o:JsonObject) { let r = new Token(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new Token(); r.fromJson(o); return r; }
+    public asString() {
+        return "0" + this.PartitionKey + "." + this.RowKey;
+    }
 }
 
 export interface IToken {
@@ -772,7 +775,7 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response) : v
     if (res.finished()) {
         return;
     }
-    setHtmlHeaders(res);
+    setHtmlHeaders(req);
     handleHttps(req, res);
     if (nonSelfRedirect != "" && ! res.finished()) {
         if (req.header("host").toLowerCase() != myHost) {
@@ -888,6 +891,13 @@ export function sha256(hashData: string) : string
 
 export function handleHttps(req: restify.Request, res: restify.Response) : void
 {
+    let redirs = orEmpty(td.serverSetting("HTTP_REDIRECTS", true)).split(/[,;]\s*/).filter(s => !!s)
+    let host = orEmpty(req.header("host")).toLowerCase();
+    if (redirs.indexOf(host) >= 0) {
+        res.redirect(302, self + req.url().slice(1));
+        return;
+    }
+    
     if (hasHttps && ! req.isSecure() && ! td.startsWith(req.serverUrl(), "http://localhost:")) {
         res.redirect(302, req.serverUrl().replace(/^http/g, "https") + req.url());
     }
@@ -1146,9 +1156,11 @@ export function hasPermission(userjs: IUser, perm: string) : boolean
     return false;
 }
 
-export function setHtmlHeaders(res: restify.Response) : void
+export function setHtmlHeaders(req: restify.Request) : void
 {
-    res.setHeader("Cache-Control", "no-cache, no-store");
+    let res = req.response
+    if (!req.url().startsWith("/app/"))
+        res.setHeader("Cache-Control", "no-cache, no-store");    
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -1157,7 +1169,6 @@ export function setHtmlHeaders(res: restify.Response) : void
 
 export function encrypt(val: string, keyid: string) : string
 {
-    let s2: string;
     if (! val) {
         return val;
     }
@@ -1176,7 +1187,13 @@ export function encrypt(val: string, keyid: string) : string
     let cipherFinal = ivCipher.final();
     let s = Buffer.concat([enciphered, cipherFinal]).toString("base64");
     return "EnC$" + keyid + "$" + iv.toString("base64") + "$" + s;
-    return s2;
+}
+
+export function sha256bin(key: string)
+{
+    let hash = crypto.createHash("sha256");
+    hash.update(key);
+    return hash.digest();
 }
 
 export function prepEncryptionKey(keyid: string) : Buffer
@@ -1185,9 +1202,7 @@ export function prepEncryptionKey(keyid: string) : Buffer
     if (key == "") {
         return null;
     }
-    let hash = crypto.createHash("sha256");
-    hash.update(key);
-    return hash.digest();
+    return sha256bin(key);
 }
 
 export function decrypt(val: string) : string
@@ -1304,10 +1319,8 @@ export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject) 
 
 export function isAbuseSafe(elt: JsonObject) : boolean
 {
-    let b2: boolean;
     let b = orEmpty(elt["abuseStatus"]) != "active";
     return b;
-    return b2;
 }
 
 export function callerHasPermission(req: ApiRequest, perm: string) : boolean

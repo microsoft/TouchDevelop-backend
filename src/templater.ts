@@ -225,6 +225,9 @@ async function uploadFileAsync(fn: string) {
 }
 
 async function uploadAsync() {
+    let branch = process.env["TRAVIS_BRANCH"]
+    if (branch && branch != "master")
+        return;
     let tmppath = "web/_temp"
     if (!fs.existsSync(tmppath))
         fs.mkdirSync(tmppath)

@@ -2,6 +2,8 @@
 
 Back-end cloud service for [Touch Develop] (https://github.com/Microsoft/TouchDevelop)
 
+[![Build Status](https://travis-ci.org/Microsoft/TouchDevelop.svg)](https://travis-ci.org/Microsoft/TouchDevelop)
+
 ## Setup
 
 In order to build Touch Develop backend, ensure that you have
