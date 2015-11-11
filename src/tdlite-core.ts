@@ -998,14 +998,14 @@ local rate    = ARGV[2] or 1000   -- token cost (1000ms - 1 token/seq)
 local burst   = ARGV[3] or 3600000    -- accumulate for up to an hour
 local dropAt  = ARGV[4] or 10000  -- return wait time of up to 10s; otherwise just drop the request
 
-local curr = redis.call(\"GET\", KEYS[1]) or 0
+local curr = redis.call("GET", KEYS[1]) or 0
 local newHorizon = math.max(now - burst, curr + rate)
 local sleepTime  = math.max(0, newHorizon - now)
 
 if sleepTime > tonumber(dropAt) then
   return -1
 else
-  redis.call(\"SET\", KEYS[1], newHorizon)
+  redis.call("SET", KEYS[1], newHorizon, "PX", burst)
   return sleepTime
 end
 `, keys, args);
