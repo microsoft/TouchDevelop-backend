@@ -4,6 +4,8 @@ node_js:
 before_script:
   - "tsd reinstall"
 sudo: false
+script:
+    - "make"
 after_success:
     - "make upload"
 notifications:
