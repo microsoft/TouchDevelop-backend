@@ -121,11 +121,12 @@ export async function initAsync() : Promise<void>
         await importFromPubloggerAsync(req);
     });
     
-    cron.registerJob(new cron.Job("importsync", 2, async() => {
-        let req = core.buildApiRequest("/api/importsync");
-        await importFromPubloggerAsync(req)
-        logger.info(`importsync: ${req.status}; ` + (req.response ? JSON.stringify(req.response,null,2) : ""))
-    }));
+    if (false)
+        cron.registerJob(new cron.Job("importsync", 2, async() => {
+            let req = core.buildApiRequest("/api/importsync");
+            await importFromPubloggerAsync(req)
+            logger.info(`importsync: ${req.status}; ` + (req.response ? JSON.stringify(req.response,null,2) : ""))
+        }));
 
     
     /*
