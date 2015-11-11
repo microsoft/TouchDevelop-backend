@@ -167,19 +167,21 @@ export async function initAsync() : Promise<void>
         req.response = resp;
     });
 
-    core.addRoute("POST", "*abusereport", "", async (req1: core.ApiRequest) => {
-        let pub = req1.rootPub["pub"];
-        await core.checkFacilitatorPermissionAsync(req1, pub["publicationuserid"]);
-        if (req1.status == 200) {
-            let res = td.toString(req1.body["resolution"]);
-            await core.pubsContainer.updateAsync(req1.rootId, async (entry1: JsonBuilder) => {
-                core.setFields(entry1["pub"], req1.body, ["resolution"]);
+    core.addRoute("POST", "*abusereport", "", async (req: core.ApiRequest) => {
+        let pub = req.rootPub["pub"];
+        // any-facilitator is good enough to update any abuse report, even about users on higher level
+        if (!core.hasPermission(req.userinfo.json, "any-facilitator"))
+            await core.checkFacilitatorPermissionAsync(req, pub["publicationuserid"]);        
+        if (req.status == 200) {
+            let res = td.toString(req.body["resolution"]);
+            await core.pubsContainer.updateAsync(req.rootId, async (entry1: JsonBuilder) => {
+                core.setFields(entry1["pub"], req.body, ["resolution"]);
             });
             await core.pubsContainer.updateAsync(pub["publicationid"], async (entry2: JsonBuilder) => {
                 entry2["abuseStatus"] = res;
                 delete entry2["abuseStatusPosted"];
             });
-            req1.response = ({});
+            req.response = ({});
         }
     });
     core.addRoute("POST", "*pub", "abusereports", async(req: core.ApiRequest) => {
@@ -225,27 +227,27 @@ export async function initAsync() : Promise<void>
             req.status = httpCode._405MethodNotAllowed;
         }
     });
-    core.addRoute("GET", "*pub", "candelete", async (req4: core.ApiRequest) => {
+    core.addRoute("GET", "*pub", "candelete", async (req: core.ApiRequest) => {
         let resp = new CandeleteResponse();
-        let pub1 = req4.rootPub["pub"];
-        resp.publicationkind = req4.rootPub["kind"];
-        resp.publicationname = withDefault(pub1["name"], "/" + req4.rootId);
+        let pub1 = req.rootPub["pub"];
+        resp.publicationkind = req.rootPub["kind"];
+        resp.publicationname = withDefault(pub1["name"], "/" + req.rootId);
         resp.publicationuserid = getAuthor(pub1);
-        resp.candeletekind = canBeAdminDeleted(req4.rootPub) || core.hasSpecialDelete(req4.rootPub);
-        let reports = await abuseReports.getIndex("publicationid").fetchAsync(req4.rootId, ({"count":10}));
+        resp.candeletekind = canBeAdminDeleted(req.rootPub) || core.hasSpecialDelete(req.rootPub);
+        let reports = await abuseReports.getIndex("publicationid").fetchAsync(req.rootId, ({"count":10}));
         resp.hasabusereports = reports.items.length > 0 || reports.continuation != "";
         if (resp.candeletekind) {
-            await checkDeletePermissionAsync(req4);
-            if (req4.status == 200) {
+            await checkDeletePermissionAsync(req);
+            if (req.status == 200) {
                 resp.candelete = true;
-                if (resp.publicationuserid == req4.userid) {
-                    await core.checkFacilitatorPermissionAsync(req4, resp.publicationuserid);
-                    if (req4.status == 200) {
+                if (resp.publicationuserid == req.userid) {
+                    await core.checkFacilitatorPermissionAsync(req, resp.publicationuserid);
+                    if (req.status == 200) {
                         resp.canmanage = true;
                     }
                     else {
                         resp.canmanage = false;
-                        req4.status = 200;
+                        req.status = 200;
                     }
                 }
                 else {
@@ -254,10 +256,13 @@ export async function initAsync() : Promise<void>
             }
             else {
                 resp.candelete = false;
-                req4.status = 200;
+                req.status = 200;
             }
+            
+            if (core.hasPermission(req.userinfo.json, "any-facilitator"))
+                resp.canmanage = true;
         }
-        req4.response = resp.toJson();
+        req.response = resp.toJson();
     });
 }
 
