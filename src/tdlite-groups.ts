@@ -69,13 +69,13 @@ export async function initAsync() : Promise<void>
     })
     await core.setResolveAsync(groups, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         let hasGlobalList = core.callerHasPermission(apiRequest, "global-list");
-        if ( ! hasGlobalList && apiRequest.userid == "") {
+        if (!core.fullTD && !hasGlobalList && apiRequest.userid == "") {
             fetchResult.items = ([]);
             return;
         }
         await core.addUsernameEtcAsync(fetchResult);
         let coll = (<PubGroup[]>[]);
-        let grps = apiRequest.userinfo.json["groups"];
+        let grps = apiRequest.userinfo.json ? apiRequest.userinfo.json["groups"] : {};
         for (let jsb of fetchResult.items) {
             let grp = PubGroup.createFromJson(jsb["pub"]);
             if ( ! hasGlobalList && grp.isclass && ! grps.hasOwnProperty(grp.id) && withDefault(apiRequest.queryOptions["code"], "none") != orEmpty(jsb["code"])) {
@@ -308,12 +308,11 @@ export async function initAsync() : Promise<void>
         }
     });
     groupMemberships = await indexedStore.createStoreAsync(core.pubsContainer, "groupmembership");
-    await core.setResolveAsync(groupMemberships, async (fetchResult1: indexedStore.FetchResult, apiRequest1: core.ApiRequest) => {
-        if (apiRequest1.userid == "") {
+    await core.setResolveAsync(groupMemberships, async(fetchResult1: indexedStore.FetchResult, apiRequest1: core.ApiRequest) => {
+        if (!core.fullTD && apiRequest1.userid == "") {
             fetchResult1.items = ([]);
             return;
         }
-        let grps1 = apiRequest1.userinfo.json["groups"];
         let hasGlobalList = core.callerHasPermission(apiRequest1, "global-list");
         
         if (core.fullTD) hasGlobalList = true;
@@ -325,6 +324,7 @@ export async function initAsync() : Promise<void>
             store = tdliteUsers.users;
         }
         if ( ! hasGlobalList) {
+            let grps1 = apiRequest1.userinfo.json ? apiRequest1.userinfo.json["groups"] : {};
             fetchResult1.items = td.arrayToJson(asArray(fetchResult1.items).filter(elt => grps1.hasOwnProperty(elt["pub"]["publicationid"])));
         }
         let pubs = await core.followPubIdsAsync(fetchResult1.items, field, store.kind);
@@ -442,8 +442,8 @@ export async function initAsync() : Promise<void>
         }
     });
     await groupMemberships.createIndexAsync("publicationid", entry10 => entry10["pub"]["publicationid"]);
-    core.addRoute("GET", "*group", "users", async (req12: core.ApiRequest) => {
-        await core.anyListAsync(groupMemberships, req12, "publicationid", req12.rootId);
+    core.addRoute("GET", "*group", "users", async (req: core.ApiRequest) => {
+        await core.anyListAsync(groupMemberships, req, "publicationid", req.rootId);
     });
 }
 
