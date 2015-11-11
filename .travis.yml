@@ -1,0 +1,16 @@
+language: node_js
+node_js:
+  - "5.0.0"
+before_script:
+  - "tsd reinstall"
+sudo: false
+after_success:
+    - "make upload"
+notifications:
+  email:
+    - touchdevelop-build@microsoft.com
+cache:
+  directories:
+    - node_modules
+    - typings
+    - web/_temp
