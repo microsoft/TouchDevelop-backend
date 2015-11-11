@@ -291,6 +291,10 @@ export async function initAsync(): Promise<void> {
     if (core.hasSetting("YAHOO_CLIENT_SECRET")) {
         serverAuth.addYahoo();
     }
+    if (core.hasSetting("GITHUB_CLIENT_SECRET")) {
+        serverAuth.addGitHub();
+    }
+
     restify.server().get("/user/logout", async(req: restify.Request, res: restify.Response) => {
         res.redirect(302, "/signout");
     });

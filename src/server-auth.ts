@@ -99,6 +99,7 @@ export class UserInfo
     @td.json public id: string = "";
     @td.json public name: string = "";
     @td.json public email: string = "";
+    @td.json public realname: string = "";
     @td.json public redirectPrefix: string = "";
     @td.json public state: string = "";
     @td.json public userData: string = "";
@@ -1048,15 +1049,6 @@ export function addYahoo(options_: IProviderOptions = {}) : void
         if (js == null) {
             return js;
         }
-        let profileExample =
-            {
-                "profile": { 
-                    "guid": "OTW....NRLXA",  
-                    "image": { "height": 192, "imageUrl": "https://s.yimg.com/dh/ap/social/profile/profile_b192.png", 
-                    "size": "192x192", "width": 192 }, 
-                    "nickname": "Touch",  
-                } 
-            }
         let request = td.createRequest("https://social.yahooapis.com/v1/user/me/profile");
         request.setHeader("Authorization", "Bearer " + js["access_token"]);
         request.setAccept("application/json");
@@ -1071,6 +1063,49 @@ export function addYahoo(options_: IProviderOptions = {}) : void
         if (!profile1["guid"]) return <UserInfo>null;
         inf.id = "yahoo:" + profile1["guid"];
         inf.name = profile1["nickname"];
+        return inf;
+    });
+}
+
+
+/**
+ * Setup GitHub authentication. Requires ``GITHUB_CLIENT_ID`` and ``GITHUB_CLIENT_SECRET`` env.
+ */
+export function addGitHub(options_: IProviderOptions = {}) : void
+{
+    let clientId = td.serverSetting("GITHUB_CLIENT_ID", false);
+    let clientSecret = td.serverSetting("GITHUB_CLIENT_SECRET", false);
+    let prov = ProviderIndex.at("github");
+    prov.name = "GitHub";
+    prov.makeCustomToken = options_.makeCustomToken;
+    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+        let url: string;
+        p.client_id = clientId;
+        p.response_type = "code";
+        p.scope = "user:email";
+        url = "https://github.com/login/oauth/authorize?" + toQueryString(p.toJson());
+        return url;
+    }
+    , async (req1: restify.Request, p1: OauthRequest) => {
+        let profile: JsonObject;
+        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://github.com/login/oauth/access_token");
+        if (js == null) {
+            return js;
+        }
+        let request = td.createRequest("https://api.github.com/user");
+        request.setHeader("Authorization", "token " + js["access_token"]);
+        request.setHeader("User-Agent", "Touch Develop backend");
+        request.setAccept("application/json");
+        let response = await request.sendAsync();
+        logger.info("gh resp: " + response.statusCode() + ": " + response.content())
+        return response.contentAsJson();
+    }, async (profile1: JsonObject) => {
+        let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
+        inf.id = "github:" + profile1["id"];
+        inf.name = profile1["login"];
+        inf.email = profile1["email"];
+        inf.realname = profile1["name"];
         return inf;
     });
 }
