@@ -111,7 +111,7 @@ async function flushCountersAsync()
     await countersContainer.updateAsync("total", async(v) => {
         addCounters(v, redisCounters);
         v["min"] = v["min"] ? Math.min(v["min"], alignedTime) : alignedTime;
-        v["max"] = v["max"] ? Math.min(v["max"], alignedTime) : alignedTime;
+        v["max"] = v["max"] ? Math.max(v["max"], alignedTime) : alignedTime;
     })    
 }
 
