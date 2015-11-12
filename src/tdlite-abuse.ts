@@ -174,6 +174,10 @@ export async function initAsync() : Promise<void>
             await core.checkFacilitatorPermissionAsync(req, pub["publicationuserid"]);        
         if (req.status == 200) {
             let res = td.toString(req.body["resolution"]);
+            if (res == "deleted") {
+                req.status = httpCode._402PaymentRequired;
+                return;
+            }
             await core.pubsContainer.updateAsync(req.rootId, async (entry1: JsonBuilder) => {
                 core.setFields(entry1["pub"], req.body, ["resolution"]);
             });
