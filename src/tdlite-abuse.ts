@@ -17,6 +17,7 @@ import * as audit from "./tdlite-audit"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteReviews from "./tdlite-reviews"
 import * as tdliteUsers from "./tdlite-users"
+import * as tdliteComments from "./tdlite-comments"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -398,16 +399,23 @@ function canBeAdminDeleted(jsonpub: JsonObject) : boolean
     return b;
 }
 
-async function checkDeletePermissionAsync(req: core.ApiRequest) : Promise<void>
-{
+async function checkDeletePermissionAsync(req: core.ApiRequest): Promise<void> {
     let pub = req.rootPub["pub"];
     let authorid = pub["userid"];
     if (pub["kind"] == "user") {
         authorid = pub["id"];
     }
-    if (authorid != req.userid) {
-        await core.checkFacilitatorPermissionAsync(req, authorid);
+    if (authorid == req.userid) return; // ok, my content
+    
+    if (pub["kind"] == "comment") {
+        let rootpub = await tdliteComments.getRootPubAsync(req.rootPub);
+        if (rootpub && rootpub["kind"] == "group") {
+            if (rootpub["pub"]["userid"] == req.userid)
+                return; // OK, I can delete comments on my group
+        }
     }
+
+    await core.checkFacilitatorPermissionAsync(req, authorid);
 }
 
 function buildRecognizer(words:string[])
