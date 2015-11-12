@@ -151,12 +151,15 @@ export async function initAsync(options_: IOptions = {}) : Promise<void>
     if(opt.version) raygunClient.setVersion(opt.version);
     td.App.addTransport({
       id: "raygun",
-      log : function(level, category, message, meta) {
-        // "crash" messages already reported below
-        if (level <= 3 && category != "crash") {
-          try { throw new Error(category + ": " + message); }
-          catch(err) {  raygunClient.send(err, meta); }
-        }
+      log: function(level, category, message, meta) {
+          // "crash" messages already reported below
+          if (level <= 3 && category != "crash") {
+              if (meta.tdException)
+                  raygunClient.send(meta.tdException, meta);
+              else
+                  try { throw new Error(category + ": " + message); }
+                  catch (err) { raygunClient.send(err, meta); }
+          }
       },
       logException : function(err, meta) {
         logger.debug("sending crash: " + err.message);
