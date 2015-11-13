@@ -150,6 +150,12 @@ export async function initAsync()
         }
 
         let url = td.toString(req.queryOptions["url"])
+        
+        if (!/^https?:\/\//.test(url)) {
+            req.status = httpCode._400BadRequest;
+            return;            
+        }
+            
         let isAnon = false;
 
         if (!url.startsWith(core.currClientConfig.primaryCdnUrl)) {
@@ -198,6 +204,11 @@ export async function initAsync()
                         
         let data = <ProxyReq>req.body;
         let rtype = td.toString(data.responseType);
+
+        if (!/^https?:\/\//.test(data.url)) {
+            req.status = httpCode._400BadRequest;
+            return;            
+        }            
         
         if (rtype != "text" && rtype != "base64") {
             req.status = httpCode._412PreconditionFailed;
