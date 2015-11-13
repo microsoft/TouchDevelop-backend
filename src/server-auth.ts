@@ -565,6 +565,7 @@ export function addLiveId(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         inf.id = "live:" + profile1["id"];
         inf.name = profile1["name"];
         let eml = profile1["emails"];
@@ -656,6 +657,7 @@ export function addFacebook(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         inf.id = "fb:" + profile1["id"];
         inf.name = profile1["name"];
         inf.email = profile1["email"];
@@ -706,6 +708,7 @@ export function addGoogle(options_: IProviderOptions = {}) : void
     }
     , async (profile1: JsonObject) => {
         let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         inf.id = "google:" + profile1["id"];
         inf.name = profile1["name"];
         inf.email = profile1["email"];
@@ -749,6 +752,7 @@ export function addEdmodo(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         info = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         info.id = "edmodo:" + profile1["id"];
         info.name = profile1["name"];
         return info;
@@ -787,6 +791,7 @@ export function addAzureAd(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         info = new UserInfo();
+        if (!profile1["oid"]) return <UserInfo>null;
         info.id = "ad:" + td.replaceAll(profile1["oid"], "-", "").toLowerCase();
         info.name = profile1["name"];
         info.email = profile1["unique_name"];
