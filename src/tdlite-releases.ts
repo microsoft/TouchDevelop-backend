@@ -59,8 +59,7 @@ export function appContainerUrl()
     return appContainer.url();
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     mainReleaseName = withDefault(td.serverSetting("MAIN_RELEASE_NAME", true), "current");
     cacheRewritten = await cachedStore.createContainerAsync("cacherewritten", {
         inMemoryCacheSeconds: 15,
@@ -70,7 +69,7 @@ export async function initAsync() : Promise<void>
     filesContainer = await core.blobService.createContainerIfNotExistsAsync("files", "hidden");
 
     releases = await indexedStore.createStoreAsync(core.pubsContainer, "release");
-    await core.setResolveAsync(releases, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(releases, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await core.addUsernameEtcAsync(fetchResult);
         let coll = (<PubRelease[]>[]);
         let labels = <IReleaseLabel[]>[];
@@ -94,11 +93,9 @@ export async function initAsync() : Promise<void>
             coll.push(rel);
         }
         fetchResult.items = td.arrayToJson(coll);
-    }
-    , {
-        byUserid: true
-    });
-    core.addRoute("POST", "releases", "", async (req1: core.ApiRequest) => {
+    }, { byUserid: true });
+    
+    core.addRoute("POST", "releases", "", async(req1: core.ApiRequest) => {
         core.checkPermission(req1, "upload");
         if (req1.status == 200) {
             let rel1 = new PubRelease();
@@ -109,7 +106,7 @@ export async function initAsync() : Promise<void>
             rel1.branch = orEmpty(req1.body["branch"]);
             rel1.buildnumber = core.orZero(req1.body["buildnumber"]);
             if (looksLikeReleaseId(rel1.releaseid)) {
-                await core.updateSettingsAsync("releaseversion", async (entry: JsonBuilder) => {
+                await core.updateSettingsAsync("releaseversion", async(entry: JsonBuilder) => {
                     let x = core.orZero(entry[core.releaseVersionPrefix]) + 1;
                     entry[core.releaseVersionPrefix] = x;
                     rel1.version = core.releaseVersionPrefix + "." + x + "." + rel1.buildnumber;
@@ -133,7 +130,7 @@ export async function initAsync() : Promise<void>
             }
         }
     });
-    core.addRoute("POST", "*release", "files", async (req2: core.ApiRequest) => {
+    core.addRoute("POST", "*release", "files", async(req2: core.ApiRequest) => {
         core.checkPermission(req2, "upload");
         if (req2.status == 200) {
             let rel2 = PubRelease.createFromJson(req2.rootPub["pub"]);
@@ -154,13 +151,11 @@ export async function initAsync() : Promise<void>
             });
             req2.response = ({ "status": "ok" });
         }
-    }
-    , {
-        sizeCheckExcludes: "content"
-    });
-    core.addRoute("POST", "*release", "label", async (req3: core.ApiRequest) => {
+    }, { sizeCheckExcludes: "content" });
+    
+    core.addRoute("POST", "*release", "label", async(req3: core.ApiRequest) => {
         let name = orEmpty(req3.body["name"]);
-        if ( ! isKnownReleaseName(name)) {
+        if (!isKnownReleaseName(name)) {
             req3.status = httpCode._412PreconditionFailed;
         }
         if (req3.status == 200) {
@@ -168,7 +163,7 @@ export async function initAsync() : Promise<void>
         }
         if (req3.status == 200) {
             let rel3 = PubRelease.createFromJson(req3.rootPub["pub"]);
-            let lab:IReleaseLabel = <any>{};
+            let lab: IReleaseLabel = <any>{};
             lab.name = name;
             lab.time = await core.nowSecondsAsync();
             lab.userid = req3.userid;
@@ -176,7 +171,7 @@ export async function initAsync() : Promise<void>
             lab.relid = rel3.id;
             lab.numpokes = 0;
             await audit.logAsync(req3, "lbl-" + lab.name);
-            await core.updateSettingsAsync("releases", async (entry2: JsonBuilder) => {
+            await core.updateSettingsAsync("releases", async(entry2: JsonBuilder) => {
                 let jsb2 = entry2["ids"];
                 if (jsb2 == null) {
                     jsb2 = {};
@@ -192,7 +187,7 @@ export async function initAsync() : Promise<void>
             req3.response = ({});
         }
     });
-    core.addRoute("POST", "upload", "files", async (req4: core.ApiRequest) => {
+    core.addRoute("POST", "upload", "files", async(req4: core.ApiRequest) => {
         if (td.startsWith(orEmpty(req4.body["filename"]).toLowerCase(), "override")) {
             core.checkPermission(req4, "root");
         }
@@ -209,11 +204,20 @@ export async function initAsync() : Promise<void>
             });
             req4.response = ({ "status": "ok" });
         }
-    }
-    , {
-        sizeCheckExcludes: "content"
-    });
+    }, {  sizeCheckExcludes: "content"  });
 
+    core.addRoute("GET", "language", "touchdevelop.tgz", async(req: core.ApiRequest) => {
+        let r = core.getSettings("releases")["ids"] || {}
+        let labl = <IReleaseLabel>r["current"]
+        if (labl) {
+            req.status = httpCode._302MovedTemporarily;
+            req.headers = {
+                "location": core.currClientConfig.primaryCdnUrl + "/app/" + labl.releaseid + "/touchdevelop.tgz"
+            }
+        } else {
+            req.status = httpCode._404NotFound;
+        }
+    });
 }
 
 

@@ -1771,7 +1771,7 @@ export function registerPubKind(desc:IPubKind)
 export async function getCloudRelidAsync(includeVer: boolean) : Promise<string>
 {
     let ver: string;
-    let entry = await settingsContainer.getAsync("releases");
+    let entry = getSettings("releases");
     let js = entry["ids"]["cloud"];
     ver = js["relid"];
     if (includeVer) {
