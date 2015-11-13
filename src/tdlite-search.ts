@@ -228,6 +228,7 @@ export async function initAsync() : Promise<void>
             total: 0,
             hidden: 0,
             loginCode: 0,
+            badLogin: 0,
             picture: 0,
             noShield: 0,
             safeArt: 0,
@@ -239,8 +240,14 @@ export async function initAsync() : Promise<void>
             counters.total++;
             if (e["pub"] && e["pub"]["ishidden"])
                 counters.hidden++;
-            else if (/^code/.test(e["login"]))
+            else if (/^code/.test(e["login"])) {
                 counters.loginCode++;
+                //logger.warning("logincode: " + e["id"])
+            }
+            else if (e["login"] && /undefined/.test(e["login"])) {
+                counters.badLogin++;
+                logger.warning("badlogin: " + e["id"])
+            }
             else if (e["arttype"] == "picture") {
                 counters.picture++;
                 let sh =e["shieldinfo"] 
