@@ -103,9 +103,9 @@ export class LoginSession
         return session
     }
     
-    public async setMigrationUserAsync(uid: string)
+    public async setMigrationUserAsync(uid: string, multipleOK = false)
     {
-        let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, this.profileId);
+        let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, this.profileId, multipleOK);
         if (!ok) return false;
         this.userid = uid
         this.askLegacy = false
@@ -165,7 +165,7 @@ export class LoginSession
     public async saveAndRedirectAsync(req:restify.Request)
     {
         await this.saveAsync();
-        req.response.redirect(302, "/oauth/dialog?td_session=" + this.state)
+        req.response.redirect(302, core.self + "oauth/dialog?td_session=" + this.state)
     }
     
     private async generateRedirectUrlAsync(): Promise<string>

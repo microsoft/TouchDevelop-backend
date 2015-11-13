@@ -922,15 +922,25 @@ export async function createNewUserAsync(username: string, email: string, profil
 }
 
 
-export async function setProfileIdFromLegacyAsync(uid: string, profileId: string) {
+export async function setProfileIdFromLegacyAsync(uid: string, profileId: string, multipleOK: boolean) {
+    let ok = false;
     let final = await updateAsync(uid, async(v) => {
-        if (!v.login)
+        ok = false;
+        if (!v.login) {
             v.login = profileId;
-        if (v.login == profileId)
+            ok = true;
+        } else if (multipleOK) {
+            if (!v.altLogins)
+                v.altLogins = [];
+            v.altLogins.push(profileId);
+            ok = true;
+        }
+        if (v.importworkspace !== "")
             v.importworkspace = "2";
     })
+    //logger.info(`setprofile: ${multipleOK} ${ok} ${uid} ${profileId}`)
 
-    if (final.login != profileId) return false;
+    if (!ok) return false;
 
     await passcodesContainer.updateAsync(profileId, async(entry: JsonBuilder) => {
         entry["kind"] = "userpointer";

@@ -227,7 +227,7 @@ export async function initAsync()
             return;
         }
 
-        let ok = await session.setMigrationUserAsync(userjson["id"])
+        let ok = await session.setMigrationUserAsync(userjson["id"], true)
         if (!ok) {
             session.storedMessage = "This user account was already bound to identity in the new system. Maybe try linking other provider?"
             logger.tick("Login_legacyBound")
