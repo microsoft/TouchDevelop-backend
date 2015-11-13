@@ -455,6 +455,8 @@ export async function saveScriptAsync(userid: string, body: PubBody, importTime 
         
     core.progress("save 1");
     let time = importTime;
+    if (!time && body.scriptVersion.time)
+        time = body.scriptVersion.time * 1000;
     if (!time) time = await core.redisClient.cachedTimeAsync();
     let id2 = (20000000000000 - time) + "." + userid + "." + azureTable.createRandomId(12);
     let _new = false;
