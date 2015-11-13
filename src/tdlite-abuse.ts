@@ -17,6 +17,7 @@ import * as audit from "./tdlite-audit"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteReviews from "./tdlite-reviews"
 import * as tdliteUsers from "./tdlite-users"
+import * as tdliteComments from "./tdlite-comments"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -174,6 +175,10 @@ export async function initAsync() : Promise<void>
             await core.checkFacilitatorPermissionAsync(req, pub["publicationuserid"]);        
         if (req.status == 200) {
             let res = td.toString(req.body["resolution"]);
+            if (res == "deleted") {
+                req.status = httpCode._402PaymentRequired;
+                return;
+            }
             await core.pubsContainer.updateAsync(req.rootId, async (entry1: JsonBuilder) => {
                 core.setFields(entry1["pub"], req.body, ["resolution"]);
             });
@@ -394,16 +399,23 @@ function canBeAdminDeleted(jsonpub: JsonObject) : boolean
     return b;
 }
 
-async function checkDeletePermissionAsync(req: core.ApiRequest) : Promise<void>
-{
+async function checkDeletePermissionAsync(req: core.ApiRequest): Promise<void> {
     let pub = req.rootPub["pub"];
     let authorid = pub["userid"];
     if (pub["kind"] == "user") {
         authorid = pub["id"];
     }
-    if (authorid != req.userid) {
-        await core.checkFacilitatorPermissionAsync(req, authorid);
+    if (authorid == req.userid) return; // ok, my content
+    
+    if (pub["kind"] == "comment") {
+        let rootpub = await tdliteComments.getRootPubAsync(req.rootPub);
+        if (rootpub && rootpub["kind"] == "group") {
+            if (rootpub["pub"]["userid"] == req.userid)
+                return; // OK, I can delete comments on my group
+        }
     }
+
+    await core.checkFacilitatorPermissionAsync(req, authorid);
 }
 
 function buildRecognizer(words:string[])

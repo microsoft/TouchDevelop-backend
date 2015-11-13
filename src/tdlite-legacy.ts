@@ -353,7 +353,8 @@ async function importHeaderAsync(v: WorkspaceEntry) {
             editorState = objs[2] || "";
         }
         else {
-            throw new Error("Blob not found: " + blobid)
+            logger.error("import blob not found: " + blobid);
+            return;
         }
     } else {
         script = decompress(v.PrivateCompressedScript)
@@ -391,8 +392,9 @@ async function importHeaderAsync(v: WorkspaceEntry) {
     }
 
     let res = await tdliteWorkspace.saveScriptAsync(userid, tdliteWorkspace.PubBody.createFromJson(body), toTime(v.LastUpdated)*1000);
-    if (res["error"])
-        throw new Error("save error: " + res["error"]);
+    if (res["error"]) {
+        logger.error("save error: " + res["error"]);        
+    }
 }
 
 export async function importWorkspaceAsync(userjson: IUser) {
