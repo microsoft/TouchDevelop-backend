@@ -112,6 +112,16 @@ export class LoginSession
         return true
     }
     
+    public fixupRedirectUrl(url:string)
+    {        
+        if (this.oauthClientId == "webapp3") {
+            // if the webapp supports this, use %23 instead of a second hash
+            // otherwise sign-in on iOS/Chrome doesn't work
+            url = url.replace(/#(.*)#/, (m, x) => "#" + x + "%23");
+        }
+        return url;
+    }
+    
     public async createUserIfNeededAsync(req: restify.Request): Promise<IUser>
     {
         if (this.userCreated()) {
@@ -140,21 +150,20 @@ export class LoginSession
         return userjs
     }
     
-    public async updateTermsVersionAsync(req:restify.Request, userjs:IUser)
-    {          
-        if (core.serviceSettings.termsversion != "") {
+    public async updateTermsVersionAsync(req: restify.Request, userjs: IUser) {
+        let ver = core.serviceSettings.termsversion || "default"
+        if (userjs.termsversion != ver) {
             userjs = await tdliteUsers.updateAsync(this.userid, async(entry1) => {
-                entry1.termsversion = core.serviceSettings.termsversion;
+                entry1.termsversion = ver;
+            });
+            await audit.logAsync(audit.buildAuditApiRequest(req), "user-agree", {
+                userid: this.userid,
+                subjectid: this.userid,
+                data: ver,
+                newvalue: userjs
             });
         }
-        await audit.logAsync(audit.buildAuditApiRequest(req), "user-agree", {
-            userid: this.userid,
-            subjectid: this.userid,
-            data: core.serviceSettings.termsversion || "default",
-            newvalue: userjs
-        });
-        
-        return userjs;        
+        return userjs;
     }
     
     public async saveAsync()
@@ -176,12 +185,13 @@ export class LoginSession
         if (tok.cookie != "") {
             redirectUrl = redirectUrl + "&td_cookie=" + tok.cookie;
         }
-        return redirectUrl;
+        return this.fixupRedirectUrl(redirectUrl);
     }
     
     public async accessTokenRedirectAsync(req:restify.Request)
     {
-        accessTokenRedirect(req.response, await this.generateRedirectUrlAsync());
+        let url = await this.generateRedirectUrlAsync();
+        accessTokenRedirect(req.response, url);
     }
 }
 
@@ -440,7 +450,7 @@ function wrapAccessTokenCookie(cookie: string): string
     return value;
 }
 
-async function getRedirectUrlAsync(user2: string, req: restify.Request) : Promise<string>
+async function getRedirectUrlAsync(user2: string, req: restify.Request, session: LoginSession) : Promise<string>
 {
     let url: string;
     let jsb = {};
@@ -452,6 +462,7 @@ async function getRedirectUrlAsync(user2: string, req: restify.Request) : Promis
         jsb["td_cookie"] = tok.cookie;
     }
     url = req.query()["redirect_uri"] + "#" + serverAuth.toQueryString(td.clone(jsb));
+    if (session) url = session.fixupRedirectUrl(url);
     return url;
 }
 
@@ -612,7 +623,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         else {
             await tdliteGroups.addUserToGroupAsync(user2, groupJson, (<core.ApiRequest>null));
         }
-        let redirectUri = await getRedirectUrlAsync(user2, req);
+        let redirectUri = await getRedirectUrlAsync(user2, req, session);
         await session.saveAsync();        
 
         let tok = stripCookie(redirectUri);
@@ -658,7 +669,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
                 else {
                     logger.tick("Login@code");
-                    accessTokenRedirect(res, await getRedirectUrlAsync(userJson["id"], req));
+                    accessTokenRedirect(res, await getRedirectUrlAsync(userJson["id"], req, session));
                 }
             }
             else if (kind == "activationcode") {
