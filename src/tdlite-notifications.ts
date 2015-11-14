@@ -171,10 +171,10 @@ export async function initAsync() : Promise<void>
         req5.rootId = "all";
         await getNotificationsAsync(req5, true);
     });
-    core.addRoute("POST", "*user", "notifications", async (req6: core.ApiRequest) => {
-        core.meOnly(req6);
-        if (req6.status == 200) {
-            let resQuery2 = notificationsTable.createQuery().partitionKeyIs(req6.rootId).top(1);
+    core.addRoute("POST", "*user", "notifications", async (req: core.ApiRequest) => {
+        core.meOnly(req);
+        if (req.status == 200) {
+            let resQuery2 = notificationsTable.createQuery().partitionKeyIs(req.rootId).top(1);
             let entities2 = await resQuery2.fetchPageAsync();
             let js = entities2.items[0];
             let topNot = "";
@@ -182,12 +182,12 @@ export async function initAsync() : Promise<void>
                 topNot = js["RowKey"];
             }
             let resp = {};
-            resp["lastNotificationId"] = orEmpty(req6.rootUser().lastNotificationId);
-            await tdliteUsers.updateAsync(req6.rootId, async (entry) => {
+            resp["lastNotificationId"] = orEmpty(req.rootUser().lastNotificationId);
+            await tdliteUsers.updateAsync(req.rootId, async (entry) => {
                 entry.lastNotificationId = topNot;
                 entry.notifications = 0;
             });
-            req6.response = td.clone(resp);
+            req.response = resp;
         }
     });
 }
