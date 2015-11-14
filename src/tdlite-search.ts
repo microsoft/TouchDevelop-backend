@@ -231,6 +231,7 @@ export async function initAsync() : Promise<void>
             badLogin: 0,
             picture: 0,
             noShield: 0,
+            emptyPerm: 0,
             safeArt: 0,
             unsafeArt: 0,
             unknownArt: 0,
@@ -240,6 +241,10 @@ export async function initAsync() : Promise<void>
             counters.total++;
             if (e["pub"] && e["pub"]["ishidden"])
                 counters.hidden++;
+            else if (e["kind"] == "user" && !e["permissions"]) {
+                counters.emptyPerm++;
+                counters[e["id"]] = "X";
+            }
             else if (/^code/.test(e["login"])) {
                 counters.loginCode++;
                 //logger.warning("logincode: " + e["id"])
