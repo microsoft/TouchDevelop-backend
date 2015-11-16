@@ -314,12 +314,15 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return result1;
             });
         }
+        else if (/\.browsers$/.test(fn)) {
+            res.redirect(httpCode._301MovedPermanently, "/app/browsers.html");
+        }
+        else if (/\.error$/.test(fn)) {
+            res.redirect(httpCode._301MovedPermanently, "/app/error.html");
+        }
         else if (fn == "error.html" || fn == "browsers.html") {
-            await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async (text2: string) => {
-                let result2: string;
-                text2 = td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
-                result2 = text2;
-                return result2;
+            await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async (text2: string) => {                
+                return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
         else {
