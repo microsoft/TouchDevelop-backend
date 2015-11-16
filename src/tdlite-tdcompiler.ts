@@ -40,6 +40,14 @@ export async function initAsync()
         }
     });
     
+    core.addRoute("GET", "*script", "webapp.js", async(req) => {
+        if (await core.throttleAsync(req, "webappjs", 10))
+            return;
+        let json = await queryCloudCompilerAsync("q/" + req.rootId + "/webapp");
+        req.response = json["compiled"];
+        req.responseContentType = "application/javascript";
+    });
+    
     // TODO this stuff should be migrated and done from here directly, not forwarded to noderunner
     core.addRoute("POST", "deploy", "*", async(req) => {
         if (!core.checkPermission(req, "azure-deploy")) return;

@@ -228,6 +228,71 @@ function looksLikeReleaseId(s: string) : boolean
     return b;
 }
 
+async function rewriteIndexAsync(rel: string, relid: string, text: string) {
+    let relpub = await core.getPointedPubAsync("rel-" + relid, "release");
+    let prel = PubRelease.createFromJson(relpub["pub"]);
+    let ccfg = clientConfigForRelease(prel);
+    ccfg.releaseLabel = rel;
+    let ver = orEmpty(relpub["pub"]["version"]);
+    let shortrelid = td.toString(relpub["id"]);
+    if (core.basicCreds == "") {
+        text = td.replaceAll(text, "data-manifest=\"\"", "manifest=\"app.manifest?releaseid=" + encodeURIComponent(rel) + "\"");
+    }
+    let suff = "?releaseid=" + encodeURIComponent(relid) + "\"";
+    text = td.replaceAll(text, "\"browsers.html\"", "\"/app/browsers.html" + suff);
+    text = td.replaceAll(text, "\"error.html\"", "\"/app/error.html" + suff);
+    text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
+    let verPref = "var tdVersion = \"" + ver + "\";\n" + "var tdConfig = " + JSON.stringify(ccfg.toJson(), null, 2) + ";\n";
+    text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
+    if (rel != "current") {
+        text = td.replaceAll(text, "betaFriendlyId = \"\"", "betaFriendlyId = \"beta " + withDefault(ver, relid.replace(/.*-/g, "")) + "\"");
+    }
+    return text;
+}
+
+export async function serveWebAppAsync(req: restify.Request, res: restify.Response): Promise<void> {
+    let rel = "cloud";
+    let entry = core.getSettings("releases");
+    let js = entry["ids"][rel];
+    let relid = js["releaseid"];
+
+    if (await core.throttleCoreAsync(core.sha256(req.remoteIp()) + ":webapp", 10)) {
+        res.sendError(httpCode._429TooManyRequests, "Too many web app reqs");
+        return;
+    }
+
+    let m = /^\/userapp\/([a-z]+)(=?)($|\?)/.exec(req.url())
+    if (!m) {
+        res.redirect(httpCode._302MovedTemporarily, "/invalid-webapp")
+        return;
+    }
+    let wid = m[1]
+
+    let scr = await core.getPubAsync(wid, "script");
+    if (!scr) {
+        res.redirect(httpCode._302MovedTemporarily, "/no-such-webapp")
+        return;
+    }
+    
+    if (!m[2]) {
+        let ujson = await core.pubsContainer.getAsync(scr["updateKey"])
+        let uid = ujson["scriptId"]
+        if (uid != scr["id"]) {
+            let uscr = await core.getPubAsync(uid, "script");
+            if (uscr && uscr["pub"]["time"] > scr["pub"]["time"])
+                scr = uscr;
+        }
+    }
+    
+    wid = scr["id"];
+
+    await rewriteAndCacheAsync(rel + "-" + wid, relid, "webapp.html", "text/html", res, async(text) => {
+        text = await rewriteIndexAsync(rel, relid, text);
+        text = text.replace("precompiled.js?a=", "/api/" + wid + "/webapp.js")
+        return text;
+    });
+}
+
 export async function serveReleaseAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
     let coll = (/^([^\?]+)(\?.*)$/.exec(req.url()) || []);
@@ -275,33 +340,8 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             res.sendText(s, "application/javascript");            
         }
         else if (fn == "") {
-            await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async (text: string) => {
-                let result: string;
-                let ver = "";
-                let shortrelid = "";
-                let relpub = await core.getPointedPubAsync("rel-" + relid, "release");
-                let prel = PubRelease.createFromJson(relpub["pub"]);
-                let ccfg = clientConfigForRelease(prel);
-                ccfg.releaseLabel = rel;
-                ver = orEmpty(relpub["pub"]["version"]);
-                shortrelid = relpub["id"];
-                if (core.basicCreds == "") {
-                    text = td.replaceAll(text, "data-manifest=\"\"", "manifest=\"app.manifest?releaseid=" + encodeURIComponent(rel) + "\"");
-                }
-                else if (false) {
-                    text = td.replaceAll(text, "data-manifest=\"\"", "manifest=\"app.manifest?releaseid=" + encodeURIComponent(rel) + "&anon_token=" + encodeURIComponent(core.basicCreds) + "\"");
-                }
-                let suff = "?releaseid=" + encodeURIComponent(relid) + "\"";
-                text = td.replaceAll(text, "\"browsers.html\"", "\"browsers.html" + suff);
-                text = td.replaceAll(text, "\"error.html\"", "\"error.html" + suff);                
-                text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
-                let verPref = "var tdVersion = \"" + ver + "\";\n" + "var tdConfig = " + JSON.stringify(ccfg.toJson(), null, 2) + ";\n";
-                text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
-                if (rel != "current") {
-                    text = td.replaceAll(text, "betaFriendlyId = \"\"", "betaFriendlyId = \"beta " + withDefault(ver, relid.replace(/.*-/g, "")) + "\"");
-                }
-                result = text;
-                return result;
+            await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async(text: string) => {
+                return await rewriteIndexAsync(rel, relid, text)
             });
         }
         else if (/\.manifest$/.test(fn)) {
