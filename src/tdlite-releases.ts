@@ -17,6 +17,7 @@ import * as core from "./tdlite-core"
 import * as audit from "./tdlite-audit"
 import * as tdliteTdCompiler from "./tdlite-tdcompiler"
 import * as tdlitePointers from "./tdlite-pointers"
+import * as tdliteUsers from "./tdlite-users"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -261,12 +262,14 @@ export async function serveWebAppAsync(req: restify.Request, res: restify.Respon
         return;
     }
 
-    let m = /^\/userapp\/([a-z]+)(=?)($|\?)/.exec(req.url())
+    let m = /^\/userapp\/(([^\/]*)\/)?([a-z]+)(=?)($|\?)/.exec(req.url())
     if (!m) {
         res.redirect(httpCode._302MovedTemporarily, "/invalid-webapp")
         return;
     }
-    let wid = m[1]
+    let usernameInUrl = m[2] || ""
+    let wid = m[3]
+    let eq = m[4]
 
     let scr = await core.getPubAsync(wid, "script");
     if (!scr) {
@@ -274,7 +277,21 @@ export async function serveWebAppAsync(req: restify.Request, res: restify.Respon
         return;
     }
     
-    if (!m[2]) {
+    let userjson = await tdliteUsers.getAsync(scr["pub"]["userid"]);
+    if (!userjson) {
+        // strange...
+        res.redirect(httpCode._302MovedTemporarily, "/no-such-webapp-user")
+        return;
+    }
+    
+    let uname = userjson.pub.name.replace(/[^A-Za-z0-9]/g, "") || "someone"
+    
+    if (usernameInUrl != uname) {
+        res.redirect(httpCode._302MovedTemporarily, "/userapp/" + uname + "/" + wid + eq)
+        return;        
+    }
+    
+    if (!eq) {
         let ujson = await core.pubsContainer.getAsync(scr["updateKey"])
         let uid = ujson["scriptId"]
         if (uid != scr["id"]) {
