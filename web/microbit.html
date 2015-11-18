@@ -16,22 +16,22 @@
         <div class='row'>
             <div class='col-md-12'>
                 <h2>
-                    TouchDevelop and the BBC micro:bit
+                    Touch Develop and the BBC micro:bit
                 </h2>
                 <p>
                     From its conception in 2011, the
-                    <a href="http://www.touchdevelop.com/">TouchDevelop</a>
+                    <a href="http://www.touchdevelop.com/">Touch Develop</a>
                     project has been about bringing the joy
                     of learning to program
                     modern devices such as smartphones and tablets, as well
 		    as laptops and desktops.
                 </p>
                 <div class="screenshot hidden-xs">
-                    <img src="/static/images/geqc.jpg" width="400" align="right" />
+                    <a href="https://www.youtube.com/playlist?list=PLE8XLCpSej07SC0CKPLsfhKNVelPXjBS4"><img src="/static/images/geqc.png" width="400" align="right" /></a>
                 </div>
-                <img class="center-block img-responsive visible-xs" src="/static/images/geqc.jpg" />
+                <a href="https://www.youtube.com/playlist?list=PLE8XLCpSej07SC0CKPLsfhKNVelPXjBS4"><img class="center-block img-responsive visible-xs" src="/static/images/geqc.png" /></a>
                 <p>
-                    <strong>The TouchDevelop team is proud to be part of the 
+                    <strong>The Touch Develop team is proud to be part of the 
                     <a href="http://www.bbc.co.uk/mediacentre/mediapacks/microbit" target="_blank">BBC
                     micro:bit</a> project.</strong>
                     The micro:bit is a small wearable and programmable
@@ -58,7 +58,7 @@
                     (3) materials and a platform to <b>support teachers</b> with the micro:bit in
                     their classrooms.
                  </p>
-                  <p>Read on to see how we have enhanced TouchDevelop
+                  <p>Read on to see how we have enhanced Touch Develop
                     and are working with
                     <a href="http://www.arm.com/" target="_blank">ARM</a>, 
                     <a href="http://www.lancaster.ac.uk/" target="_blank">
@@ -74,10 +74,10 @@
                     <div class='col-xs-12 col-sm-9 col-md-6'>
                         <h2>Languages, Editors, Compilers</h2>
                         <p>
-                            We extended TouchDevelop to support a <em>progression</em> of languages with accompanying browser-based editors.
+                            We extended Touch Develop to support a <em>progression</em> of languages with accompanying browser-based editors.
                             The <b>Block Editor</b> provides an introduction
                             to structured programming via blocks that can be
-                            snapped together. <b>TouchDevelop</b>
+                            snapped together. <b>Touch Develop</b>
                             introduces a statically-typed scripting language with
                             syntax-directed editor. 
                             <!--
@@ -89,29 +89,29 @@
                         <img class="img-responsive img-column" src="/static/images/qlgq.png" />
                 </div>
                         <p>
-                            Browser-based <b>compilers</b> from the Block Editor to TouchDevelop and from TouchDevelop to C++
+                            Browser-based <b>compilers</b> from the Block Editor to Touch Develop and from Touch Develop to C++
                             automate the transition from a visual language to a text-based language, and then to the
 			    language (C++) of the mbed-based micro:bit.
-                            The first compiler allows a student to convert a Block Editor script into a TouchDevelop script with
+                            The first compiler allows a student to convert a Block Editor script into a Touch Develop script with
                             a single press of a button.
                         </p>
                        
                     </div>
 
                     <div class='col-xs-12 col-sm-9 col-md-6'>
-                        <h2>Coding with TouchDevelop</h2>
+                        <h2>Coding with Touch Develop</h2>
                         <p>
                             To go from the world of browser-based scripting languages
                             to that of the micro:bit's
                             <a href="http://www.arm.com/products/processors/cortex-m/cortex-m0.php" target="_blank">
                                 ARM Cortex-M0 Processor
                             </a>,
-                            we defined a <b>subset of the TouchDevelop language</b> for programming the micro:bit.
-                            Here's an example of a TouchDevelop script that counts up as the user
+                            we defined a <b>subset of the Touch Develop language</b> for programming the micro:bit.
+                            Here's an example of a Touch Develop script that counts up as the user
                             presses the A button:
                             </p>
                 <div class='center-block'>
-                            <img class="img-responsive img-column" alt="TouchDevelop count program" src="/static/images/sgic.png" />
+                            <img class="img-responsive img-column" alt="Touch Develop count program" src="/static/images/sgic.png" />
                <!--             <img src="thinking.jpg" width="100" /> -->
 		</div>
                             <p>
@@ -137,32 +137,24 @@
                         Compile and Flash
                     </h2>                    
                     <p>
-                        When a student has her TouchDevelop script <img src="/static/images/seie.png" class="img-counter"/> ready,
+                        When a student has her Touch Develop script ready (1),
                         she can connect her micro:bit to a computer via a
                         USB cable, so it appears as a mounted drive.
 		    </p><p>
-                        Compilation from TouchDevelop to the micro:bit proceeds into two steps.
-                        The first step (Compiler 1)
-                        compiles the TouchDevelop script to a C++ program <img src="/static/images/enmn.png" class="img-counter"/>, in the web browser.
+                        Compilation from Touch Develop to the ARM thumb machine code  happens in the browser (2). 
+                        <a href="https://www.touchdevelop.com/docs/touch-develop-in-208-bits" >Read more</a> about the details of building an javascript-based ARM assembler.
 				    </p><p>
-                        This C++ program then is sent to ARM's mbed compiler service where the
-                        second compilation step (Compiler 2) takes place,
-                        compiling the C++ program into
-                        an ARM binary program <img alt="number 3" src="/static/images/yvco.png" class="img-counter"/>,
-                        which is sent back to the web browser.
-	            </p><p>
                         The student is prompted to save the ARM binary program
                         to a file, which she then
                         simply drags to the micro:bit mounted drive, which
                         flashes the micro:bit device 
-			<img alt="number 4" src="/static/images/amgj.png" class="img-counter" />
-			with the new program.
+			with the new program (3).
                     </p>                    
                 </div>
 
                 <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
 		  <div class='center-block'>
-                    <img class="img-responsive img-column" alt="compilation toolchain" src="/static/images/aaat.png" /> 
+                    <img class="img-responsive img-column" alt="compilation toolchain" src="/static/images/aaat2.png" /> 
 		  </div>
                 </div>
 
@@ -174,7 +166,7 @@
                 <h2>Simulator: Test Your Code</h2>
                 <p>
                     Before a student compiles her script for the micro:bit,
-                    she can run it using the <b>TouchDevelop micro:bit simulator</b>,
+                    she can run it using the <b>Touch Develop micro:bit simulator</b>,
                     all within the confines of a web browser. The simulator
                     has support for the LED screen, buttons, as well as
                     compass, accelerometer, and digital I/O pins.
@@ -184,14 +176,14 @@
                   <img src="/static/images/aakr.png" width="100" />
                 </div>
                 <p>
-                    To run a student's TouchDevelop script in the web browser,
-                    TouchDevelop compiles it into JavaScript,
+                    To run a student's Touch Develop script in the web browser,
+                    Touch Develop compiles it into JavaScript,
                     the scripting language built into all web browsers.
                 </p>
             </div>
 
             <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
-                <h2>C++ and TouchDevelop Libraries</h2>
+                <h2>C++ and Touch Develop Libraries</h2>
                 <p>
                     The <b>C++ micro:bit library</b>, created at
                     <a href="http://www.lancaster.ac.uk/" target="_blank">
@@ -200,17 +192,17 @@
                     of the micro:bit, as well as a set of helper
                     functions (such as displaying a number/image/string
                     on the LED screen).
-                    The <b>TouchDevelop micro:bit library</b> mirrors the
+                    The <b>Touch Develop micro:bit library</b> mirrors the
                     functions of the C++ library.
-                    When a TouchDevelop script is compiled to C++,
-                    the calls to TouchDevelop micro:bit functions
+                    When a Touch Develop script is compiled to C++,
+                    the calls to Touch Develop micro:bit functions
                     are replaced with calls to the corresponding C++ functions.
                 </p>
                 <div class='center-block'>
                 <img class="img-responsive img-column" src="/static/images/wdgn.png" width="450"/>
                 </div>
                     Above, see the mapping from
-                    the TouchDevelop "show number" function to its corresponding the C++ function. 
+                    the Touch Develop "show number" function to its corresponding the C++ function. 
             </div>
 
         </div>
@@ -221,15 +213,15 @@
 		<p>
                     In addition to the technology stack described above,
                     we also provide in-depth online resources for
-                    the Block Editor, TouchDevelop, the TouchDevelop micro:bit library,
-                    and other TouchDevelop resources.
-                    The TouchDevelop authoring experience allows for "literate
+                    the Block Editor, Touch Develop, the Touch Develop micro:bit library,
+                    and other Touch Develop resources.
+                    The Touch Develop authoring experience allows for "literate
                     programming" and the generation of HTML pages and tutorials that
                     contain example code fragments. 
 		 </p><p>
 		    Working with master teachers from
                     <a href="http://www.computingatschool.org.uk/" target="_blank">Computing at Schools</a> (CAS),
-		    we will create micro:bit activities using TouchDevelop,
+		    we will create micro:bit activities using Touch Develop,
 		    mapped to the UK CS curriculum for year 7 students.
 		  </p>
                 </div>
@@ -237,7 +229,7 @@
                 <div class='col-xs-12 col-sm-9 col-md-6 tech-box'>
                     <h2>Events</h2>
 		    <p>
-		      The TouchDevelop team has run learning events for many years and
+		      The Touch Develop team has run learning events for many years and
 		      already has engaged in the UK, running micro:bit workshops at the
 		      2015 CAS conference.   We will be part of the BBC's
 		      <a href="http://www.bbc.co.uk/programmes/articles/1n782BnBGChcwqW45FBmgFB/make-it-digital-tour" target="_blank" >Make It Digital Tour</a>,
