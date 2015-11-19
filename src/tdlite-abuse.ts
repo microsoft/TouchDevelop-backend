@@ -179,7 +179,14 @@ export async function initAsync() : Promise<void>
                 req.status = httpCode._402PaymentRequired;
                 return;
             }
-            await core.pubsContainer.updateAsync(req.rootId, async (entry1: JsonBuilder) => {
+            if (res == "ignored")
+                logger.tick("AbuseSet@ignored")
+            else if (res == "active")
+                logger.tick("AbuseSet@active")
+            else
+                logger.tick("AbuseSet@other");
+
+            await core.pubsContainer.updateAsync(req.rootId, async(entry1: JsonBuilder) => {
                 core.setFields(entry1["pub"], req.body, ["resolution"]);
             });
             await core.pubsContainer.updateAsync(pub["publicationid"], async (entry2: JsonBuilder) => {
@@ -295,6 +302,7 @@ async function deletePubRecAsync(delEntry: JsonObject) : Promise<void>
                 await core.pubsContainer.updateAsync(json1["id"], async (entry2: JsonBuilder) => {
                     entry2["pub"]["resolution"] = "deleted";
                 });
+                logger.tick("AbuseSet@deleted")
             });
 
         }
