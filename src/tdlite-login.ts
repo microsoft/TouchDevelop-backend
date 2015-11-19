@@ -360,18 +360,17 @@ export async function initAsync(): Promise<void> {
         let _new = "<p>Your access token is below. Only paste in applications you absolutely trust.</p>\n<pre id=\"token\">\nloading...\n</pre>\n<p>You could have added <code>?u=xyzw</code> to get access token for a different user (given the right permissions).\n</p>\n<script>\nsetTimeout(function() {\nvar h = document.location.href.replace(/oauth\\/gettoken.*access_token/, \"?access_token\").replace(/&.*/, \"\");\ndocument.getElementById(\"token\").textContent = h;\n}, 100)\n</script>";
         res4.html(td.replaceAll(td.replaceAll(template_html, "@JS@", ""), "@BODY@", _new));
     });
+    
+    core.addRoute("POST", "*user", "logout", async(req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "root")) return;
+        await logoutEverywhereAsync(req.rootId);
+        req.response = {};
+    })
 
     core.addRoute("POST", "logout", "", async(req3: core.ApiRequest) => {
         if (req3.userid != "") {
             if (core.orFalse(req3.body["everywhere"])) {
-                let entities = await tokensTable.createQuery().partitionKeyIs(req3.userid).fetchAllAsync();
-                await parallel.forAsync(entities.length, async(x: number) => {
-                    let json = entities[x];
-                    // TODO: filter out reason=admin?
-                    let token = core.Token.createFromJson(json);
-                    await tokensTable.deleteEntityAsync(token.toJson());
-                    await core.redisClient.setpxAsync("tok:" + tokenString(token), "", 500);
-                });
+                await logoutEverywhereAsync(req3.userid);
             }
             else {
                 await tokensTable.deleteEntityAsync(req3.userinfo.token.toJson());
@@ -407,6 +406,17 @@ export async function initAsync(): Promise<void> {
             resp["token"] = tok.url;
             req7.response = td.clone(resp);
         }
+    });
+}
+
+async function logoutEverywhereAsync(uid:string) {
+    let entities = await tokensTable.createQuery().partitionKeyIs(uid).fetchAllAsync();
+    await parallel.forAsync(entities.length, async(x: number) => {
+        let json = entities[x];
+        // TODO: filter out reason=admin?
+        let token = core.Token.createFromJson(json);
+        await tokensTable.deleteEntityAsync(token.toJson());
+        await core.redisClient.setpxAsync("tok:" + tokenString(token), "", 500);
     });
 }
 
