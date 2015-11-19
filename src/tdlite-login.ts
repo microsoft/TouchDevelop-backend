@@ -768,7 +768,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             if (!session.termsOk) {
                 inner = "agree";
             }
-            else if (!core.fullTD && !session.userCreated() && !session.nickname && tdlitePointers.templateSuffix) {
+            else if (!core.fullTD && !session.userCreated() && !session.nickname) {
                 inner = "newadult";
                 params["EXAMPLES"] = "";
                 params["SESSION"] = session.state;
