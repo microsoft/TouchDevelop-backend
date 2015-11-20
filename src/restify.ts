@@ -691,9 +691,16 @@ function initProxy(logger:td.AppLogger) : void
     var server = restify.createServer()
     rootRestifyApp = new Server()
     rootRestifyApp.handle = server
-
-    server.use(restify.acceptParser(server.acceptable));
     
+    // hack for NPM
+    server.use(function(req, res, next) {
+        if (/application\/x-tar/.test(req.header('accept'))) {
+            delete req.headers['accept'];
+        }
+        next();
+    });
+    
+    server.use(restify.acceptParser(server.acceptable));
     
     server.on("uncaughtException", (req, res, route, e) => {
         restifyErrorResponse(e, req, res, route)
