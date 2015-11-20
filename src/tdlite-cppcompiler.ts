@@ -109,6 +109,11 @@ export async function initAsync()
             req9.response = response2.contentAsJson();
         }
     });
+    
+    core.addRoute("POST", "compile", "extension", async(req) => {
+        if (!core.checkPermission(req, "root")) return;
+        await mbedCompileExtAsync(req);
+    }, { noSizeCheck: true })
 }
 
 
@@ -246,6 +251,99 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
+interface CompileExtReq {
+    config: string;
+    tag: string;
+    replaceFiles: {};
+}
+
+async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
+    let buf = new Buffer(req.body["data"], "base64")
+    // the request is base64 encoded in data field to avoid any issues with sha256 client-side computation yielding different results    
+    let sha = td.sha256(buf)
+    
+    if (buf.length > 200000) {
+        req.status = httpCode._413RequestEntityTooLarge;
+        return;
+    }
+
+    let hexurl = compileContainer.url() + "/" + sha + ".hex";
+    let info = await compileContainer.getBlobToTextAsync(sha + ".hex");
+    if (info.succeded()) {
+        // the client should have come here themselves...
+        req.response = { ready: true, hex: hexurl }
+        return;
+    }
+
+    let compileReq: CompileExtReq = JSON.parse(buf.toString("utf8"))
+
+    let cfg = core.getSettings("compile");
+
+    if (cfg[compileReq.config] == null) {
+        logger.info("compile config doesn't exists: " + compileReq.config)
+        req.status = httpCode._412PreconditionFailed;
+    }
+    else {
+        await core.throttleAsync(req, "compile", 50);
+
+        if (req.status != 200) return;
+
+        let ccfg = CompilerConfig.createFromJson(cfg[compileReq.config]);
+        if (!ccfg.repourl) {
+            req.status = httpCode._404NotFound;
+            return;
+        }
+        
+        let tag = orEmpty(compileReq.tag)
+       
+       
+        ccfg.hexfilename = "";
+        if (orEmpty(ccfg.internalUrl) != "" || !ccfg.target_binary) {
+            req.status = httpCode._404NotFound;
+            return;
+        }
+        if (/^[\w.\-]+$/.test(tag)) {
+            ccfg.repourl = ccfg.repourl.replace(/#.*/g, "#" + compileReq.tag);
+        } else {
+            req.status = httpCode._400BadRequest;
+            return;            
+        }
+        
+        let metaUrl = ccfg.repourl
+            .replace(/^https:\/\/github.com/, "https://raw.githubusercontent.com")
+            .replace(/\.git#.*/, "/" + tag + "/generated/metainfo.json")
+        
+        logger.debug("download metainfo: " + metaUrl)
+        let resp = await td.createRequest(metaUrl).sendAsync();
+        if (resp.statusCode() != 200) {
+            req.status = httpCode._412PreconditionFailed;
+            return;
+        }
+        
+        let result2 = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "-metainfo.json", resp.contentAsBuffer(), {
+            contentType: "application/json; charset=utf-8",
+            smartGzip: true
+        });
+
+        logger.debug("compile at " + ccfg.repourl);
+        let compile = mbedworkshopCompiler.createCompilation(ccfg.platform, ccfg.repourl, ccfg.target_binary);
+        compile.replaceFiles = compileReq.replaceFiles;
+
+        let started = await compile.startAsync();
+        if (!started) {
+            logger.tick("MbedWsCompileStartFailed");
+            req.status = httpCode._424FailedDependency;
+        }
+        else {
+            /* async */ mbedwsDownloadAsync(sha, compile, ccfg);
+            req.response = {
+                ready: false,
+                hex: hexurl
+            }
+        }
+    }
+}
+
 async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.CompilationRequest, ccfg: CompilerConfig) : Promise<void>
 {
     logger.newContext();
@@ -263,8 +361,12 @@ async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.Co
             logger.tick("MbedEmptyDownload");
         }
         else {
-            st.hexurl = compileContainer.url() + "/" + sha + "/" + ccfg.hexfilename;
-            let result = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "/" + ccfg.hexfilename, bytes, {
+            let hexname = sha + "/" + ccfg.hexfilename;
+            if (!ccfg.hexfilename)
+                hexname = sha + ".hex";    
+            st.hexurl = compileContainer.url() + "/" + hexname;
+                
+            let result = await compileContainer.createGzippedBlockBlobFromBufferAsync(hexname, bytes, {
                 contentType: ccfg.hexcontenttype
             });
             logger.tick("MbedHexCreated");
@@ -282,9 +384,11 @@ async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.Co
             core.withDefault(payload.result ? payload.result.exception : null, "Cannot find exception")
                 .replace(/(\\r)?\\n/g, "\n")
                 .replace(/['"], ["']/g, "\n"),                
-            JSON.stringify(payload, null, 1),
-            compile.replaceFiles["/source/main.cpp"]            
+            JSON.stringify(payload, null, 1)            
         ];
+        for (let k of Object.keys(compile.replaceFiles)) {
+            err.bugAttachments.push(k + ":\n" + compile.replaceFiles[k])
+        }        
         st.mbedresponse = { result: { exception: "ReportID: " + st.bugReportId }}
     }
     
