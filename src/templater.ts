@@ -128,7 +128,7 @@ async function uploadArtAsync(fn:string):Promise<string>
         content: buf.toString("base64"),
         contentType: contentType,
         description: "#template",
-        name: fn        
+        name: fn.replace(/.*\//, "")       
     })  
     req.setMethod("post")
     let resp = await req.sendAsync();
