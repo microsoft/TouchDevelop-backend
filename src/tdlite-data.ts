@@ -112,3 +112,32 @@ export var artContentTypes: td.SMap<string> =
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
     };
+
+export var tdLegacyKinds: td.SMap<number> = {
+      "board":1, "boardbackgroundlayer":1, "boolean":1, "box":1, "camera":1,
+      "clouddata":1, "cloudsession":1, "gamepad":1, "invalid":1, "location":1,
+      "number":1, "page":1, "ref":1, "senses":1, "spriteanimation":1,
+      "string":1, "textbox":1, "tiles":1, "action":1, "action1":1, "app":1,
+      "appenv":1, "applogger":1, "appointment":1, "atomicaction":1,
+      "atomicaction1":1, "bazaar":1, "bits":1, "bluetoothdevice":1,
+      "booleanaction":1, "buffer":1, "cloudpicture":1, "cloudstorage":1,
+      "collection":1, "collectionmessageaction":1, "collections":1, "color":1,
+      "colors":1, "comparison":1, "contact":1, "contract":1, "converter":1,
+      "create":1, "datetime":1, "device":1, "docs":1, "document":1, "dom":1,
+      "editor":1, "eventbinding":1, "formbuilder":1, "home":1, "jsonaction":1,
+      "jsonbuilder":1, "jsonobject":1, "languages":1, "link":1, "locations":1,
+      "map":1, "mappushpin":1, "maps":1, "math":1, "matrix":1, "media":1,
+      "medialink":1, "mediaplayer":1, "mediaserver":1, "message":1, "motion":1,
+      "numberaction":1, "numberconverter":1, "numbermap":1, "oauthresponse":1,
+      "obstacle":1, "pagebutton":1, "phone":1, "picture":1, "picturealbum":1,
+      "picturealbums":1, "pictures":1, "place":1, "player":1, "playlist":1,
+      "playlists":1, "positionaction":1, "predicate":1, "printer":1, "radio":1,
+      "serverrequest":1, "serverresponse":1, "social":1, "song":1,
+      "songalbum":1, "songalbums":1, "songs":1, "sound":1, "spring":1,
+      "sprite":1, "spriteaction":1, "spriteset":1, "spritesetaction":1,
+      "stringconverter":1, "stringmap":1, "tags":1, "task":1, "textaction":1,
+      "tile":1, "time":1, "timer":1, "tutorial":1, "unknown":1, "user":1,
+      "vectoraction":1, "vector3":1, "wall":1, "web":1, "webeventsource":1,
+      "webrequest":1, "webresponse":1, "webresponseaction":1, "websocket":1,
+      "websocketmessage":1, "xmlobject":1
+}

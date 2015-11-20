@@ -20,6 +20,7 @@ import * as search from "./tdlite-search"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteTdCompiler from "./tdlite-tdcompiler"
 import * as tdliteDocs from "./tdlite-docs"
+import * as tdliteData from "./tdlite-data"
 import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteArt from "./tdlite-art"
 import * as tdliteUsers from "./tdlite-users"
@@ -619,6 +620,23 @@ interface CachedPage {
     expiration: number;
 }
 
+function legacyKindPrefix(name: string)
+{
+    name = name.replace(/^docs\//, "").toLowerCase();
+    
+    if (tdliteData.tdLegacyKinds.hasOwnProperty(name))
+        return null;
+
+    let len = Math.min(25, name.length)
+    while (len > 0) {        
+        let sl = name.slice(0, len);
+        if (tdliteData.tdLegacyKinds.hasOwnProperty(sl))
+            return sl;
+        len--;
+    }
+    return null;
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
     let lang = await handleLanguageAsync(req);
@@ -667,6 +685,10 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             else if (core.fullTD && fn.startsWith("blog/")) {
                 v.redirect = fn.replace(/^blog/, "/docs")
             }
+            else if (core.fullTD && fn.startsWith("docs/") && legacyKindPrefix(fn)) {
+                let pref = legacyKindPrefix(fn);
+                v.redirect = "/docs/" + pref + "#" + fn.slice(5 + pref.length)
+            }    
             else if (td.startsWith(fn, "preview/")) {
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
                 await renderFinalAsync(pubdata, v, lang);
