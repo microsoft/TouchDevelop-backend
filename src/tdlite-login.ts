@@ -405,7 +405,7 @@ export async function initAsync(): Promise<void> {
                 req7.headers["Set-Cookie"] = wrapAccessTokenCookie(tok.cookie);
             }
             else {
-                assert(false, "no cookie in token");
+                assert(clientId == "no-cookie", "no cookie in token");
             }
             await audit.logAsync(req7, "signin-as", {
                 data: core.sha256(tok.url).substr(0, 10)
