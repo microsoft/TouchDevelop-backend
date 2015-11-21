@@ -55,6 +55,20 @@ export class PubPointer
     static createFromJson(o:JsonObject) { let r = new PubPointer(); r.fromJson(o); return r; }
 }
 
+export async function reindexStoreAsync(req: core.ApiRequest, store: indexedStore.Store, processOneAsync: td.Action1<{}>) {
+    if (!core.checkPermission(req, "operator")) return;
+    let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
+    let resp = {
+        continuation: lst.continuation,
+        itemCount: lst.items.length,
+        itemsReindexed: 0
+    }
+    await parallel.forJsonAsync(lst.items, async(e) => {
+        await processOneAsync(e);
+    }, 20)
+    req.response = resp;
+}
+
 export async function initAsync() : Promise<void>
 {
     deployChannels = withDefault(td.serverSetting("CHANNELS", false), core.myChannel).split(",");
@@ -75,11 +89,17 @@ export async function initAsync() : Promise<void>
             coll.push(ptr);
         }
         fetchResult.items = td.arrayToJson(coll);
-    },
-    {
+    }, {
         byUserid: true,
         anonSearch: true
     });
+
+    await pointers.createIndexAsync("rootns", entry => orEmpty(entry["id"]).replace(/^ptr-/, "").replace(/-.*/, ""));
+    
+    core.addRoute("GET", "pointers", "*", async(req) => {
+        await core.anyListAsync(pointers, req, "rootns", req.verb);    
+    })
+    
     core.addRoute("GET", "*script", "cardinfo", async (req14: core.ApiRequest) => {
         let jsb1 = await getCardInfoAsync(req14, req14.rootPub);
         req14.response = td.clone(jsb1);
@@ -176,19 +196,22 @@ export async function initAsync() : Promise<void>
         if (req2.status == 200) {
             /* async */ pointers.getIndex("all").forAllBatchedAsync("all", 50, async (json) => {
                 await parallel.forJsonAsync(json, async (json1: JsonObject) => {
-                    let ref = {}
-                    await pointers.container.updateAsync(json1["id"], async (entry1: JsonBuilder) => {
-                        await setPointerPropsAsync(core.adminRequest, entry1, ({}));
-                        ref = td.clone(entry1);
-                    });
-                    await audit.logAsync(req2, "reindex-ptr", {
-                        oldvalue: json1,
-                        newvalue: ref
-                    });
                 });
             });
             req2.response = ({});
         }
+    });
+    
+    core.addRoute("POST", "pointers", "reindex", async(req: core.ApiRequest) => {
+        await reindexStoreAsync(req, pointers, async(ptr) => {
+            let refx = await pointers.reindexAsync(ptr["id"], async(entry1: JsonBuilder) => {
+                await setPointerPropsAsync(core.adminRequest, entry1, {});
+            }, true);
+            await audit.logAsync(req, "reindex-ptr", {
+                oldvalue: ptr,
+                newvalue: refx
+            });
+        });
     });
     
     restify.server().get("/:userid/oauth", async(req, res) => {
