@@ -450,6 +450,13 @@ export function randomUint32():number
     return (b[0] | (b[1]<<8) | (b[2]<<16) | ((b[3]<<24) >>> 0)) >>> 0
 }
 
+export function strcmp(a: string, b: string)
+{
+    if (a == b) return 0;
+    if (a < b) return -1;
+    return 1;
+}
+
 export function sha256(b:Buffer):string
 {
     let h = crypto.createHash('sha256')

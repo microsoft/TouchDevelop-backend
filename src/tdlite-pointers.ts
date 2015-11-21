@@ -100,6 +100,41 @@ export async function initAsync() : Promise<void>
         await core.anyListAsync(pointers, req, "rootns", req.verb);    
     })
     
+    core.addRoute("GET", "pointers", "doctoc", async(req) => {
+        let lst = await pointers.getIndex("rootns").fetchAllAsync("docs");        
+        lst = lst.filter(e => !!e["pub"]["scriptid"])
+        let tot = 0
+        let totC = 0
+        for (let e of lst) {
+            e["children"] = [];
+            e["orphan"] = true;
+            e["pub"]["path"] = e["pub"]["path"].replace(/^\/+/, ""); 
+            tot++;
+        }
+        let byPath = td.toDictionary(lst, e => e["pub"]["path"])        
+        for (let e of lst) {
+            let pub = e["pub"]
+            let par = pub["parentpath"] 
+            if (par != pub["path"] && par && byPath.hasOwnProperty(par)) {
+                byPath[par]["children"].push(e)
+                e["orphan"] = false;
+                totC++
+            }
+        }
+        let res = `tot:${tot}, ch:${totC}\n`
+        let num = 0
+        let dumpList = (ind: string, ee: {}[]) => {
+            if (num++ > 1000) return; 
+            ee.sort((a, b) => td.strcmp(a["id"], b["id"]))
+            for (let e of ee) {
+                res += ind + e["pub"]["scriptname"] + " /" + e["pub"]["path"] + "\n"
+                dumpList(ind + "    ", e["children"])
+            }
+        }
+        dumpList("", lst.filter(e => e["orphan"]))        
+        req.response = res;
+    })
+    
     core.addRoute("GET", "*script", "cardinfo", async (req14: core.ApiRequest) => {
         let jsb1 = await getCardInfoAsync(req14, req14.rootPub);
         req14.response = td.clone(jsb1);
