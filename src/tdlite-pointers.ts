@@ -229,7 +229,7 @@ async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body:
             pub[k] = empty[k];
         }
     }
-    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid", "customtick"]);
+    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid", "customtick", "path"]);
     pub["parentpath"] = "";
     pub["scriptname"] = "";
     pub["scriptdescription"] = "";
