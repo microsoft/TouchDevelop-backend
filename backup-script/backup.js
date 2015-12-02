@@ -597,8 +597,13 @@ function backupTable(st, cb) {
               st.bufSize += JSON.stringify(e).length + 10
 
               if (st.workspace && e.currentBlob) {
+                  if (/^-/.test(e.currentBlob))
+                      return;
                   var m = /^\d+\.([a-z]+)\..*$/.exec(e.currentBlob)
-                  if(!m)log("bad blob " + e.currentBlob)
+                  if(!m){
+                      log("bad blob " + e.currentBlob)
+                      return;
+                  }
                   var uid = m[1]
                   var id = uid.charCodeAt(uid.length - 1) % numWorkspaces
                   st.workspace[id][e.currentBlob] = 1
