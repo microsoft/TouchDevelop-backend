@@ -92,7 +92,7 @@ export async function initAsync() : Promise<void>
     });
     core.addRoute("POST", "groups", "", async (req: core.ApiRequest) => {
         await core.canPostAsync(req, "group");
-        if (req.status == 200) {
+        if (!core.fullTD && req.status == 200) {
             let js2 = req.userinfo.json["settings"];
             if ( ! js2["emailverified"]) {
                 req.status = httpCode._405MethodNotAllowed;

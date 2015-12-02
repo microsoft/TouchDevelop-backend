@@ -464,7 +464,7 @@ export async function createContainerAsync(name: string, options: ICreateOptions
         container.blob = await options.blobService.createContainerIfNotExistsAsync(name, options.access);
     }
     container.cacheEnabled = ! options.noCache;
-    container.cacheValidity = options.redisCacheSeconds || 0;
+    container.cacheValidity = options.redisCacheSeconds || 7200;
     options.inMemoryCacheSeconds = options.inMemoryCacheSeconds || 0;
     if (options.inMemoryCacheSeconds > 0) {
         container.memCacheValidity = options.inMemoryCacheSeconds * 1000;
