@@ -438,6 +438,19 @@ function buildRecognizer(words:string[])
     return root
 }
 
+function unescapeCode(text: string)
+{
+    if (/^</.test(text)) {
+        // XML
+        text = text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    } else {
+        // JavaScript-like
+        text = text.replace(/\\u([a-fA-F0-9]{4})/g, (m, n) => String.fromCharCode(parseInt(n, 16)));
+        text = text.replace(/\\[rnt]/g, m => m + " ");
+    }
+    return text;
+}
+
 function scanCore(tree: {}, str: string) {
     let hits: string[] = []
     let issep = c => /^[^a-z0-9]$/.test(c);
@@ -467,7 +480,7 @@ function initScanner() {
     scannerRegexes = {}
     let reg = sett["regexps"]
     for (let rxname of Object.keys(reg)) {
-        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b");        
+        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b", "g");        
     }
 }
 
@@ -475,6 +488,8 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     let res = ""
 
     initScanner();
+    
+    txt = unescapeCode(txt);
 
     let hits = scanCore(wordRecognizer, txt);
 
@@ -487,10 +502,10 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     } else {
         for (let rxname of Object.keys(scannerRegexes)) {
             if (rxname.endsWith("*") && !isdesc) continue;
-            let m = scannerRegexes[rxname].exec(txt)
-            if (m) {
-                res += rxname + ": " + m[0] + ".\n"
-            }
+            let dummy = txt.replace(scannerRegexes[rxname], m => {
+                res += rxname + ": " + m + ".\n"
+                return "";
+            })
         }
     }
 
@@ -514,9 +529,11 @@ export async function postAcsReport(pubid: string, msg: string, acsInfo:string =
     }
 }
 
-export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: core.IUser) {
-    let msg = scanText(body, core.hasPermission(userjson, "external-links"), false);
-    msg += scanText(desc, core.hasPermission(userjson, "external-links"), true);
+export async function scanAndPostAsync(pubid: string, body: string, desc: string, userjson: core.IUser) {
+    let canemail = core.hasPermission(userjson, "external-links");
+    canemail = false;
+    let msg = scanText(body, canemail, false);
+    msg += scanText(desc, canemail, true);
     if (msg) {
         await postAcsReport(pubid, msg);
     }    
