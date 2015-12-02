@@ -319,6 +319,7 @@ async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promis
         let pub = req.rootPub["pub"];
         report.publicationname = orEmpty(pub["name"]);
         report.publicationuserid = getAuthor(pub);
+        let authorjs = await tdliteUsers.getAsync(report.publicationuserid);
         let jsb = {};
         jsb["pub"] = report.toJson();
         if (acsInfo)
@@ -326,7 +327,7 @@ async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promis
         await core.generateIdAsync(jsb, 10);
         await abuseReports.insertAsync(jsb);
         await core.pubsContainer.updateAsync(report.publicationid, async (entry: JsonBuilder) => {
-            if (! entry["abuseStatus"]) {
+            if (!core.hasPermission(authorjs, "root-ptr") && !entry["abuseStatus"]) {
                 entry["abuseStatus"] = "active";
             }
             entry["abuseStatusPosted"] = "active";
