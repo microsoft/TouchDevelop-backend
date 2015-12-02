@@ -209,7 +209,7 @@ export async function initAsync(): Promise<void> {
 
     core.addRoute("GET", "language", "touchdevelop.tgz", async(req: core.ApiRequest) => {
         let r = core.getSettings("releases")["ids"] || {}
-        let labl = <IReleaseLabel>r["current"]
+        let labl = <IReleaseLabel>r["cloud"]
         if (labl) {
             req.status = httpCode._302MovedTemporarily;
             req.headers = {

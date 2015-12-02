@@ -16,6 +16,7 @@ import * as search from "./tdlite-search"
 import * as cron from "./cron"
 import * as tdliteGroups from "./tdlite-groups"
 import * as indexedStore from "./indexed-store"
+import * as tdlitePointers from "./tdlite-pointers"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -100,20 +101,12 @@ export async function initAsync() : Promise<void>
         req.response = await importGroupMembers(req.rootPub); 
     })
     
-    core.addRoute("POST", "groups", "reimportmembers", async (req: core.ApiRequest) => {
-        if (!core.checkPermission(req, "operator")) return;
+    core.addRoute("POST", "groups", "reimportmembers", async(req: core.ApiRequest) => {
         let store = indexedStore.storeByKind("group");
-        let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
-        let resp = {
-            continuation: lst.continuation,
-            itemCount: lst.items.length,
-            itemsReindexed: 0
-        }
-        await parallel.forJsonAsync(lst.items, async(v) => {
+        await tdlitePointers.reindexStoreAsync(req, store, async(v)=>{
             let lst = await importGroupMembers(v);
-            resp.itemsReindexed += lst.length; 
-        }, 20)
-        req.response = resp;
+            req.response["itemsReindexed"] += lst.length; 
+        })        
     });
 
     core.addRoute("POST", "importsync", "", async(req: core.ApiRequest) => {

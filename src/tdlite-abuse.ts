@@ -18,6 +18,7 @@ import * as notifications from "./tdlite-notifications"
 import * as tdliteReviews from "./tdlite-reviews"
 import * as tdliteUsers from "./tdlite-users"
 import * as tdliteComments from "./tdlite-comments"
+import * as tdlitePointers from "./tdlite-pointers"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -136,16 +137,9 @@ export async function initAsync() : Promise<void>
         await core.anyListAsync(abuseReports, req, "publicationuserid", req.rootId);
     });
     
-    core.addRoute("POST", "art", "reshield", async (req: core.ApiRequest) => {
-        if (!core.checkPermission(req, "operator")) return;
+    core.addRoute("POST", "art", "reshield", async(req: core.ApiRequest) => {
         let store = indexedStore.storeByKind("art");
-        let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
-        let resp = {
-            continuation: lst.continuation,
-            itemCount: lst.items.length,
-            itemsReindexed: 0
-        }
-        await parallel.forJsonAsync(lst.items, async(e) => {
+        await tdlitePointers.reindexStoreAsync(req, store, async(e) => {
             if (e["arttype"] != "picture") return;
             
             let sh = e["shieldinfo"]
@@ -153,7 +147,7 @@ export async function initAsync() : Promise<void>
                 if (sh["acssafe"] == "1" || sh["webpurifysafe"] == "1") {
                     // OK
                 } else if (sh["acssafe"] == "0") {
-                    resp.itemsReindexed++;
+                    req.response["itemsReindexed"]++;
                     let jobid = sh["acsjobid"] || ""
                     await postAcsReport(e["id"], "Legacy ACS flag. " + jobid, jobid)                    
                 } else {
@@ -164,8 +158,7 @@ export async function initAsync() : Promise<void>
             if (!sh) {
                 // TODO rescan ...
             }            
-        }, 20)
-        req.response = resp;
+        })
     });
 
     core.addRoute("POST", "*abusereport", "", async (req: core.ApiRequest) => {

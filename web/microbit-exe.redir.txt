@@ -1,1 +1,1 @@
-/static/uploader/Microsoft.Uploader.exe
+/static/uploader/Microbit.Uploader.exe

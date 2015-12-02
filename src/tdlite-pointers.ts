@@ -20,6 +20,7 @@ import * as search from "./tdlite-search"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteTdCompiler from "./tdlite-tdcompiler"
 import * as tdliteDocs from "./tdlite-docs"
+import * as tdliteData from "./tdlite-data"
 import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteArt from "./tdlite-art"
 import * as tdliteUsers from "./tdlite-users"
@@ -54,6 +55,20 @@ export class PubPointer
     static createFromJson(o:JsonObject) { let r = new PubPointer(); r.fromJson(o); return r; }
 }
 
+export async function reindexStoreAsync(req: core.ApiRequest, store: indexedStore.Store, processOneAsync: td.Action1<{}>) {
+    if (!core.checkPermission(req, "operator")) return;
+    let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
+    let resp = {
+        continuation: lst.continuation,
+        itemCount: lst.items.length,
+        itemsReindexed: 0
+    }
+    await parallel.forJsonAsync(lst.items, async(e) => {
+        await processOneAsync(e);
+    }, 20)
+    req.response = resp;
+}
+
 export async function initAsync() : Promise<void>
 {
     deployChannels = withDefault(td.serverSetting("CHANNELS", false), core.myChannel).split(",");
@@ -74,11 +89,52 @@ export async function initAsync() : Promise<void>
             coll.push(ptr);
         }
         fetchResult.items = td.arrayToJson(coll);
-    },
-    {
+    }, {
         byUserid: true,
         anonSearch: true
     });
+
+    await pointers.createIndexAsync("rootns", entry => orEmpty(entry["id"]).replace(/^ptr-/, "").replace(/-.*/, ""));
+    
+    core.addRoute("GET", "pointers", "*", async(req) => {
+        await core.anyListAsync(pointers, req, "rootns", req.verb);    
+    })
+    
+    core.addRoute("GET", "pointers", "doctoc", async(req) => {
+        let lst = await pointers.getIndex("rootns").fetchAllAsync("docs");        
+        lst = lst.filter(e => !!e["pub"]["scriptid"])
+        let tot = 0
+        let totC = 0
+        for (let e of lst) {
+            e["children"] = [];
+            e["orphan"] = true;
+            e["pub"]["path"] = e["pub"]["path"].replace(/^\/+/, ""); 
+            tot++;
+        }
+        let byPath = td.toDictionary(lst, e => e["pub"]["path"])        
+        for (let e of lst) {
+            let pub = e["pub"]
+            let par = pub["parentpath"] 
+            if (par != pub["path"] && par && byPath.hasOwnProperty(par)) {
+                byPath[par]["children"].push(e)
+                e["orphan"] = false;
+                totC++
+            }
+        }
+        let res = `tot:${tot}, ch:${totC}\n`
+        let num = 0
+        let dumpList = (ind: string, ee: {}[]) => {
+            if (num++ > 1000) return; 
+            ee.sort((a, b) => td.strcmp(a["id"], b["id"]))
+            for (let e of ee) {
+                res += ind + e["pub"]["scriptname"] + " /" + e["pub"]["path"] + "\n"
+                dumpList(ind + "    ", e["children"])
+            }
+        }
+        dumpList("", lst.filter(e => e["orphan"]))        
+        req.response = res;
+    })
+    
     core.addRoute("GET", "*script", "cardinfo", async (req14: core.ApiRequest) => {
         let jsb1 = await getCardInfoAsync(req14, req14.rootPub);
         req14.response = td.clone(jsb1);
@@ -175,19 +231,22 @@ export async function initAsync() : Promise<void>
         if (req2.status == 200) {
             /* async */ pointers.getIndex("all").forAllBatchedAsync("all", 50, async (json) => {
                 await parallel.forJsonAsync(json, async (json1: JsonObject) => {
-                    let ref = {}
-                    await pointers.container.updateAsync(json1["id"], async (entry1: JsonBuilder) => {
-                        await setPointerPropsAsync(core.adminRequest, entry1, ({}));
-                        ref = td.clone(entry1);
-                    });
-                    await audit.logAsync(req2, "reindex-ptr", {
-                        oldvalue: json1,
-                        newvalue: ref
-                    });
                 });
             });
             req2.response = ({});
         }
+    });
+    
+    core.addRoute("POST", "pointers", "reindex", async(req: core.ApiRequest) => {
+        await reindexStoreAsync(req, pointers, async(ptr) => {
+            let refx = await pointers.reindexAsync(ptr["id"], async(entry1: JsonBuilder) => {
+                await setPointerPropsAsync(core.adminRequest, entry1, {});
+            }, true);
+            await audit.logAsync(req, "reindex-ptr", {
+                oldvalue: ptr,
+                newvalue: refx
+            });
+        });
     });
     
     restify.server().get("/:userid/oauth", async(req, res) => {
@@ -228,7 +287,8 @@ async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body:
             pub[k] = empty[k];
         }
     }
-    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid", "customtick"]);
+    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid", "customtick", "path"]);
+    pub["path"] = pub["path"].replace(/^\/+/, "");
     pub["parentpath"] = "";
     pub["scriptname"] = "";
     pub["scriptdescription"] = "";
@@ -619,6 +679,23 @@ interface CachedPage {
     expiration: number;
 }
 
+function legacyKindPrefix(name: string)
+{
+    name = name.replace(/^docs\//, "").toLowerCase();
+    
+    if (tdliteData.tdLegacyKinds.hasOwnProperty(name))
+        return null;
+
+    let len = Math.min(25, name.length)
+    while (len > 0) {        
+        let sl = name.slice(0, len);
+        if (tdliteData.tdLegacyKinds.hasOwnProperty(sl))
+            return sl;
+        len--;
+    }
+    return null;
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
     let lang = await handleLanguageAsync(req);
@@ -667,6 +744,10 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             else if (core.fullTD && fn.startsWith("blog/")) {
                 v.redirect = fn.replace(/^blog/, "/docs")
             }
+            else if (core.fullTD && fn.startsWith("docs/") && legacyKindPrefix(fn)) {
+                let pref = legacyKindPrefix(fn);
+                v.redirect = "/docs/" + pref + "#" + fn.slice(5 + pref.length)
+            }    
             else if (td.startsWith(fn, "preview/")) {
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
                 await renderFinalAsync(pubdata, v, lang);

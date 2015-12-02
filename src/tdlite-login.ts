@@ -179,8 +179,11 @@ export class LoginSession
     
     private async generateRedirectUrlAsync(): Promise<string>
     {
-        assert(this.userCreated())        
-        let tok = await generateTokenAsync(this.userid, this.profileId, this.oauthClientId);
+        assert(this.userCreated())
+        let clientId = this.oauthClientId;
+        if (this.federatedUserInfo.redirectPrefix.startsWith("http://localhost:"))
+            clientId = "no-cookie";
+        let tok = await generateTokenAsync(this.userid, this.profileId, clientId);
         let redirectUrl = td.replaceAll(this.federatedUserInfo.redirectPrefix, "TOKEN", encodeURIComponent(tok.url)) + "&id=" + this.userid;
         if (tok.cookie != "") {
             redirectUrl = redirectUrl + "&td_cookie=" + tok.cookie;
@@ -376,10 +379,11 @@ export async function initAsync(): Promise<void> {
                 await tokensTable.deleteEntityAsync(req3.userinfo.token.toJson());
                 await core.redisClient.setpxAsync("tok:" + tokenString(req3.userinfo.token), "", 500);
             }
-            req3.response = ({});
-            req3.headers = {};
-            let s4 = wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971");
-            req3.headers["Set-Cookie"] = s4;
+            req3.response = {};
+            if (req3.userinfo.token.cookie)
+                req3.headers = {
+                    "Set-Cookie": wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971") 
+                };
         }
         else {
             req3.status = httpCode._401Unauthorized;
@@ -390,7 +394,10 @@ export async function initAsync(): Promise<void> {
         core.checkPermission(req7, "signin-" + req7.rootId);
         if (req7.status == 200) {
             let resp = {};
-            let tok = await generateTokenAsync(req7.rootId, "admin", "webapp2");
+            let clientId = "webapp2";
+            if (!req7.userinfo.token.cookie)
+                clientId = "no-cookie";    
+            let tok = await generateTokenAsync(req7.rootId, "admin", clientId);
             if (tok.cookie) {
                 if (req7.headers == null) {
                     req7.headers = {};
@@ -398,7 +405,7 @@ export async function initAsync(): Promise<void> {
                 req7.headers["Set-Cookie"] = wrapAccessTokenCookie(tok.cookie);
             }
             else {
-                assert(false, "no cookie in token");
+                assert(clientId == "no-cookie", "no cookie in token");
             }
             await audit.logAsync(req7, "signin-as", {
                 data: core.sha256(tok.url).substr(0, 10)
