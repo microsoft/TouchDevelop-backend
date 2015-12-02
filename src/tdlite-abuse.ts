@@ -531,7 +531,6 @@ export async function postAcsReport(pubid: string, msg: string, acsInfo:string =
 
 export async function scanAndPostAsync(pubid: string, body: string, desc: string, userjson: core.IUser) {
     let canemail = core.hasPermission(userjson, "external-links");
-    canemail = false;
     let msg = scanText(body, canemail, false);
     msg += scanText(desc, canemail, true);
     if (msg) {
