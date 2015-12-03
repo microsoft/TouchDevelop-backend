@@ -734,8 +734,9 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
 
     if ( ! res.finished()) {
         await core.refreshSettingsAsync();
-        let params = {};
-        params["LANG"] = lang;
+        let params = {
+            LANG: lang,
+        };        
         let inner = "kidornot";
         if (accessCode == "kid") {
             inner = "kidcode";
@@ -776,9 +777,14 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 await session.saveAsync();
             }
             let username = orEmpty(req.query()["td_username"]).slice(0, 25);
-            if (!session.nickname && username) {
-                session.nickname = username;
-                await session.saveAsync();
+            if (!session.nickname && username) {                
+                let nick = username.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+                if (new RegExp(core.serviceSettings.blockedNicknameRx).test(nick)) {
+                    msg = core.translateMessage("This nickname is not allowed.", lang);
+                } else {
+                    session.nickname = username;
+                    await session.saveAsync();
+                }    
             }
             
             
