@@ -11,8 +11,8 @@ type JsonBuilder = td.JsonBuilder;
 
 var logger: td.AppLogger;
 var options: IOptions;
-var authHeaderName = "Ocp-Apim-Subscription-Key";
-//var authHeaderName = "x-api-key";
+//var authHeaderName = "Ocp-Apim-Subscription-Key";
+var authHeaderName = "x-api-key";
 
 export interface IOptions {
     apikey?: string;
@@ -175,7 +175,7 @@ export function init(options_: IOptions = {}) : void
     if (!options.apiurl) {
         options.apiurl = td.serverSetting("MBED_API_URL", true);
         if (!options.apiurl) {
-            options.apiurl = "https://mbedworkshop.azure-api.net";
+            options.apiurl = "https://workshop.mbed.com";
         }
         options.apiurl = options.apiurl.replace(/\/+$/, "");
     }
