@@ -268,6 +268,17 @@ export class Store
     }
 }
 
+function unique(ids: string[])
+{
+    let existing = {}
+    return ids.filter(e => {
+        if (existing.hasOwnProperty(e))
+            return false;
+        existing[e] = 1;
+        return true;
+    })
+}
+
 export class Index
 {
     public parent: Store;
@@ -280,11 +291,8 @@ export class Index
         let fetchResult: FetchResult;
         let tableQuery = this.table.createQuery().partitionKeyIs(key);
         let entities = await executeTableQueryAsync(tableQuery, options);
-        let ids = (<string[]>[]);
-        for (let js of entities.items) {
-            ids.push(js["pub"]);
-        }
-        fetchResult = await this.parent.fetchJsonObjectsAsync(ids);
+        let ids = entities.items.map(js => td.toString(js["pub"]));
+        fetchResult = await this.parent.fetchJsonObjectsAsync(unique(ids));
         fetchResult.continuation = entities.continuation;
         return fetchResult;
     }
