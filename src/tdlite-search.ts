@@ -268,6 +268,10 @@ export async function initAsync() : Promise<void>
                     }
                 }
             }
+            else if (e["kind"] == "script") {
+                let t = tdliteScripts.scriptTick(e);
+                counters[t] = (counters[t] || 0) + 1;
+            }
         }
         req.response = counters
     })
