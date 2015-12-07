@@ -198,6 +198,44 @@ export async function initAsync() : Promise<void>
     core.addRoute("POST", "*pointer", "", async (req1: core.ApiRequest) => {
         await updatePointerAsync(req1);
     });
+    core.addRoute("GET", "*pointer", "history", async(req) => {
+        if (!core.checkPermission(req, "root-ptr")) return;
+        let fetchResult = await audit.queryPubLogAsync(req);
+        fetchResult.items = fetchResult.items.filter(e => e["pub"]["type"] == "update-ptr");
+        
+        let last = fetchResult.items[fetchResult.items.length - 1]
+        if (last && last["pub"]["oldvalue"] && last["pub"]["oldvalue"]["__version"] == 1) {
+            let final = td.clone(last);
+            let pub = last["pub"]["oldvalue"];
+            final["pub"]["newvalue"] = pub;
+            final["pub"]["oldvalue"] = null;
+            final["pub"]["userid"] = pub["pub"]["userid"];
+            final["pub"]["time"] = pub["pub"]["time"];
+            fetchResult.items.push(final)
+        }
+        
+        fetchResult.items = fetchResult.items.map(it => {
+            let pub = it["pub"];
+            let ptr = it["pub"]["newvalue"];
+            let ptrpub = ptr["pub"];
+            ptrpub["userid"] = pub["userid"];
+            ptrpub["time"] = pub["time"];
+            ptr["id"] = ptr["id"] + "@v" + ptr["__version"]
+            if (pub["oldvalue"])
+                ptr["oldscriptid"] = pub["oldvalue"]["pub"]["scriptid"];
+            return ptr;
+        });
+        
+        await core.addUsernameEtcAsync(fetchResult);        
+        fetchResult.items = fetchResult.items.map(jsb => {
+            let ptr = PubPointer.createFromJson(jsb["pub"]);
+            let ret = ptr.toJson();
+            ret["oldscriptid"] = jsb["oldscriptid"];
+            return ret; 
+        })
+
+        req.response = fetchResult.toJson();        
+    });
     tdliteDocs.init(async (v: JsonBuilder) => {
         let wp = orEmpty(v["webpath"]);
         if (wp != "") {

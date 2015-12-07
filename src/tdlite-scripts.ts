@@ -74,6 +74,7 @@ export class PubScript
     @td.json public unmoderated: boolean = false;
     @td.json public noexternallinks: boolean = false;
     @td.json public promo: JsonObject;
+    @td.json public lastpointer: string = "";
     static createFromJson(o:JsonObject) { let r = new PubScript(); r.fromJson(o); return r; }
 }
 
@@ -195,6 +196,7 @@ export async function resolveScriptsAsync(entities: indexedStore.FetchResult, re
             script.positivereviews = count;
             script.cumulativepositivereviews = count;
         }
+        script.lastpointer = js["lastPointer"] || undefined;
     }
     entities.items = td.arrayToJson(coll);
 }
