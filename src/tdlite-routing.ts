@@ -248,10 +248,13 @@ function sendResponse(apiRequest: core.ApiRequest, req: restify.Request, res: re
     
     if (apiRequest.status != 200) {
         if (apiRequest.status == httpCode._401Unauthorized) {
-            res.sendError(httpCode._403Forbidden, "Invalid or missing ?access_token=...");
+            res.sendError(httpCode._403Forbidden, "Invalid or missing access_token");
         }
         else if (apiRequest.status == httpCode._402PaymentRequired) {
-            res.sendCustomError(httpCode._402PaymentRequired, "Your account is not authorized to perform this operation.");
+            if (apiRequest.userid)
+                res.sendCustomError(httpCode._402PaymentRequired, "Your account is not authorized to perform this operation.");
+            else
+                res.sendError(httpCode._403Forbidden, "Invalid or missing access_token.");
         }
         else {
             if (apiRequest.status < 310 && apiRequest.headers != null && apiRequest.headers.hasOwnProperty("location")) {

@@ -897,6 +897,10 @@ export async function lookupTokenAsync(token: string):Promise<core.Token> {
     }
 }
 
+// Don't set the 401 code on token expired/cookie missing.
+// If it's anonymous request it will suceeded, otherwise checkPermission() will set code to 401 anyways.
+var softTokenFailure = true;
+
 export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
 {
     if (req.isCached) {
@@ -922,8 +926,9 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
             }
             if (orEmpty(token2.cookie) != "") {
                 let ok = td.stringContains(orEmpty(rreq.header("cookie")), "TD_ACCESS_TOKEN2=" + token2.cookie);
-                if ( ! ok) {
-                    req.status = httpCode._401Unauthorized;
+                if (!ok) {
+                    if (!softTokenFailure)
+                        req.status = httpCode._401Unauthorized;
                     logger.info("cookie missing, user=" + token2.PartitionKey);
                     return;
                 }
@@ -937,8 +942,9 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
                 }
                 // minimum token expiration - 5min
                 if (orEmpty(token2.reason) != "code" && core.orZero(core.serviceSettings.tokenExpiration) > 300 && await core.nowSecondsAsync() - token2.time > core.serviceSettings.tokenExpiration) {
-                    // core.Token expired
-                    req.status = httpCode._401Unauthorized;
+                    // Token expired.
+                    if (!softTokenFailure)
+                        req.status = httpCode._401Unauthorized;
                     return;
                 }
             }
