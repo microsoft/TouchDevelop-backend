@@ -1088,7 +1088,7 @@ export async function followIdsAsync(fetchResult: JsonObject[], field: string, k
         let s = js[field];
         ids.push(s);
     }
-    pubs = (await pubsContainer.getManyAsync(ids)).filter(elt => isGoodPub(elt, kind));
+    pubs = (await pubsContainer.getManyAsync(ids)).filter(elt => kind ? isGoodPub(elt, kind) : !!elt);
     return pubs;
 }
 
