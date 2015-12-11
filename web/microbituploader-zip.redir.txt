@@ -1,1 +1,1 @@
-/static/uploader/Microsoft.Uploader.Microbit.zip
+/static/uploader/Microbit.Uploader.zip
