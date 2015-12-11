@@ -394,6 +394,13 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
             if ( ! result.succeded()) {
                 req.status = httpCode._424FailedDependency;
             }
+            else if (ext == "mp3") {
+                // this for backward compat
+                result = await aacContainer.createBlockBlobFromBufferAsync(filename + ".m4a", buf, {
+                    contentType: contentType,
+                    cacheControl: "public, max-age=900",
+                });                
+            }
             else if (jsb["isImage"]) {
                 await rethumbOneAsync(req, filename, contentType);
             }

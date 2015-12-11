@@ -190,6 +190,17 @@ export class Container
     }
 
     /**
+     * Creates a new block blob and uploads the contents of a JSON.
+     */
+    public async createBlockBlobFromJsonAsync(blobName: string, json: {}, options: ICreateOptions = {}) : Promise<BlobInfo>
+    {
+        if (!options.contentType)
+            options.contentType = "application/json; charset=utf-8";        
+        return await this.createBlockBlobFromTextAsync(blobName, JSON.stringify(json), options);
+    }
+
+
+    /**
      * Creates a new block blob and uploads the contents of a string.
      */
     public async createBlockBlobFromTextAsync(blobName: string, text: string, options?: ICreateOptions) : Promise<BlobInfo>

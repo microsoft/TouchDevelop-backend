@@ -371,7 +371,7 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
     let response = await request.sendAsync();
     let js = response.contentAsJson();
     let searchResults: JsonObject[] = js["value"];
-    if (true || searchResults == null) {
+    if (searchResults == null) {
         logger.debug("js: " + qurl + " -> " + JSON.stringify(js, null, 2));
     }
     let ids0:string[] = searchResults.map(e => e["id"]);    

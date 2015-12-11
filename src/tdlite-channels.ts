@@ -42,8 +42,7 @@ export async function initAsync() : Promise<void>
             coll.push(grp);
         }
         fetchResult.items = td.arrayToJson(coll);
-    }
-    , {
+    }, {
         byUserid: true,
         anonSearch: true
     });
@@ -77,20 +76,22 @@ export async function initAsync() : Promise<void>
         }
     });
     channelMemberships = await indexedStore.createStoreAsync(core.pubsContainer, "channelmembership");
-    await core.setResolveAsync(channelMemberships, async (fetchResult1: indexedStore.FetchResult, apiRequest1: core.ApiRequest) => {
+    await core.setResolveAsync(channelMemberships, async (fetchResult: indexedStore.FetchResult, apiRequest1: core.ApiRequest) => {
         let store = tdliteScripts.scripts;
+        //logger.debug("chres: " + JSON.stringify(fetchResult.items,null,1))
         if (apiRequest1.verb == "channels") {
             store = channels;
-            fetchResult1.items = td.arrayToJson(await core.followPubIdsAsync(fetchResult1.items, "channelid", store.kind));
+            fetchResult.items = td.arrayToJson(await core.followPubIdsAsync(fetchResult.items, "channelid", store.kind));
         }
         else {
-            let pubs = await core.followIdsAsync(fetchResult1.items, "updateKey", "updateslot");
-            fetchResult1.items = td.arrayToJson(await core.followIdsAsync(td.arrayToJson(pubs), "scriptId", "script"));
+            let pubs = await core.followIdsAsync(fetchResult.items, "updateKey", "");
+            fetchResult.items = td.arrayToJson(await core.followIdsAsync(pubs, "scriptId", "script"));
             let opts = apiRequest1.queryOptions;
             // ?applyupdates=true no longer needed - already applied - perf opt
             delete opts['applyupdates']
         }
-        await core.resolveAsync(store, fetchResult1, apiRequest1);        
+        //logger.debug("chres2: " + JSON.stringify(fetchResult.items,null,1))
+        await core.resolveAsync(store, fetchResult, apiRequest1);        
     });
     await channelMemberships.createIndexAsync("channelid", entry1 => entry1["pub"]["channelid"]);
     await channelMemberships.createIndexAsync("updatekey", entry2 => orEmpty(entry2["updateKey"]));
