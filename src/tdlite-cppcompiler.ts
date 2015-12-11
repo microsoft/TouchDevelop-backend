@@ -15,6 +15,7 @@ import * as azureBlobStorage from "./azure-blob-storage"
 import * as raygun from "./raygun"
 import * as core from "./tdlite-core"
 import * as mbedworkshopCompiler from "./mbedworkshop-compiler"
+import * as cachedStore from "./cached-store"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -24,7 +25,8 @@ var httpCode = core.httpCode;
 var mbedVersion = 2;
 var mbedCache = true;
 var compileContainer: azureBlobStorage.Container;
-
+var githubCache: cachedStore.Container; 
+var cppCache: cachedStore.Container;
 
 export class CompileReq
     extends td.JsonRecord
@@ -99,6 +101,8 @@ export async function initAsync()
     mbedworkshopCompiler.setVerbosity("debug");
 
     compileContainer = await core.blobService.createContainerIfNotExistsAsync("compile", "hidden");
+    githubCache = await cachedStore.createContainerAsync("cachegithub");
+    cppCache = await cachedStore.createContainerAsync("cachecpp");
 
     core.addRoute("POST", "admin", "mbedint", async (req9: core.ApiRequest) => {
         core.checkPermission(req9, "root");
@@ -111,7 +115,7 @@ export async function initAsync()
     });
     
     core.addRoute("POST", "compile", "extension", async(req) => {
-        if (!core.checkPermission(req, "root")) return;
+        //if (!core.checkPermission(req, "root")) return;
         await mbedCompileExtAsync(req);
     }, { noSizeCheck: true })
 }
@@ -251,13 +255,44 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
+async function githubFetchAsync(ccfg: CompilerConfig, path: string):Promise<string> {
+    let metaUrl = ccfg.repourl
+        .replace(/^https:\/\/github.com/, "https://raw.githubusercontent.com")
+        .replace(/\.git#.*/, "/" + path)
+    let key = core.sha256(metaUrl)
+
+    let res = await githubCache.getAsync(key)
+
+    if (res == null) {
+        logger.debug("download metainfo: " + metaUrl)
+        let resp = await td.createRequest(metaUrl).sendAsync();
+        if (resp.statusCode() != 200) return <string>null;
+        res = { url: metaUrl, path: path, text: resp.content() }
+        await githubCache.justInsertAsync(key, res);
+    }
+
+    return <string>res["text"]
+}
+
 interface CompileExtReq {
     config: string;
     tag: string;
     replaceFiles: {};
+    dependencies?: {};
+}
+
+interface IntCompileStatus {
+    finished: boolean;
+    starttime: number;
+    success: boolean;
+    version: number;
 }
 
 async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
+    
+    await core.throttleAsync(req, "compile", 5); // pay for the initial processing
+    if (req.status != 200) return;
+    
     let buf = new Buffer(req.body["data"], "base64")
     // the request is base64 encoded in data field to avoid any issues with sha256 client-side computation yielding different results    
     let sha = td.sha256(buf)
@@ -266,15 +301,41 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
         req.status = httpCode._413RequestEntityTooLarge;
         return;
     }
-
+    
     let hexurl = compileContainer.url() + "/" + sha + ".hex";
-    let info = await compileContainer.getBlobToTextAsync(sha + ".hex");
-    if (info.succeded()) {
-        // the client should have come here themselves...
-        req.response = { ready: true, hex: hexurl }
+    req.response = { ready: false, hex: hexurl }
+    let now = await core.nowSecondsAsync();
+    let currStatus = <IntCompileStatus> await cppCache.getAsync(sha + "-status");
+    if (currStatus) {
+        // if not success, we let them retry after two minutes (below) 
+        if (currStatus.finished && currStatus.success) {
+            // the client should have come here themselves...
+            req.response = { ready: true, hex: hexurl }
+            return;
+        }
+        if (now - currStatus.starttime < 2 * 60) {            
+            return;
+        }
+    }
+    
+    let shouldStart = false;
+    
+    await cppCache.updateAsync(sha + "-status", async(entry:IntCompileStatus) => {
+        let starttime = entry.starttime
+        if (now - starttime < 2 * 60) {
+            logger.info("race on compile start for " + sha)
+            shouldStart = false;
+        } else {
+            entry.starttime = now;
+            entry.finished = false;
+            shouldStart = true;
+        }
+    })
+    
+    if (!shouldStart) {        
         return;
     }
-
+        
     let compileReq: CompileExtReq = JSON.parse(buf.toString("utf8"))
 
     let cfg = core.getSettings("compile");
@@ -295,8 +356,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
         }
         
         let tag = orEmpty(compileReq.tag)
-       
-       
+        
         ccfg.hexfilename = "";
         if (orEmpty(ccfg.internalUrl) != "" || !ccfg.target_binary) {
             req.status = httpCode._404NotFound;
@@ -309,20 +369,20 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             return;            
         }
         
-        let metaUrl = ccfg.repourl
-            .replace(/^https:\/\/github.com/, "https://raw.githubusercontent.com")
-            .replace(/\.git#.*/, "/" + tag + "/generated/metainfo.json")
-        
-        logger.debug("download metainfo: " + metaUrl)
-        let resp = await td.createRequest(metaUrl).sendAsync();
-        if (resp.statusCode() != 200) {
+        let metainfo = await githubFetchAsync(ccfg, tag + "/generated/metainfo.json");
+        if (metainfo == null) {
             req.status = httpCode._412PreconditionFailed;
             return;
         }
         
-        let result2 = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "-metainfo.json", resp.contentAsBuffer(), {
-            contentType: "application/json; charset=utf-8",
-            smartGzip: true
+        if (compileReq.dependencies && Object.keys(compileReq.dependencies).length > 0) {
+            let modulejson = JSON.parse(await githubFetchAsync(ccfg, tag + "/module.json"));
+            td.jsonCopyFrom(modulejson["dependencies"], compileReq.dependencies);
+            compileReq.replaceFiles["/module.json"] = JSON.stringify(modulejson, null, 2) + "\n"
+        }
+        
+        let result2 = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "-metainfo.json", new Buffer(metainfo, "utf8"), {
+            contentType: "application/json; charset=utf-8"
         });
 
         logger.debug("compile at " + ccfg.repourl);
@@ -335,16 +395,17 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             req.status = httpCode._424FailedDependency;
         }
         else {
-            /* async */ mbedwsDownloadAsync(sha, compile, ccfg);
+            /* async */ mbedwsDownloadAsync(sha, compile, ccfg, true);
             req.response = {
                 ready: false,
+                started: true,
                 hex: hexurl
             }
         }
     }
 }
 
-async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.CompilationRequest, ccfg: CompilerConfig) : Promise<void>
+async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.CompilationRequest, ccfg: CompilerConfig, saveSt = false) : Promise<void>
 {
     logger.newContext();
     let task = await compile.statusAsync(true);
@@ -392,9 +453,13 @@ async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.Co
         st.mbedresponse = { result: { exception: "ReportID: " + st.bugReportId }}
     }
     
-    let result2 = await compileContainer.createBlockBlobFromTextAsync(sha + ".json", JSON.stringify(st.toJson()), {
-        contentType: "application/json; charset=utf-8"
-    });
+    let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
+    
+    if (saveSt)
+        await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
+            entry.finished = true;
+            entry.success = task.success;
+        })
     
     if (err)    
         throw err;
@@ -428,9 +493,7 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
             logger.tick("MbedHexCreated");
         }
     }
-    let result2 = await compileContainer.createBlockBlobFromTextAsync(sha + ".json", JSON.stringify(st.toJson()), {
-        contentType: "application/json; charset=utf-8"
-    });
+    let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
 }
 
 function setMbedresponse(st: CompileStatus, msg: string) : void
