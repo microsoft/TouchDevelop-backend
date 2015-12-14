@@ -1319,7 +1319,8 @@ export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject) 
 
 export function isAbuseSafe(elt: JsonObject) : boolean
 {
-    let b = orEmpty(elt["abuseStatus"]) != "active";
+    // promos always safe
+    let b = orEmpty(elt["kind"]) == "promo" || orEmpty(elt["abuseStatus"]) != "active";
     return b;
 }
 
