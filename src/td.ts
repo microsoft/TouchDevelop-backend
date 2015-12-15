@@ -436,10 +436,25 @@ export function clone(e:JsonObject):JsonObject
     return JSON.parse(JSON.stringify(e))
 }
 
+export function flatClone(e: any): any{
+    let r = {}
+    for (let f of Object.keys(e)) {
+        r[f] = e[f];
+    }
+    return r;
+}
+
 export function randomUint32():number
 {
     var b = crypto.randomBytes(4)
     return (b[0] | (b[1]<<8) | (b[2]<<16) | ((b[3]<<24) >>> 0)) >>> 0
+}
+
+export function strcmp(a: string, b: string)
+{
+    if (a == b) return 0;
+    if (a < b) return -1;
+    return 1;
 }
 
 export function sha256(b:Buffer):string
@@ -530,7 +545,13 @@ export class AppLogger {
     public debug(message: string) { this.log("debug", message, undefined); }
     public info(message: string) { this.log("info", message, undefined); }
     public warning(message: string) { this.log("warning", message, undefined); }
-    public error(message: string) { this.log("error", message, undefined); }
+    public error(message: string) {
+        // capture stack trace at the point where it was called
+        try { throw new Error(this.category + ": " + message) }
+        catch (e) {
+            this.log("error", message, { tdException: e });    
+        }        
+    }
 
     private stringToLevel(level:string)
     {
@@ -602,7 +623,7 @@ export class AppLogger {
 
         if (!AppLogger.findContext()) return v || {}
 
-        if (v) v = clone(v)
+        if (v) v = flatClone(v)
         else v = {}
 
         this.setMetaFromContext(v)

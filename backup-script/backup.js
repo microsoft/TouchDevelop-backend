@@ -149,7 +149,7 @@ var vaultUrl = "";
 var numRetries = 0;
 
 function downloadSecret(uri, f) {
-    var p = url.parse(uri + "?api-version=2015-02-01-preview");
+    var p = url.parse(uri + "?api-version=2015-06-01");
     p.headers = {};
     if (vaultToken)
         p.headers['Authorization'] = 'Bearer ' + vaultToken;
@@ -174,9 +174,12 @@ function downloadSecret(uri, f) {
                 'Content-Type': 'application/x-www-form-urlencoded'
             };
             pp.method = 'POST';
+            //console.log(pp, d)
             var r = https.request(pp, function (res) {
                 readRes(res, function (total) {
                     if (res.statusCode != 200) {
+                        log("status: " + res.statusCode);
+                        console.log(res.headers)
                         log(total.toString("utf8"));
                         f(new Error("get token failed for " + uri))
                         return;
@@ -595,8 +598,13 @@ function backupTable(st, cb) {
               st.bufSize += JSON.stringify(e).length + 10
 
               if (st.workspace && e.currentBlob) {
+                  if (/^-/.test(e.currentBlob))
+                      return;
                   var m = /^\d+\.([a-z]+)\..*$/.exec(e.currentBlob)
-                  if(!m)log("bad blob " + e.currentBlob)
+                  if(!m){
+                      log("bad blob " + e.currentBlob)
+                      return;
+                  }
                   var uid = m[1]
                   var id = uid.charCodeAt(uid.length - 1) % numWorkspaces
                   st.workspace[id][e.currentBlob] = 1

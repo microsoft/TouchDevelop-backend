@@ -4,6 +4,7 @@
 
 import * as td from './td';
 import * as assert from 'assert';
+import * as crypto from 'crypto';
 import * as querystring from 'querystring';
 
 type JsonObject = td.JsonObject;
@@ -79,7 +80,17 @@ export class ClientOauth
     @td.json public provider: string = "";
     @td.json public td_state: string = "";
     @td.json public u: string = "";
-    static createFromJson(o:JsonObject) { let r = new ClientOauth(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new ClientOauth(); r.fromJson(o); return r; }
+    
+    public toQueryString()
+    {
+        return toQueryString({
+            state: this.state,
+            client_id: this.client_id,
+            redirect_uri: this.redirect_uri,
+            response_type: this.response_type,
+        })
+    }
 }
 
 export class UserInfo
@@ -88,6 +99,7 @@ export class UserInfo
     @td.json public id: string = "";
     @td.json public name: string = "";
     @td.json public email: string = "";
+    @td.json public realname: string = "";
     @td.json public redirectPrefix: string = "";
     @td.json public state: string = "";
     @td.json public userData: string = "";
@@ -403,7 +415,7 @@ export function addAzureAdClientOnly(options_: IProviderOptions = {}) : void
     }
     , async (req1: restify.Request, p1: OauthRequest) => {
         let profile: JsonObject;        
-        let payload = decodeJwtVerify(req1.bodyAsJson()["id_token"], azureKey);
+        let payload = decodeJwtVerify(req1.bodyAsJson()["id_token"], "RS256", azureKey);
         if (payload["nonce"] == p1.nonce) {
             profile = payload;
         }
@@ -553,6 +565,7 @@ export function addLiveId(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         inf.id = "live:" + profile1["id"];
         inf.name = profile1["name"];
         let eml = profile1["emails"];
@@ -644,6 +657,7 @@ export function addFacebook(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         inf.id = "fb:" + profile1["id"];
         inf.name = profile1["name"];
         inf.email = profile1["email"];
@@ -694,6 +708,7 @@ export function addGoogle(options_: IProviderOptions = {}) : void
     }
     , async (profile1: JsonObject) => {
         let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         inf.id = "google:" + profile1["id"];
         inf.name = profile1["name"];
         inf.email = profile1["email"];
@@ -737,6 +752,7 @@ export function addEdmodo(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         info = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
         info.id = "edmodo:" + profile1["id"];
         info.name = profile1["name"];
         return info;
@@ -775,6 +791,7 @@ export function addAzureAd(options_: IProviderOptions = {}) : void
     , async (profile1: JsonObject) => {
         let info: UserInfo;
         info = new UserInfo();
+        if (!profile1["oid"]) return <UserInfo>null;
         info.id = "ad:" + td.replaceAll(profile1["oid"], "-", "").toLowerCase();
         info.name = profile1["name"];
         info.email = profile1["unique_name"];
@@ -788,7 +805,12 @@ export function base64urlDecode(s: string): Buffer
     return new Buffer(s.replace(/-/g, '+').replace(/_/g, '/'), "base64");
 }
 
-function decodeJwt(jwt: string): JsonObject {
+export function base64urlEncode(buf: Buffer): string
+{
+    return buf.toString("base64").replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, "")
+}
+
+function decodeJwt(jwt: string): JwtPayload {
     if (!jwt) return null;
     let elts = jwt.split('.');
     if (elts.length != 3) return null;
@@ -800,8 +822,79 @@ function decodeJwt(jwt: string): JsonObject {
     }
 }
 
-function decodeJwtVerify(jwt: string, key: string): JsonObject {
-    throw new Error("TODO: implement RSA checking")
+export interface JwtPayload {
+    jti?: string; // JWT ID
+    iss?: string; // issuer
+    sub?: string; // subject
+    aud?: string; // audience
+    iat?: number; // issued at
+    nbf?: number; // not-before
+    exp?: number; // expiration time
+}
+
+export function createJwtHS256(payload: JwtPayload, shakey:Buffer)
+{
+    let hd = {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+    let enc = s => base64urlEncode(new Buffer(JSON.stringify(s), "utf8"))
+    let data = enc(hd) + "." + enc(payload)
+    let hash = crypto.createHmac("sha256", shakey)
+    hash.update(new Buffer(data, "utf8"))
+    return data + "." + base64urlEncode(hash.digest())    
+}
+
+export function createJwtRS256(payload: JwtPayload, rsakey:string)
+{
+    let hd = {
+        "alg": "RS256",
+        "typ": "JWT"
+    }
+    let enc = s => base64urlEncode(new Buffer(JSON.stringify(s), "utf8"))
+    let data = enc(hd) + "." + enc(payload)
+    let hash = crypto.createSign("RSA-SHA256")
+    hash.update(new Buffer(data, "utf8"))    
+    return data + "." + base64urlEncode(<any>hash.sign(rsakey, null))    
+}
+
+export function decodeJwtVerify(jwt: string, alg:string, key: any): JwtPayload {
+    if (!jwt) return null;
+    let elts = jwt.split('.');
+    if (elts.length != 3) return null;
+    let hd = null
+    let payload: JwtPayload = null
+    try {
+        hd = JSON.parse(base64urlDecode(elts[0]).toString("utf8"));
+        payload = JSON.parse(base64urlDecode(elts[1]).toString("utf8"));
+    } catch (e) {
+        return null;
+    }
+
+    if (hd["typ"] !== "JWT") return null;
+    if (hd["alg"] !== alg) return null;
+
+    let data = elts[0] + "." + elts[1]
+    if (hd["alg"] == "HS256") {
+        if (!Buffer.isBuffer(key))
+            throw new Error("Bad key");            
+        let hash = crypto.createHmac("sha256", key)
+        hash.update(new Buffer(data, "utf8"))
+        if (base64urlEncode(hash.digest()) !== elts[2]) {
+            return null;
+        }
+        return payload;
+    } else if (hd["alg"] == "RS256") {
+        if (typeof key != "string")
+            throw new Error("Bad key");
+        let verify = crypto.createVerify("RSA-SHA256");
+        verify.update(data)
+        if (!verify.verify(key, <any>base64urlDecode(elts[2])))
+            return null;
+        return payload;
+    } else {
+        return null;
+    }
 }    
 
 async function oauthLoginAsync(req: restify.Request, res: restify.Response) : Promise<void>
@@ -938,3 +1031,86 @@ export function providerLinks(query: JsonObject) : JsonBuilder
 }
 
 
+/**
+ * Setup Yahoo! authentication. Requires ``YAHOO_CLIENT_ID`` and ``YAHOO_CLIENT_SECRET`` env.
+ */
+export function addYahoo(options_: IProviderOptions = {}) : void
+{
+    let clientId = td.serverSetting("YAHOO_CLIENT_ID", false);
+    let clientSecret = td.serverSetting("YAHOO_CLIENT_SECRET", false);
+    let prov = ProviderIndex.at("yahoo");
+    prov.name = "Yahoo!";
+    prov.makeCustomToken = options_.makeCustomToken;
+    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+        let url: string;
+        p.client_id = clientId;
+        p.response_type = "code";
+        url = "https://api.login.yahoo.com/oauth2/request_auth?" + toQueryString(p.toJson());
+        return url;
+    }
+    , async (req1: restify.Request, p1: OauthRequest) => {
+        let profile: JsonObject;
+        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://api.login.yahoo.com/oauth2/get_token");
+        if (js == null) {
+            return js;
+        }
+        let request = td.createRequest("https://social.yahooapis.com/v1/user/me/profile");
+        request.setHeader("Authorization", "Bearer " + js["access_token"]);
+        request.setAccept("application/json");
+        let response = await request.sendAsync();
+        //logger.info("yahoo resp: " + response.statusCode() + ": " + response.content())        
+        profile = response.contentAsJson();
+        if (profile) profile = profile["profile"];
+        return profile;
+    }
+    , async (profile1: JsonObject) => {
+        let inf = new UserInfo();
+        if (!profile1["guid"]) return <UserInfo>null;
+        inf.id = "yahoo:" + profile1["guid"];
+        inf.name = profile1["nickname"];
+        return inf;
+    });
+}
+
+
+/**
+ * Setup GitHub authentication. Requires ``GITHUB_CLIENT_ID`` and ``GITHUB_CLIENT_SECRET`` env.
+ */
+export function addGitHub(options_: IProviderOptions = {}) : void
+{
+    let clientId = td.serverSetting("GITHUB_CLIENT_ID", false);
+    let clientSecret = td.serverSetting("GITHUB_CLIENT_SECRET", false);
+    let prov = ProviderIndex.at("github");
+    prov.name = "GitHub";
+    prov.makeCustomToken = options_.makeCustomToken;
+    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+        let url: string;
+        p.client_id = clientId;
+        p.response_type = "code";
+        p.scope = "user:email";
+        url = "https://github.com/login/oauth/authorize?" + toQueryString(p.toJson());
+        return url;
+    }
+    , async (req1: restify.Request, p1: OauthRequest) => {
+        let profile: JsonObject;
+        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://github.com/login/oauth/access_token");
+        if (js == null) {
+            return js;
+        }
+        let request = td.createRequest("https://api.github.com/user");
+        request.setHeader("Authorization", "token " + js["access_token"]);
+        request.setHeader("User-Agent", "Touch Develop backend");
+        request.setAccept("application/json");
+        let response = await request.sendAsync();
+        logger.info("gh resp: " + response.statusCode() + ": " + response.content())
+        return response.contentAsJson();
+    }, async (profile1: JsonObject) => {
+        let inf = new UserInfo();
+        if (!profile1["id"]) return <UserInfo>null;
+        inf.id = "github:" + profile1["id"];
+        inf.name = profile1["login"];
+        inf.email = profile1["email"];
+        inf.realname = profile1["name"];
+        return inf;
+    });
+}

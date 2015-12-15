@@ -47,6 +47,7 @@ async function performBatchedRequestAsync(inpReq: JsonBuilder, req: core.ApiRequ
     apiRequest.method = core.withDefault(inpReq["method"], "GET").toUpperCase();
     apiRequest.userid = req.userid;
     apiRequest.userinfo = req.userinfo;
+    apiRequest.restifyReq = req.restifyReq;
 
     apiRequest.isUpgrade = req.isUpgrade;
     if ( ! allowPost) {
@@ -95,7 +96,17 @@ async function performSingleRequestAsync(apiRequest: core.ApiRequest) : Promise<
             apiRequest.root = apiRequest.userid;
         }
     }
+    
+    // the web app sometimes posts JSON without setting proper content type
+    if (typeof apiRequest.body == "string") {
+        try {
+            apiRequest.body = JSON.parse(<string>apiRequest.body)
+        } catch (e) {
+        }
+    }
+    
     if (apiRequest.status == 200 && apiRequest.method == "POST" && typeof apiRequest.body != "object") {
+        logger.info("bad request, " + typeof apiRequest.body)
         apiRequest.status = httpCode._400BadRequest;        
     }
     if (apiRequest.status == 200) {
@@ -200,6 +211,7 @@ export async function performRoutingAsync(req: restify.Request, res: restify.Res
     let apiRequest = core.buildApiRequest(req.url());
     apiRequest.method = req.method();
     apiRequest.body = req.bodyAsJson();
+    apiRequest.restifyReq = req;
     await tdliteLogin.validateTokenAsync(apiRequest, req);
     if (apiRequest.userid == "") {
         apiRequest.throttleIp = core.sha256(req.remoteIp());
@@ -231,14 +243,23 @@ export async function performRoutingAsync(req: restify.Request, res: restify.Res
 
 function sendResponse(apiRequest: core.ApiRequest, req: restify.Request, res: restify.Response) : void
 {
+    if (res.finished())
+        return;
+    
     if (apiRequest.status != 200) {
         if (apiRequest.status == httpCode._401Unauthorized) {
-            res.sendError(httpCode._403Forbidden, "Invalid or missing ?access_token=...");
+            res.sendError(httpCode._403Forbidden, "Invalid or missing access_token");
         }
         else if (apiRequest.status == httpCode._402PaymentRequired) {
-            res.sendCustomError(httpCode._402PaymentRequired, "Your account is not authorized to perform this operation.");
+            if (apiRequest.userid)
+                res.sendCustomError(httpCode._402PaymentRequired, "Your account is not authorized to perform this operation.");
+            else
+                res.sendError(httpCode._403Forbidden, "Invalid or missing access_token.");
         }
         else {
+            if (apiRequest.status < 310 && apiRequest.headers != null && apiRequest.headers.hasOwnProperty("location")) {
+                res.setHeader("location", apiRequest.headers["location"]);
+            }            
             res.sendError(apiRequest.status, "");
         }
     }

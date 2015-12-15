@@ -74,6 +74,7 @@ export class PubScript
     @td.json public unmoderated: boolean = false;
     @td.json public noexternallinks: boolean = false;
     @td.json public promo: JsonObject;
+    @td.json public lastpointer: string = "";
     static createFromJson(o:JsonObject) { let r = new PubScript(); r.fromJson(o); return r; }
 }
 
@@ -195,8 +196,27 @@ export async function resolveScriptsAsync(entities: indexedStore.FetchResult, re
             script.positivereviews = count;
             script.cumulativepositivereviews = count;
         }
+        script.lastpointer = js["lastPointer"] || undefined;
     }
     entities.items = td.arrayToJson(coll);
+}
+
+export function scriptTick(jsb: {})
+{
+    let pubScript = PubScript.createFromJson(jsb["pub"]);
+    let editor = pubScript.editor || "touchdevelop";
+    if (editor == "touchdevelop" && td.stringContains(pubScript.description, "#docs"))
+        editor = "docs";
+    else if (editor != "html" && !core.currClientConfig.tickFilter.hasOwnProperty("editor_" + editor))
+        editor = "other";
+
+    let cat = "update";
+    if (pubScript.rootid == pubScript.id)
+        cat = "fresh";
+    else if (jsb["isFork"])
+        cat = "fork";
+    
+    return "PubScript_" + cat + "_" + editor;
 }
 
 export async function publishScriptCoreAsync(pubScript: PubScript, jsb: JsonBuilder, body: string, req: core.ApiRequest) : Promise<void>
@@ -227,9 +247,9 @@ export async function publishScriptCoreAsync(pubScript: PubScript, jsb: JsonBuil
         newvalue: scr
     });
     core.progress("publish - inserted");
-    if (td.stringContains(pubScript.description, "#docs")) {
-        logger.tick("CreateHashDocsScript");
-    }
+    
+    logger.tick(scriptTick(jsb));
+    
     if ( ! pubScript.ishidden) {
         await notifications.storeAsync(req, jsb, "");
         core.progress("publish - notified");
@@ -380,7 +400,7 @@ export async function initAsync() : Promise<void>
     });
     core.addRoute("POST", "scripts", "", async (req3: core.ApiRequest) => {
         await core.canPostAsync(req3, "direct-script");
-        if (req3.status == 200 && orEmpty(req3.body["text"]).length > 100000) {
+        if (req3.status == 200 && orEmpty(req3.body["text"]).length > 200000) {
             req3.status = httpCode._413RequestEntityTooLarge;
         }
 
@@ -395,10 +415,12 @@ export async function initAsync() : Promise<void>
 
         if (req3.status == 200) {
             let scr = new PubScript();
+            let isFork = false;
             let entry3 = await core.getPubAsync(orEmpty(req3.body["baseid"]), "script");
             if (entry3 != null) {
                 scr.baseid = entry3["id"];
                 scr.rootid = entry3["pub"]["rootid"];
+                isFork = entry3["pub"]["userid"] != req3.userid;
             }
             scr.userid = req3.userid;
             scr.mergeids = (<string[]>[]);
@@ -426,6 +448,7 @@ export async function initAsync() : Promise<void>
             if (forceid != "") {
                 jsb["id"] = forceid;
             }
+            jsb["isFork"] = isFork;
             await publishScriptCoreAsync(scr, jsb, td.toString(req3.body["text"]), req3);
             await core.returnOnePubAsync(scripts, td.clone(jsb), req3);
         }
@@ -491,6 +514,13 @@ export async function initAsync() : Promise<void>
         }
         else {
             req6.status = httpCode._402PaymentRequired;
+        }
+    });
+    core.addRoute("GET", "*script", "scripts", async (req6: core.ApiRequest) => {
+        // TODO consumers?
+        req6.response = {
+            items: [],
+            continuation: null
         }
     });
     core.addRoute("GET", "*script", "canexportapp", async (req7: core.ApiRequest) => {

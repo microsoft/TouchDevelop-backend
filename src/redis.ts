@@ -91,13 +91,13 @@ export class Client
     }
 
     /**
-     * Returns the set cardinality (number of elements) of the set stored at key.
+     * Returns the elements of the set stored at key.
      */
-    public async smembersAsync(key: string) : Promise<JsonObject>
+    public async smembersAsync(key: string) : Promise<string[]>
     {
         let members: JsonObject;
         members = await this.sendCommand1Async("smembers", key);
-        return members;
+        return <string[]>members;
     }
 
     /**
@@ -312,10 +312,13 @@ export class Client
     {
         let redis = {};
         let redisText = td.toString(await this.sendCommandAsync("info", []));
+        if (!redisText) {
+            return <{}>null;
+        }
         let dummy = td.replaceFn(redisText, /(\w+):(.*)/g, (elt: string[]) => {
             let result: string;
             let x = parseFloat(elt[2]);
-            if (x == null) {
+            if (isNaN(x) || x == null) {
                 redis[elt[1]] = elt[2];
             }
             else {

@@ -52,12 +52,12 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 225;
+export var rewriteVersion: number = 234;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
 var settingsCleanups: (() => void)[] = [];
-export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations"]
+export var settingsObjects = ["settings", "compile", "promo", "compiletag", "releases", "releaseversion", "scanner", "translations", "ticks"]
 
 export class IdObject
     extends td.JsonRecord
@@ -174,6 +174,7 @@ export class ApiRequest
     public headers: td.StringMap;
     public userinfo: ApireqUserInfo;
     public isCached: boolean = false;
+    public restifyReq: restify.Request;
     
     public rootUser(): IUser
     {
@@ -205,7 +206,10 @@ export class Token
     @td.json public reason: string = "";
     @td.json public cookie: string = "";
     @td.json public version: number = 0;
-    static createFromJson(o:JsonObject) { let r = new Token(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new Token(); r.fromJson(o); return r; }
+    public asString() {
+        return "0" + this.PartitionKey + "." + this.RowKey;
+    }
 }
 
 export interface IToken {
@@ -247,6 +251,7 @@ export class ClientConfig
     @td.json public anonToken: string = "";
     @td.json public primaryCdnUrl: string = "";
     @td.json public altCdnUrls: string[];
+    @td.json public tickFilter: JsonObject;
     @td.json public doNothingText: string;
     static createFromJson(o:JsonObject) { let r = new ClientConfig(); r.fromJson(o); return r; }
 }
@@ -464,6 +469,12 @@ export interface IResolveOptions {
     anonSearch?: boolean;
 }
 
+export function checkRelexedGlobalList(req:ApiRequest)
+{
+    if (fullTD) return req.status == 200;
+    return checkPermission(req, "global-list")
+}
+
 export async function setResolveAsync(store: indexedStore.Store, resolutionCallback: ResolutionCallback, options_: IResolveOptions = {}) : Promise<void>
 {
     if (options_.anonList) {
@@ -486,8 +497,8 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
     addRoute("GET", plural, "", async (req1: ApiRequest) => {
         let q = orEmpty(req1.queryOptions["q"]);
         if (q == "") {
-            if ( ! options_.anonList) {
-                checkPermission(req1, "global-list");
+            if (!options_.anonList) {
+                checkRelexedGlobalList(req1);                
             }
             if (req1.status == 200) {
                 await anyListAsync(store, req1, "all", "all");
@@ -495,7 +506,7 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
         }
         else {
             if ( ! options_.anonSearch) {
-                checkPermission(req1, "global-list");
+                checkRelexedGlobalList(req1);
             }
             if (req1.status == 200) {
                 await executeSearchAsync(store.kind, q, req1);
@@ -764,7 +775,7 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response) : v
     if (res.finished()) {
         return;
     }
-    setHtmlHeaders(res);
+    setHtmlHeaders(req);
     handleHttps(req, res);
     if (nonSelfRedirect != "" && ! res.finished()) {
         if (req.header("host").toLowerCase() != myHost) {
@@ -880,6 +891,13 @@ export function sha256(hashData: string) : string
 
 export function handleHttps(req: restify.Request, res: restify.Response) : void
 {
+    let redirs = orEmpty(td.serverSetting("HTTP_REDIRECTS", true)).split(/[,;]\s*/).filter(s => !!s)
+    let host = orEmpty(req.header("host")).toLowerCase();
+    if (redirs.indexOf(host) >= 0) {
+        res.redirect(302, self + req.url().slice(1));
+        return;
+    }
+    
     if (hasHttps && ! req.isSecure() && ! td.startsWith(req.serverUrl(), "http://localhost:")) {
         res.redirect(302, req.serverUrl().replace(/^http/g, "https") + req.url());
     }
@@ -980,14 +998,14 @@ local rate    = ARGV[2] or 1000   -- token cost (1000ms - 1 token/seq)
 local burst   = ARGV[3] or 3600000    -- accumulate for up to an hour
 local dropAt  = ARGV[4] or 10000  -- return wait time of up to 10s; otherwise just drop the request
 
-local curr = redis.call(\"GET\", KEYS[1]) or 0
+local curr = redis.call("GET", KEYS[1]) or 0
 local newHorizon = math.max(now - burst, curr + rate)
 local sleepTime  = math.max(0, newHorizon - now)
 
 if sleepTime > tonumber(dropAt) then
   return -1
 else
-  redis.call(\"SET\", KEYS[1], newHorizon)
+  redis.call("SET", KEYS[1], newHorizon, "PX", burst)
   return sleepTime
 end
 `, keys, args);
@@ -1070,7 +1088,7 @@ export async function followIdsAsync(fetchResult: JsonObject[], field: string, k
         let s = js[field];
         ids.push(s);
     }
-    pubs = (await pubsContainer.getManyAsync(ids)).filter(elt => isGoodPub(elt, kind));
+    pubs = (await pubsContainer.getManyAsync(ids)).filter(elt => kind ? isGoodPub(elt, kind) : !!elt);
     return pubs;
 }
 
@@ -1138,9 +1156,11 @@ export function hasPermission(userjs: IUser, perm: string) : boolean
     return false;
 }
 
-export function setHtmlHeaders(res: restify.Response) : void
+export function setHtmlHeaders(req: restify.Request) : void
 {
-    res.setHeader("Cache-Control", "no-cache, no-store");
+    let res = req.response
+    if (!req.url().startsWith("/app/"))
+        res.setHeader("Cache-Control", "no-cache, no-store");    
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -1149,7 +1169,6 @@ export function setHtmlHeaders(res: restify.Response) : void
 
 export function encrypt(val: string, keyid: string) : string
 {
-    let s2: string;
     if (! val) {
         return val;
     }
@@ -1168,7 +1187,13 @@ export function encrypt(val: string, keyid: string) : string
     let cipherFinal = ivCipher.final();
     let s = Buffer.concat([enciphered, cipherFinal]).toString("base64");
     return "EnC$" + keyid + "$" + iv.toString("base64") + "$" + s;
-    return s2;
+}
+
+export function sha256bin(key: string)
+{
+    let hash = crypto.createHash("sha256");
+    hash.update(key);
+    return hash.digest();
 }
 
 export function prepEncryptionKey(keyid: string) : Buffer
@@ -1177,9 +1202,7 @@ export function prepEncryptionKey(keyid: string) : Buffer
     if (key == "") {
         return null;
     }
-    let hash = crypto.createHash("sha256");
-    hash.update(key);
-    return hash.digest();
+    return sha256bin(key);
 }
 
 export function decrypt(val: string) : string
@@ -1296,10 +1319,9 @@ export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject) 
 
 export function isAbuseSafe(elt: JsonObject) : boolean
 {
-    let b2: boolean;
-    let b = orEmpty(elt["abuseStatus"]) != "active";
+    // promos always safe
+    let b = orEmpty(elt["kind"]) == "promo" || orEmpty(elt["abuseStatus"]) != "active";
     return b;
-    return b2;
 }
 
 export function callerHasPermission(req: ApiRequest, perm: string) : boolean
@@ -1422,6 +1444,9 @@ export async function initAsync()
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
+    self = td.serverSetting("SELF", false).toLowerCase();
+    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
+    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));    
 
     let creds = orEmpty(td.serverSetting("BASIC_CREDS", true));
     if (creds != "") {
@@ -1440,6 +1465,18 @@ export async function lateInitAsync()
     redisClient = await redis.createClientAsync("", 0, "");
 }
 
+export function cdnUrl(url:string)
+{
+    if (!fullTD) return url;
+    
+    for (let pref of currClientConfig.altCdnUrls) {
+        if (url.substr(0, pref.length) == pref)
+            url = currClientConfig.primaryCdnUrl + url.slice(pref.length)
+    }
+    
+    return url;
+}
+
 export async function initFinalAsync()
 {
     settingsContainer = await cachedStore.createContainerAsync("settings");
@@ -1455,10 +1492,16 @@ export async function initFinalAsync()
     currClientConfig.shareUrl = currClientConfig.rootUrl;
     currClientConfig.cdnUrl = pubsContainer.blobContainer().url().replace(/\/pubs$/g, "");
     currClientConfig.primaryCdnUrl = withDefault(td.serverSetting("CDN_URL", true), currClientConfig.cdnUrl);
-    currClientConfig.altCdnUrls = (<string[]>[]);
-    currClientConfig.altCdnUrls.push(pubsContainer.blobContainer().url().replace(/\/pubs$/g, ""));
-    currClientConfig.altCdnUrls.push(currClientConfig.primaryCdnUrl);
+    currClientConfig.altCdnUrls = [
+        pubsContainer.blobContainer().url().replace(/\/pubs$/g, ""),
+        currClientConfig.primaryCdnUrl
+    ];
+    if (fullTD) {
+        currClientConfig.altCdnUrls.push("http://cdn.touchdevelop.com")
+        currClientConfig.altCdnUrls.push("https://az31353.vo.msecnd.net")
+    }
     currClientConfig.anonToken = basicCreds;
+    
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();
     });
@@ -1467,9 +1510,7 @@ export async function initFinalAsync()
     adminRequest = buildApiRequest("/api");
     adminRequest.userinfo.json = <any> { "groups": {} };
 
-    self = td.serverSetting("SELF", false).toLowerCase();
-    myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
-    nonSelfRedirect = orEmpty(td.serverSetting("NON_SELF_REDIRECT", true));
+    await refreshSettingsAsync();
 }
 
 export function removeDerivedProperties(body: JsonObject) : JsonObject
@@ -1490,9 +1531,10 @@ export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<
     let users = await followPubIdsAsync(entities, "userid", "");
     coll2 = (<JsonBuilder[]>[]);
     for (let i = 0; i < entities.length; i++) {
-        let userJs:any = users[i];
+        let userJs = users[i];
         let root = td.clone(entities[i]);
         coll2.push(root);
+        let userTop = <tdliteUsers.IUser>(userJs || {});
         if (userJs != null) {
             root["*userid"] = userJs;
             userJs = userJs["pub"];
@@ -1502,9 +1544,9 @@ export async function addUsernameEtcCoreAsync(entities: JsonObject[]) : Promise<
         let pub = root["pub"];
         pub["id"] = root["id"];
         pub["kind"] = root["kind"];
-        pub["userhaspicture"] = userJs.haspicture;
-        pub["username"] = userJs.name;
-        pub["userscore"] = userJs.score;
+        pub["userhaspicture"] = !!userTop.picturePrefix;        
+        pub["username"] = userJs["name"];
+        pub["userscore"] = userJs["score"];
         if ( ! fullTD) {
             pub["userplatform"] = [];
         }
@@ -1611,6 +1653,9 @@ export async function refreshSettingsAsync(): Promise<void> {
     for (let f of settingsCleanups) {
         f();
     }
+    
+    if (currClientConfig)
+        currClientConfig.tickFilter = (getSettings("ticks") || {})["ticks"];
 
     let entry2 = getSettings("settings") || { permissions: {} };
     let permMap = td.clone(entry2["permissions"]);
@@ -1727,7 +1772,7 @@ export function registerPubKind(desc:IPubKind)
 export async function getCloudRelidAsync(includeVer: boolean) : Promise<string>
 {
     let ver: string;
-    let entry = await settingsContainer.getAsync("releases");
+    let entry = getSettings("releases");
     let js = entry["ids"]["cloud"];
     ver = js["relid"];
     if (includeVer) {

@@ -50,6 +50,7 @@ import * as tdliteRouting from "./tdlite-routing"
 import * as tdliteStatus from "./tdlite-status"
 import * as tdliteLegacy from "./tdlite-legacy"
 import * as tdliteCounters from "./tdlite-counters"
+import * as tdliteProgress from "./tdlite-progress"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -141,7 +142,7 @@ async function _initAsync() : Promise<void>
         }
     });
     await tdliteLogin.initAsync();
-
+    
     // ## batch api here
     server.post("/api", async(req2: restify.Request, res2: restify.Response) => {
         await core.refreshSettingsAsync();
@@ -155,29 +156,38 @@ async function _initAsync() : Promise<void>
         res3.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, HEAD, OPTIONS");
         res3.sendStatus(200);
     });
-    server.all(async(req4: restify.Request, res4: restify.Response) => {
+    server.all(async(req: restify.Request, res: restify.Response) => {
         await core.refreshSettingsAsync();
         cron.poke(); // we're getting requests; it seems we're alive
-        if (td.startsWith(req4.url(), "/api/")) {
-            await tdliteRouting.performRoutingAsync(req4, res4);
+        if (td.startsWith(req.url(), "/api/")) {
+            await tdliteRouting.performRoutingAsync(req, res);
         }
         else {
-            core.handleBasicAuth(req4, res4);
-            if ( ! res4.finished() && req4.method() != "GET") {
-                res4.sendError(httpCode._405MethodNotAllowed, "");
+            core.handleBasicAuth(req, res);
+            if ( ! res.finished() && req.method() != "GET") {
+                res.sendError(httpCode._405MethodNotAllowed, "");
             }
-            if ( ! res4.finished()) {
-                if (td.startsWith(req4.url(), "/app/")) {
-                    await tdliteReleases.serveReleaseAsync(req4, res4);
+            if (!res.finished()) {
+                let url = req.url();
+                let webappMatch = /^\/users\/@([a-z]+)-[^\/\?]*\/@([a-z]+)-[^\/\?]*($|\?)/.exec(req.url())
+                if (webappMatch) {
+                    res.redirect(httpCode._301MovedPermanently, "/userapp/" + webappMatch[2])
                 }
-                else if (td.startsWith(req4.url(), "/favicon.ico")) {
-                    res4.sendBuffer(await tdliteReleases.getFaviconAsync(), "image/x-icon");
+                else if (url.startsWith("/app/authorize")) {
+                    await tdlitePointers.servePointerAsync(req, res);
+                } else if (url.startsWith("/app/")) {
+                    await tdliteReleases.serveReleaseAsync(req, res);
+                } else if (url.startsWith("/userapp/")) {
+                    await tdliteReleases.serveWebAppAsync(req, res);
                 }
-                else if (td.startsWith(req4.url(), "/verify/")) {
-                    await tdliteUsers.handleEmailVerificationAsync(req4, res4);
+                else if (url.startsWith("/favicon.ico")) {
+                    res.sendBuffer(await tdliteReleases.getFaviconAsync(), "image/x-icon");
+                }
+                else if (url.startsWith("/verify/")) {
+                    await tdliteUsers.handleEmailVerificationAsync(req, res);
                 }
                 else {
-                    await tdlitePointers.servePointerAsync(req4, res4);
+                    await tdlitePointers.servePointerAsync(req, res);
                 }
             }
         }
@@ -225,6 +235,7 @@ async function initSubsystems() : Promise<void>
     await tdliteImport.initAsync();
     await tdliteWorkspace.initAsync();
     await tdliteCppCompiler.initAsync();
+    await tdliteProgress.initAsync();
     if (core.fullTD) {
         await tdliteLegacy.initAsync();
     }    

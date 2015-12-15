@@ -17,6 +17,8 @@ import * as audit from "./tdlite-audit"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteReviews from "./tdlite-reviews"
 import * as tdliteUsers from "./tdlite-users"
+import * as tdliteComments from "./tdlite-comments"
+import * as tdlitePointers from "./tdlite-pointers"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -126,8 +128,7 @@ export async function initAsync() : Promise<void>
             x = x + 1;
         }
         fetchResult.items = td.arrayToJson(coll);
-    }
-    , {
+    }, {
         byUserid: true,
         byPublicationid: true
     });
@@ -135,19 +136,57 @@ export async function initAsync() : Promise<void>
     core.addRoute("GET", "*user", "abuses", async (req: core.ApiRequest) => {
         await core.anyListAsync(abuseReports, req, "publicationuserid", req.rootId);
     });
-    core.addRoute("POST", "*abusereport", "", async (req1: core.ApiRequest) => {
-        let pub = req1.rootPub["pub"];
-        await core.checkFacilitatorPermissionAsync(req1, pub["publicationuserid"]);
-        if (req1.status == 200) {
-            let res = td.toString(req1.body["resolution"]);
-            await core.pubsContainer.updateAsync(req1.rootId, async (entry1: JsonBuilder) => {
-                core.setFields(entry1["pub"], req1.body, ["resolution"]);
+    
+    core.addRoute("POST", "art", "reshield", async(req: core.ApiRequest) => {
+        let store = indexedStore.storeByKind("art");
+        await tdlitePointers.reindexStoreAsync(req, store, async(e) => {
+            if (e["arttype"] != "picture") return;
+            
+            let sh = e["shieldinfo"]
+            if (sh) {
+                if (sh["acssafe"] == "1" || sh["webpurifysafe"] == "1") {
+                    // OK
+                } else if (sh["acssafe"] == "0") {
+                    req.response["itemsReindexed"]++;
+                    let jobid = sh["acsjobid"] || ""
+                    await postAcsReport(e["id"], "Legacy ACS flag. " + jobid, jobid)                    
+                } else {
+                    sh = null;
+                }
+            }
+            
+            if (!sh) {
+                // TODO rescan ...
+            }            
+        })
+    });
+
+    core.addRoute("POST", "*abusereport", "", async (req: core.ApiRequest) => {
+        let pub = req.rootPub["pub"];
+        // any-facilitator is good enough to update any abuse report, even about users on higher level
+        if (!core.hasPermission(req.userinfo.json, "any-facilitator"))
+            await core.checkFacilitatorPermissionAsync(req, pub["publicationuserid"]);        
+        if (req.status == 200) {
+            let res = td.toString(req.body["resolution"]);
+            if (res == "deleted") {
+                req.status = httpCode._402PaymentRequired;
+                return;
+            }
+            if (res == "ignored")
+                logger.tick("AbuseSet@ignored")
+            else if (res == "active")
+                logger.tick("AbuseSet@active")
+            else
+                logger.tick("AbuseSet@other");
+
+            await core.pubsContainer.updateAsync(req.rootId, async(entry1: JsonBuilder) => {
+                core.setFields(entry1["pub"], req.body, ["resolution"]);
             });
             await core.pubsContainer.updateAsync(pub["publicationid"], async (entry2: JsonBuilder) => {
                 entry2["abuseStatus"] = res;
                 delete entry2["abuseStatusPosted"];
             });
-            req1.response = ({});
+            req.response = ({});
         }
     });
     core.addRoute("POST", "*pub", "abusereports", async(req: core.ApiRequest) => {
@@ -193,27 +232,27 @@ export async function initAsync() : Promise<void>
             req.status = httpCode._405MethodNotAllowed;
         }
     });
-    core.addRoute("GET", "*pub", "candelete", async (req4: core.ApiRequest) => {
+    core.addRoute("GET", "*pub", "candelete", async (req: core.ApiRequest) => {
         let resp = new CandeleteResponse();
-        let pub1 = req4.rootPub["pub"];
-        resp.publicationkind = req4.rootPub["kind"];
-        resp.publicationname = withDefault(pub1["name"], "/" + req4.rootId);
+        let pub1 = req.rootPub["pub"];
+        resp.publicationkind = req.rootPub["kind"];
+        resp.publicationname = withDefault(pub1["name"], "/" + req.rootId);
         resp.publicationuserid = getAuthor(pub1);
-        resp.candeletekind = canBeAdminDeleted(req4.rootPub) || core.hasSpecialDelete(req4.rootPub);
-        let reports = await abuseReports.getIndex("publicationid").fetchAsync(req4.rootId, ({"count":10}));
+        resp.candeletekind = canBeAdminDeleted(req.rootPub) || core.hasSpecialDelete(req.rootPub);
+        let reports = await abuseReports.getIndex("publicationid").fetchAsync(req.rootId, ({"count":10}));
         resp.hasabusereports = reports.items.length > 0 || reports.continuation != "";
         if (resp.candeletekind) {
-            await checkDeletePermissionAsync(req4);
-            if (req4.status == 200) {
+            await checkDeletePermissionAsync(req);
+            if (req.status == 200) {
                 resp.candelete = true;
-                if (resp.publicationuserid == req4.userid) {
-                    await core.checkFacilitatorPermissionAsync(req4, resp.publicationuserid);
-                    if (req4.status == 200) {
+                if (resp.publicationuserid == req.userid) {
+                    await core.checkFacilitatorPermissionAsync(req, resp.publicationuserid);
+                    if (req.status == 200) {
                         resp.canmanage = true;
                     }
                     else {
                         resp.canmanage = false;
-                        req4.status = 200;
+                        req.status = 200;
                     }
                 }
                 else {
@@ -222,10 +261,13 @@ export async function initAsync() : Promise<void>
             }
             else {
                 resp.candelete = false;
-                req4.status = 200;
+                req.status = 200;
             }
+            
+            if (core.hasPermission(req.userinfo.json, "any-facilitator"))
+                resp.canmanage = true;
         }
-        req4.response = resp.toJson();
+        req.response = resp.toJson();
     });
 }
 
@@ -253,13 +295,14 @@ async function deletePubRecAsync(delEntry: JsonObject) : Promise<void>
                 await core.pubsContainer.updateAsync(json1["id"], async (entry2: JsonBuilder) => {
                     entry2["pub"]["resolution"] = "deleted";
                 });
+                logger.tick("AbuseSet@deleted")
             });
 
         }
     }
 }
 
-export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
+async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promise<void>
 {
     let baseKind = req.rootPub["kind"];
     if ( ! canHaveAbuseReport(baseKind)) {
@@ -276,12 +319,15 @@ export async function postAbusereportAsync(req: core.ApiRequest) : Promise<void>
         let pub = req.rootPub["pub"];
         report.publicationname = orEmpty(pub["name"]);
         report.publicationuserid = getAuthor(pub);
+        let authorjs = await tdliteUsers.getAsync(report.publicationuserid);
         let jsb = {};
         jsb["pub"] = report.toJson();
+        if (acsInfo)
+            jsb["acsInfo"] = acsInfo;
         await core.generateIdAsync(jsb, 10);
         await abuseReports.insertAsync(jsb);
         await core.pubsContainer.updateAsync(report.publicationid, async (entry: JsonBuilder) => {
-            if (! entry["abuseStatus"]) {
+            if (!core.hasPermission(authorjs, "root-ptr") && !entry["abuseStatus"]) {
                 entry["abuseStatus"] = "active";
             }
             entry["abuseStatusPosted"] = "active";
@@ -355,16 +401,23 @@ function canBeAdminDeleted(jsonpub: JsonObject) : boolean
     return b;
 }
 
-async function checkDeletePermissionAsync(req: core.ApiRequest) : Promise<void>
-{
+async function checkDeletePermissionAsync(req: core.ApiRequest): Promise<void> {
     let pub = req.rootPub["pub"];
     let authorid = pub["userid"];
     if (pub["kind"] == "user") {
         authorid = pub["id"];
     }
-    if (authorid != req.userid) {
-        await core.checkFacilitatorPermissionAsync(req, authorid);
+    if (authorid == req.userid) return; // ok, my content
+    
+    if (pub["kind"] == "comment") {
+        let rootpub = await tdliteComments.getRootPubAsync(req.rootPub);
+        if (rootpub && rootpub["kind"] == "group") {
+            if (rootpub["pub"]["userid"] == req.userid)
+                return; // OK, I can delete comments on my group
+        }
     }
+
+    await core.checkFacilitatorPermissionAsync(req, authorid);
 }
 
 function buildRecognizer(words:string[])
@@ -384,6 +437,19 @@ function buildRecognizer(words:string[])
     }
     
     return root
+}
+
+function unescapeCode(text: string)
+{
+    if (/^</.test(text)) {
+        // XML
+        text = text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    } else {
+        // JavaScript-like
+        text = text.replace(/\\u([a-fA-F0-9]{4})/g, (m, n) => String.fromCharCode(parseInt(n, 16)));
+        text = text.replace(/\\[rnt]/g, m => m + " ");
+    }
+    return text;
 }
 
 function scanCore(tree: {}, str: string) {
@@ -415,7 +481,7 @@ function initScanner() {
     scannerRegexes = {}
     let reg = sett["regexps"]
     for (let rxname of Object.keys(reg)) {
-        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b");        
+        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b", "g");        
     }
 }
 
@@ -423,6 +489,8 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     let res = ""
 
     initScanner();
+    
+    txt = unescapeCode(txt);
 
     let hits = scanCore(wordRecognizer, txt);
 
@@ -435,35 +503,40 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     } else {
         for (let rxname of Object.keys(scannerRegexes)) {
             if (rxname.endsWith("*") && !isdesc) continue;
-            let m = scannerRegexes[rxname].exec(txt)
-            if (m) {
-                res += rxname + ": " + m[0] + ".\n"
-            }
+            let dummy = txt.replace(scannerRegexes[rxname], m => {
+                res += rxname + ": " + m + ".\n"
+                return "";
+            })
         }
     }
 
     return res;
 }
 
-export async function scanAndPostAsync(pubid: string, body: string, desc:string, userjson: core.IUser) {
-    let msg = scanText(body, core.hasPermission(userjson, "external-links"), false);
-    msg += scanText(desc, core.hasPermission(userjson, "external-links"), true);
-    if (!msg) return;
-    
+export async function postAcsReport(pubid: string, msg: string, acsInfo:string = null, req: core.ApiRequest = null) {
     let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
     if (uid != "") {
-        let req = core.buildApiRequest("/api/" + pubid + "/abuse")
+        if (!req)
+            req = core.buildApiRequest("/api/" + pubid + "/abuse");
         await core.setReqUserIdAsync(req, uid);
         req.rootPub = await core.pubsContainer.getAsync(pubid);
         if (core.isGoodEntry(req.rootPub)) {
-            let jsb = {
+            req.body = {
                 text: msg
             };
-            req.body = jsb;
             req.rootId = pubid;
-            await postAbusereportAsync(req);
+            await postAbusereportAsync(req, acsInfo);
         }
     }
+}
+
+export async function scanAndPostAsync(pubid: string, body: string, desc: string, userjson: core.IUser) {
+    let canemail = core.hasPermission(userjson, "external-links");
+    let msg = scanText(body, canemail, false);
+    msg += scanText(desc, canemail, true);
+    if (msg) {
+        await postAcsReport(pubid, msg);
+    }    
 }
 
 function testscanner()

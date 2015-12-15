@@ -50,6 +50,9 @@ interface LegacySettings {
     YearOfBirth: number;
     FacebookId: string;
     Nickname: string;
+    PicturePrefix: string;
+    PictureLinkedToFacebook: boolean;
+    LastActiveTime: Date;
 }
 
 var legacyTable: azureTable.Client;
@@ -58,6 +61,7 @@ var settingsTable: azureTable.Table;
 var workspaceTable: azureTable.Table;
 var identityTable: azureTable.Table;
 var largeinstalledContainer: azureBlobStorage.Container;
+var userpicContainer: azureBlobStorage.Container;
 
 type IUser = tdliteUsers.IUser;
 
@@ -74,6 +78,7 @@ export async function initAsync()
     workspaceTable = legacyTable.getTable("svcUSRscripts");
     identityTable = legacyTable.getTable("svcUSRidentity");
     largeinstalledContainer = legacyBlob.getContainer("largeinstalled");
+    userpicContainer = legacyBlob.getContainer("pic");
     
     core.addRoute("POST", "*user", "importsettings", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
@@ -126,45 +131,46 @@ export async function initAsync()
     });
     
     core.addRoute("POST", "migrationtoken", "", async(req) => {
-        let tok = td.orEmpty(req.body["access_token"])        
+        let tok = td.orEmpty(req.body["access_token"])
         if (!tok || !core.fullTD) {
             req.status = httpCode._400BadRequest;
             return;
         }
-        
+
         let q = td.createRequest("https://api.touchdevelop.com/me?access_token=" + encodeURIComponent(tok))
         let resp = await q.sendAsync()
         let json = resp.contentAsJson()
-        if (!json) { 
+        if (!json) {
             req.status = httpCode._403Forbidden;
             return;
         }
-        
+
         let uid = json["id"]
         let userjson = await tdliteUsers.getAsync(uid);
         if (!userjson) {
-            userjson = <IUser> await tdliteImport.reimportPub(uid, "user");
+            userjson = <IUser>await tdliteImport.reimportPub(uid, "user");
             if (!userjson) {
                 req.status = httpCode._424FailedDependency;
                 return;
-            }    
+            }
         }
         
         if (userjson["login"]) {
             req.status = httpCode._409Conflict;
             return;            
         }
-        
-        userjson = await tdliteUsers.updateAsync(uid, async(v) => {            
-            if (!v.migrationtoken) {
-                v.migrationtoken = "1" + uid + "." + td.createRandomId(32);
-            }
-        })
-        
+
+        if (!userjson.migrationtoken)
+            userjson = await tdliteUsers.updateAsync(uid, async(v) => {
+                if (!v.migrationtoken) {
+                    v.migrationtoken = "1" + uid + "." + td.createRandomId(32);
+                }
+            })
+
         req.response = {
             userid: uid,
             migrationtoken: userjson.migrationtoken
-        }        
+        }
     })
     
     restify.server().post("/oauth/legacycallback", async(req, res) => {
@@ -193,7 +199,6 @@ export async function initAsync()
         }
         let idprov = token.payload["identityprovider"];
         let name = token.payload["nameid"];
-        let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
         
 
         let session = await tdliteLogin.LoginSession.loadAsync(req.query()["token"])
@@ -203,18 +208,17 @@ export async function initAsync()
             return
         }
         
+        let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
         let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
         if (!ent) {            
             session.storedMessage = "Cannot find that user account in the legacy system. Maybe try linking other provider?"
+            logger.tick("Login_legacyNotFound")
             logger.warning("cannot find ACS user: " + encode(name) + ":" + encode(idprov))
             await session.saveAndRedirectAsync(req);
             return;
         }
 
-        let uid = td.orEmpty(ent["UserId"])
-        let userjson = await tdliteUsers.getAsync(uid)
-        if (!userjson)
-            userjson = <IUser> await tdliteImport.reimportPub(uid, "user");
+        let userjson = await reimportUserAsync(td.orEmpty(ent["UserId"]))
 
         if (!userjson) {
             // log crash
@@ -223,13 +227,23 @@ export async function initAsync()
             return;
         }
 
-        let ok = await session.setMigrationUserAsync(userjson["id"])
+        let ok = await session.setMigrationUserAsync(userjson["id"], true)
         if (!ok) {
             session.storedMessage = "This user account was already bound to identity in the new system. Maybe try linking other provider?"
+            logger.tick("Login_legacyBound")
+        } else {
+            logger.tick("Login_legacyOK")
         }        
         
         await session.saveAndRedirectAsync(req);                
     });
+}
+
+async function reimportUserAsync(uid: string) {
+    let userjson = await tdliteUsers.getAsync(uid)
+    if (!userjson)
+        userjson = <IUser>await tdliteImport.reimportPub(uid, "user");
+    return userjson;
 }
 
 function decodeJWT(wresult: string) {
@@ -259,22 +273,22 @@ function decompress(buf: Buffer)
 {
     if (!buf) return "";
     
-	if (buf.length <= 1) return "";
-	
-	if (buf[0] == 0) {
-		buf = buf.slice(1);
-	} else if (buf[0] == 1 || buf[0] == 2) {
-		let len = buf.readInt32LE(1);
-		if (buf[0] == 1)
-			buf = zlib.inflateRawSync(buf.slice(5));
-		else
-			buf = zlib.gunzipSync(buf.slice(5));
-		assert(len == buf.length)		
-	} else {
-		assert(false)		
-	}
-	
-	return buf.toString("utf8");
+    if (buf.length <= 1) return "";
+    
+    if (buf[0] == 0) {
+        buf = buf.slice(1);
+    } else if (buf[0] == 1 || buf[0] == 2) {
+        let len = buf.readInt32LE(1);
+        if (buf[0] == 1)
+            buf = zlib.inflateRawSync(buf.slice(5));
+        else
+            buf = zlib.gunzipSync(buf.slice(5));
+        assert(len == buf.length)       
+    } else {
+        assert(false)       
+    }
+    
+    return buf.toString("utf8");
 }
 
 function decompressBlob(buf: Buffer) {
@@ -339,7 +353,8 @@ async function importHeaderAsync(v: WorkspaceEntry) {
             editorState = objs[2] || "";
         }
         else {
-            throw new Error("Blob not found: " + blobid)
+            logger.error("import blob not found: " + blobid);
+            return;
         }
     } else {
         script = decompress(v.PrivateCompressedScript)
@@ -352,8 +367,10 @@ async function importHeaderAsync(v: WorkspaceEntry) {
             script = tmp["text"];
     }
 
-    if (!script)
-        throw new Error("empty script")
+    if (!script) {
+        logger.error("empty script: " + v.ScriptId + " " + v.PartitionKey + " / " + v.RowKey);
+        return;
+    }
 
     let body: tdliteWorkspace.IPubBody = {
         guid: v.RowKey.slice(1).toLowerCase(),
@@ -375,8 +392,9 @@ async function importHeaderAsync(v: WorkspaceEntry) {
     }
 
     let res = await tdliteWorkspace.saveScriptAsync(userid, tdliteWorkspace.PubBody.createFromJson(body), toTime(v.LastUpdated)*1000);
-    if (res["error"])
-        throw new Error("save error: " + res["error"]);
+    if (res["error"]) {
+        logger.error("save error: " + res["error"]);        
+    }
 }
 
 export async function importWorkspaceAsync(userjson: IUser) {
@@ -428,6 +446,8 @@ export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
     let res = await settingsTable.createQuery().partitionKeyIs(id).and("RowKey", "=", "$").fetchAllAsync()
     let code = 200;
     let loginid = "";
+    let lastTime = 0;
+    let picpref = "";
     if (res && res[0]) {
         let legacy = <LegacySettings>res[0];
         for (let k of normalFields) {
@@ -438,7 +458,26 @@ export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
         if (legacy.YearOfBirth) s.yearofbirth = legacy.YearOfBirth;
         if (legacy.FacebookId)
             loginid = "fb:" + legacy.FacebookId;
-        
+        if (legacy.LastActiveTime)
+            lastTime = Math.round(legacy.LastActiveTime.getTime() / 1000);
+        if (legacy.PictureLinkedToFacebook)
+            picpref = "fb:" + legacy.FacebookId;
+        else if (legacy.PicturePrefix) {
+            picpref = "pf:" + legacy.PicturePrefix;
+            logger.debug("download pic: " + legacy.PicturePrefix)
+            for (let i = 0; i <= 5; ++i) {
+                let fn = legacy.PicturePrefix + "-" + i
+                let pic = await userpicContainer.getBlobToBufferAsync(fn + ".jpeg", { justTry: true })
+                if (pic.succeded()) {
+                    await tdliteUsers.userpicContainer.createBlockBlobFromBufferAsync(fn + ".jpg", pic.buffer(), {
+                        contentType: "image/jpeg",
+                        cacheControl: "public, max-age=3600"                        
+                    })
+                } else {
+                    logger.info("failpic: " + fn + " : " + pic.error())
+                }
+            }
+        }
     } else {
         code = 404;
     }
@@ -452,6 +491,10 @@ export async function importSettingsAsync(jsb: tdliteUsers.IUser) {
             v["permissions"] = ",user,";
         if (loginid)
             v["legacyLogin"] = loginid;
+        if (lastTime && !v.lastlogin)
+            v.lastlogin = lastTime;
+        if (picpref)
+            v.picturePrefix = picpref;
     }, force)
 
     let ret = s.toJson();
@@ -467,6 +510,21 @@ function gencode() {
     return numCode;
 }
 
+async function handleFacebookAsync(session: tdliteLogin.LoginSession) {
+    let m = /^id\/fb\/(\d+)$/.exec(session.profileId);
+    if (!m) return;
+
+    let ent = await identityTable.getEntityAsync(m[1], "Facebook%002D256157661061452")
+    if (!ent) return;
+
+    let userjson = await reimportUserAsync(td.orEmpty(ent["UserId"]))
+    if (!userjson) return;
+    
+    logger.tick("Login_fbauto")
+    await session.setMigrationUserAsync(userjson["id"])
+    await session.saveAsync()
+}
+    
 // TODO throttling for emails etc
 
 export async function handleLegacyAsync(req: restify.Request, session: tdliteLogin.LoginSession, params: {}): Promise<void> {
@@ -477,7 +535,9 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         
         let prov = serverAuth.ProviderIndex.all().filter(p => p.shortname == session.providerId)[0]        
         params["PROVIDER"] = prov ? prov.name : session.providerId
-    }  
+    } else {
+        return
+    }
     
     let sett = n => td.orEmpty(req.query()["fld_" + n]).toLowerCase().trim();
     let legEmail = sett("legacyemail");
@@ -528,8 +588,12 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         await session.saveAsync();
         return;
     }
+    
+    await handleFacebookAsync(session);
+    if (session.userCreated())
+        return
 
-    if(tokM) {
+    if (tokM) {
         let userjson = await tdliteUsers.getAsync(tokM[1]);
         if (userjson && userjson["migrationtoken"] === session.oauthU) {
             let ok = await session.setMigrationUserAsync(userjson["id"]);
@@ -537,21 +601,25 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
                 alreadyBound();
                 return
             }
+            logger.tick("Login_migrationtoken")
         } else {
-            err("Invalid migration code.")
+            err("Invalid migration code. Please start over.")
             return;
         }
     } else if (sett("legacyskip")) {
+        logger.tick("Login_skiplegacy")
         session.askLegacy = false;
     } else if (sett("legacyrestart")) {
         session.askLegacy = true;
         session.legacyCodes = null;
         params["INNER"] = "legacy";
     } else if (sett("legacyacct")) {
+        logger.tick("Login_legacystart")
         params["INNER"] = "legacylogin"
     } else if (sett("linkacct")) {
-        err("Sorry, not implemented yet")
-        params["INNER"] = "legacy";
+        logger.tick("Login_linkaccts")
+        let redirUrl = "/oauth/providers?" + session.getRestartQuery();
+        req.response.redirect(httpCode._302MovedTemporarily, redirUrl)
     } else if (emailLinkingEnabled && legEmail) {
         let users = await tdliteUsers.users.getIndex("email").fetchAllAsync(legEmail)
         if (users.length == 0) {

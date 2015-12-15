@@ -1,6 +1,7 @@
 {
   "private": true,
   "devDependencies": {
+    "tsd": "^0.5.7",
     "typescript": "https://microbit0.blob.core.windows.net/files/npm0/typescript-1.7.0-node4.tgz"
   },
   "dependencies": {

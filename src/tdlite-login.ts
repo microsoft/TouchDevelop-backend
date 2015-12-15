@@ -61,6 +61,8 @@ export class LoginSession
     @td.json public oauthClientId: string;
     @td.json public oauthU: string;
     @td.json public federatedUserInfo: serverAuth.IUserInfo;
+    @td.json public linksecret: string;
+    @td.json public restartQuery: string;
 
     static createFromJson(o: JsonObject) { let r = new LoginSession(); r.fromJson(o); return r; }
     
@@ -68,7 +70,7 @@ export class LoginSession
         return (this.userid && this.userid != "pending");
     }
     
-    static async loadAsync(id: string): Promise<LoginSession>
+    static async loadCoreAsync(id: string): Promise<LoginSession>
     {
         let sessionString = orEmpty(await serverAuth.options().getData(orEmpty(id)));
         logger.debug("session string: " + sessionString);
@@ -77,13 +79,47 @@ export class LoginSession
         } else return <LoginSession>null;        
     }
     
-    public async setMigrationUserAsync(uid: string)
+    public getRestartQuery()
     {
-        let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, this.profileId);
+        if (!this.linksecret)
+            this.linksecret = td.createRandomId(12);
+        return this.restartQuery + "&u=2" + this.state + "." + this.linksecret
+    }
+    
+    public async getLinkedSessionAsync():Promise<LoginSession> {
+        let tokM2 = /^2(\w+)\.(\w+)$/.exec(this.oauthU);
+        if (tokM2) {
+            let othersession = await LoginSession.loadCoreAsync(tokM2[1])
+            if (othersession && othersession.linksecret && othersession.linksecret == tokM2[2]) {
+                return othersession
+            }
+        }
+        
+        return <LoginSession>null;
+    }
+    
+    static async loadAsync(id: string): Promise<LoginSession> {
+        let session = await LoginSession.loadCoreAsync(id);
+        return session
+    }
+    
+    public async setMigrationUserAsync(uid: string, multipleOK = false)
+    {
+        let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, this.profileId, multipleOK);
         if (!ok) return false;
         this.userid = uid
         this.askLegacy = false
         return true
+    }
+    
+    public fixupRedirectUrl(url:string)
+    {        
+        if (this.oauthClientId == "webapp3") {
+            // if the webapp supports this, use %23 instead of a second hash
+            // otherwise sign-in on iOS/Chrome doesn't work
+            url = url.replace(/#(.*)#/, (m, x) => "#" + x + "%23");
+        }
+        return url;
     }
     
     public async createUserIfNeededAsync(req: restify.Request): Promise<IUser>
@@ -114,21 +150,20 @@ export class LoginSession
         return userjs
     }
     
-    public async updateTermsVersionAsync(req:restify.Request, userjs:IUser)
-    {          
-        if (core.serviceSettings.termsversion != "") {
+    public async updateTermsVersionAsync(req: restify.Request, userjs: IUser) {
+        let ver = core.serviceSettings.termsversion || "default"
+        if (userjs.termsversion != ver) {
             userjs = await tdliteUsers.updateAsync(this.userid, async(entry1) => {
-                entry1.termsversion = core.serviceSettings.termsversion;
+                entry1.termsversion = ver;
+            });
+            await audit.logAsync(audit.buildAuditApiRequest(req), "user-agree", {
+                userid: this.userid,
+                subjectid: this.userid,
+                data: ver,
+                newvalue: userjs
             });
         }
-        await audit.logAsync(audit.buildAuditApiRequest(req), "user-agree", {
-            userid: this.userid,
-            subjectid: this.userid,
-            data: core.serviceSettings.termsversion || "default",
-            newvalue: userjs
-        });
-        
-        return userjs;        
+        return userjs;
     }
     
     public async saveAsync()
@@ -139,23 +174,27 @@ export class LoginSession
     public async saveAndRedirectAsync(req:restify.Request)
     {
         await this.saveAsync();
-        req.response.redirect(302, "/oauth/dialog?td_session=" + this.state)
+        req.response.redirect(302, core.self + "oauth/dialog?td_session=" + this.state)
     }
     
     private async generateRedirectUrlAsync(): Promise<string>
     {
-        assert(this.userCreated())        
-        let tok = await generateTokenAsync(this.userid, this.profileId, this.oauthClientId);
+        assert(this.userCreated())
+        let clientId = this.oauthClientId;
+        if (this.federatedUserInfo.redirectPrefix.startsWith("http://localhost:"))
+            clientId = "no-cookie";
+        let tok = await generateTokenAsync(this.userid, this.profileId, clientId);
         let redirectUrl = td.replaceAll(this.federatedUserInfo.redirectPrefix, "TOKEN", encodeURIComponent(tok.url)) + "&id=" + this.userid;
         if (tok.cookie != "") {
             redirectUrl = redirectUrl + "&td_cookie=" + tok.cookie;
         }
-        return redirectUrl;
+        return this.fixupRedirectUrl(redirectUrl);
     }
     
     public async accessTokenRedirectAsync(req:restify.Request)
     {
-        accessTokenRedirect(req.response, await this.generateRedirectUrlAsync());
+        let url = await this.generateRedirectUrlAsync();
+        accessTokenRedirect(req.response, url);
     }
 }
 
@@ -222,6 +261,7 @@ export async function initAsync(): Promise<void> {
     serverAuth.init({
         makeJwt: async(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) => {
             let url2 = await loginFederatedAsync(profile, oauthReq);
+            /*
             let stripped = stripCookie(url2);
             let jsb2 = ({ "headers": {} });
             if (stripped.cookie) {
@@ -229,6 +269,10 @@ export async function initAsync(): Promise<void> {
             }
             jsb2["http redirect"] = stripped.url;
             return jsb2;
+            */
+            return {
+                "http redirect": url2
+            }
         },
         getData: async(key: string) => {
             let value: string;
@@ -241,7 +285,7 @@ export async function initAsync(): Promise<void> {
         },
         federationMaster: orEmpty(td.serverSetting("AUTH_FEDERATION_MASTER", true)),
         federationTargets: orEmpty(td.serverSetting("AUTH_FEDERATION_TARGETS", true)),
-        self: td.serverSetting("SELF", false).replace(/\/$/g, ""),
+        self: core.self.replace(/\/$/g, ""),
         requestEmail: true,
         redirectOnError: "/#loginerror"
     });
@@ -257,6 +301,13 @@ export async function initAsync(): Promise<void> {
     if (core.hasSetting("FACEBOOK_CLIENT_SECRET")) {
         serverAuth.addFacebook();
     }
+    if (core.hasSetting("YAHOO_CLIENT_SECRET")) {
+        serverAuth.addYahoo();
+    }
+    if (core.hasSetting("GITHUB_CLIENT_SECRET")) {
+        serverAuth.addGitHub();
+    }
+
     restify.server().get("/user/logout", async(req: restify.Request, res: restify.Response) => {
         res.redirect(302, "/signout");
     });
@@ -265,7 +316,7 @@ export async function initAsync(): Promise<void> {
         core.handleBasicAuth(req1, res1);
         if (!res1.finished()) {
             let links = serverAuth.providerLinks(req1.query());
-            let lang2 = await tdlitePointers.handleLanguageAsync(req1, res1, true);
+            let lang2 = await tdlitePointers.handleLanguageAsync(req1);
             let html = await getLoginHtmlAsync("providers", lang2);
             for (let k of Object.keys(links)) {
                 html = td.replaceAll(html, "@" + k + "-url@", links[k]);
@@ -312,27 +363,27 @@ export async function initAsync(): Promise<void> {
         let _new = "<p>Your access token is below. Only paste in applications you absolutely trust.</p>\n<pre id=\"token\">\nloading...\n</pre>\n<p>You could have added <code>?u=xyzw</code> to get access token for a different user (given the right permissions).\n</p>\n<script>\nsetTimeout(function() {\nvar h = document.location.href.replace(/oauth\\/gettoken.*access_token/, \"?access_token\").replace(/&.*/, \"\");\ndocument.getElementById(\"token\").textContent = h;\n}, 100)\n</script>";
         res4.html(td.replaceAll(td.replaceAll(template_html, "@JS@", ""), "@BODY@", _new));
     });
+    
+    core.addRoute("POST", "*user", "logout", async(req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "root")) return;
+        await logoutEverywhereAsync(req.rootId);
+        req.response = {};
+    })
 
     core.addRoute("POST", "logout", "", async(req3: core.ApiRequest) => {
         if (req3.userid != "") {
             if (core.orFalse(req3.body["everywhere"])) {
-                let entities = await tokensTable.createQuery().partitionKeyIs(req3.userid).fetchAllAsync();
-                await parallel.forAsync(entities.length, async(x: number) => {
-                    let json = entities[x];
-                    // TODO: filter out reason=admin?
-                    let token = core.Token.createFromJson(json);
-                    await tokensTable.deleteEntityAsync(token.toJson());
-                    await core.redisClient.setpxAsync("tok:" + tokenString(token), "", 500);
-                });
+                await logoutEverywhereAsync(req3.userid);
             }
             else {
                 await tokensTable.deleteEntityAsync(req3.userinfo.token.toJson());
                 await core.redisClient.setpxAsync("tok:" + tokenString(req3.userinfo.token), "", 500);
             }
-            req3.response = ({});
-            req3.headers = {};
-            let s4 = wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971");
-            req3.headers["Set-Cookie"] = s4;
+            req3.response = {};
+            if (req3.userinfo.token.cookie)
+                req3.headers = {
+                    "Set-Cookie": wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971") 
+                };
         }
         else {
             req3.status = httpCode._401Unauthorized;
@@ -343,7 +394,10 @@ export async function initAsync(): Promise<void> {
         core.checkPermission(req7, "signin-" + req7.rootId);
         if (req7.status == 200) {
             let resp = {};
-            let tok = await generateTokenAsync(req7.rootId, "admin", "webapp2");
+            let clientId = "webapp2";
+            if (!req7.userinfo.token.cookie)
+                clientId = "no-cookie";    
+            let tok = await generateTokenAsync(req7.rootId, "admin", clientId);
             if (tok.cookie) {
                 if (req7.headers == null) {
                     req7.headers = {};
@@ -351,7 +405,7 @@ export async function initAsync(): Promise<void> {
                 req7.headers["Set-Cookie"] = wrapAccessTokenCookie(tok.cookie);
             }
             else {
-                assert(false, "no cookie in token");
+                assert(clientId == "no-cookie", "no cookie in token");
             }
             await audit.logAsync(req7, "signin-as", {
                 data: core.sha256(tok.url).substr(0, 10)
@@ -359,6 +413,17 @@ export async function initAsync(): Promise<void> {
             resp["token"] = tok.url;
             req7.response = td.clone(resp);
         }
+    });
+}
+
+async function logoutEverywhereAsync(uid:string) {
+    let entities = await tokensTable.createQuery().partitionKeyIs(uid).fetchAllAsync();
+    await parallel.forAsync(entities.length, async(x: number) => {
+        let json = entities[x];
+        // TODO: filter out reason=admin?
+        let token = core.Token.createFromJson(json);
+        await tokensTable.deleteEntityAsync(token.toJson());
+        await core.redisClient.setpxAsync("tok:" + tokenString(token), "", 500);
     });
 }
 
@@ -402,7 +467,7 @@ function wrapAccessTokenCookie(cookie: string): string
     return value;
 }
 
-async function getRedirectUrlAsync(user2: string, req: restify.Request) : Promise<string>
+async function getRedirectUrlAsync(user2: string, req: restify.Request, session: LoginSession) : Promise<string>
 {
     let url: string;
     let jsb = {};
@@ -414,6 +479,7 @@ async function getRedirectUrlAsync(user2: string, req: restify.Request) : Promis
         jsb["td_cookie"] = tok.cookie;
     }
     url = req.query()["redirect_uri"] + "#" + serverAuth.toQueryString(td.clone(jsb));
+    if (session) url = session.fixupRedirectUrl(url);
     return url;
 }
 
@@ -459,9 +525,15 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         let entry31 = await tdliteUsers.getAsync(upointer["userid"]);
         if (entry31 != null) {
             userjs = entry31;
-            if (orEmpty(userjs.login) != profileId) {
+            let logins = (userjs.altLogins || []).concat([userjs.login])
+            if (logins.indexOf(profileId) < 0) {
                 userjs = await tdliteUsers.updateAsync(userjs.id, async(entry4) => {
-                    entry4.login = profileId;
+                    if (!entry4.login)
+                        entry4.login = profileId;
+                    else {
+                        if (!entry4.altLogins) entry4.altLogins = [];
+                        entry4.altLogins.push(profileId)
+                    }
                 });
             }
         }
@@ -474,6 +546,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     session.providerId = provider;
     session.oauthClientId = clientOAuth.client_id;
     session.oauthU = clientOAuth.u;
+    session.restartQuery = clientOAuth.toQueryString();
     
     if (userjs == null) {
         if (core.jsonArrayIndexOf(core.serviceSettings.blockedAuth, provider) >= 0) {
@@ -499,6 +572,26 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
 
     session.state = cachedStore.freshShortId(16);
     session.userid = userjs["id"];
+    
+    if (session.userCreated()) {
+        let linkedSession = await session.getLinkedSessionAsync();
+        if (linkedSession && linkedSession.profileId) {
+            let last = await tdliteUsers.passcodesContainer.updateAsync(linkedSession.profileId, async(v) => {
+                let kind = v["kind"]
+                if (!kind || kind == "reserved" || kind == "userpointer") {
+                    v["kind"] = "userpointer";
+                    let existing = await tdliteUsers.getAsync(v["userid"])
+                    if (!existing)
+                        v["userid"] = session.userid;
+                }
+            })
+            if (last["userid"] == session.userid)
+                await tdliteUsers.updateAsync(session.userid, async(v) => {
+                    if (!v.altLogins) v.altLogins = [];
+                    v.altLogins.push(linkedSession.profileId);
+                })
+        }
+    }
     
     if (core.fullTD) {
         session.termsOk = true;
@@ -547,19 +640,19 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         else {
             await tdliteGroups.addUserToGroupAsync(user2, groupJson, (<core.ApiRequest>null));
         }
-        let redirectUri = await getRedirectUrlAsync(user2, req);
+        let redirectUri = await getRedirectUrlAsync(user2, req, session);
         await session.saveAsync();        
 
         let tok = stripCookie(redirectUri);
         if (tok.cookie != "") {
             res.setHeader("Set-Cookie", tok.cookie);
         }
-        let lang = await tdlitePointers.handleLanguageAsync(req, res, false);
+        let lang = await tdlitePointers.handleLanguageAsync(req);
         let html = td.replaceAll(await getLoginHtmlAsync("usercreated", lang), "@URL@", tok.url);
         html = td.replaceAll(html, "@USERID@", session.userid);
         html = td.replaceAll(html, "@PASSWORD@", session.pass);
         html = td.replaceAll(html, "@NAME@", core.htmlQuote(tdUsername));
-        core.setHtmlHeaders(res);
+        core.setHtmlHeaders(req);
         res.html(html);
     }
 }
@@ -567,7 +660,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
 async function loginHandleCodeAsync(accessCode: string, res: restify.Response, req: restify.Request, session: LoginSession) : Promise<void>
 {
     let passId = core.normalizeAndHash(accessCode);
-    let lang = await tdlitePointers.handleLanguageAsync(req, res, true);
+    let lang = await tdlitePointers.handleLanguageAsync(req);
     let msg = "";
     if (passId == "" || accessCode == "kid") {
     }
@@ -593,7 +686,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
                 else {
                     logger.tick("Login@code");
-                    accessTokenRedirect(res, await getRedirectUrlAsync(userJson["id"], req));
+                    accessTokenRedirect(res, await getRedirectUrlAsync(userJson["id"], req, session));
                 }
             }
             else if (kind == "activationcode") {
@@ -641,8 +734,9 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
 
     if ( ! res.finished()) {
         await core.refreshSettingsAsync();
-        let params = {};
-        params["LANG"] = lang;
+        let params = {
+            LANG: lang,
+        };        
         let inner = "kidornot";
         if (accessCode == "kid") {
             inner = "kidcode";
@@ -652,9 +746,9 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             for (let i = 0; i < session.passwords.length; i++) {
                 links = links + "<button type=\"button\" class=\"button provider\" href=\"#\" onclick=\"passwordok(" + i + ")\">" + session.passwords[i] + "</button><br/>\n";
             }
-            let lang2 = await tdlitePointers.handleLanguageAsync(req, res, true);
+            let lang2 = await tdlitePointers.handleLanguageAsync(req);
             inner = td.replaceAll(td.replaceAll(await getLoginHtmlAsync("newuser", lang2), "@PASSWORDS@", links), "@SESSION@", session.state);
-            core.setHtmlHeaders(res);
+            core.setHtmlHeaders(req);
             res.html(td.replaceAll(inner, "@MSG@", msg));
             return;
         }
@@ -683,16 +777,21 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 await session.saveAsync();
             }
             let username = orEmpty(req.query()["td_username"]).slice(0, 25);
-            if (!session.nickname && username) {
-                session.nickname = username;
-                await session.saveAsync();
+            if (!session.nickname && username) {                
+                let nick = username.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+                if (new RegExp(core.serviceSettings.blockedNicknameRx).test(nick)) {
+                    msg = core.translateMessage("This nickname is not allowed.", lang);
+                } else {
+                    session.nickname = username;
+                    await session.saveAsync();
+                }    
             }
             
             
             if (!session.termsOk) {
                 inner = "agree";
             }
-            else if (!core.fullTD && !session.userCreated() && !session.nickname && tdlitePointers.templateSuffix) {
+            else if (!core.fullTD && !session.userCreated() && !session.nickname) {
                 inner = "newadult";
                 params["EXAMPLES"] = "";
                 params["SESSION"] = session.state;
@@ -773,6 +872,34 @@ function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
     }
 }
 
+export async function lookupTokenAsync(token: string):Promise<core.Token> {
+    let tokenJs: {} = null;
+    if (td.startsWith(token, "0") && token.length < 100) {
+        let value = await core.redisClient.getAsync("tok:" + token);
+        if (value == null || value == "") {
+            let coll = (/^0([a-z]+)\.([A-Za-z]+)$/.exec(token) || []);
+            if (coll.length > 1) {
+                tokenJs = await tokensTable.getEntityAsync(coll[1], coll[2]);
+                if (tokenJs != null) {
+                    await core.redisClient.setpxAsync("tok:" + token, JSON.stringify(tokenJs), 1000 * 1000);
+                }
+            }
+        }
+        else {
+            tokenJs = JSON.parse(value);
+        }
+    }
+    
+    if (tokenJs) {
+        return core.Token.createFromJson(tokenJs);
+    } else {
+        return <core.Token>null;
+    }
+}
+
+// Don't set the 401 code on token expired/cookie missing.
+// If it's anonymous request it will suceeded, otherwise checkPermission() will set code to 401 anyways.
+var softTokenFailure = true;
 
 export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
 {
@@ -781,40 +908,32 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
     }
     let token = withDefault(rreq.header("x-td-access-token"), td.toString(req.queryOptions["access_token"]));
     if (token != null && token != "null" && token != "undefined") {
-        let tokenJs = (<JsonObject>null);
-        if (td.startsWith(token, "0") && token.length < 100) {
-            let value = await core.redisClient.getAsync("tok:" + token);
-            if (value == null || value == "") {
-                let coll = (/^0([a-z]+)\.([A-Za-z]+)$/.exec(token) || []);
-                if (coll.length > 1) {
-                    tokenJs = await tokensTable.getEntityAsync(coll[1], coll[2]);
-                    if (tokenJs != null) {
-                        await core.redisClient.setpxAsync("tok:" + token, JSON.stringify(tokenJs), 1000 * 1000);
-                    }
-                }
-            }
-            else {
-                tokenJs = JSON.parse(value);
-            }
+        if (token.length > 100) {
+            // this is to prompt migration client-side
+            req.status = 442;
+            return;
         }
-        if (tokenJs == null) {
+        
+        let token2 = await lookupTokenAsync(token);
+     
+        if (token2 == null) {
             req.status = httpCode._401Unauthorized;
         }
         else {
-            let token2 = core.Token.createFromJson(tokenJs);
             if (core.orZero(token2.version) < 2) {
                 req.status = httpCode._401Unauthorized;
                 return;
             }
             if (orEmpty(token2.cookie) != "") {
                 let ok = td.stringContains(orEmpty(rreq.header("cookie")), "TD_ACCESS_TOKEN2=" + token2.cookie);
-                if ( ! ok) {
-                    req.status = httpCode._401Unauthorized;
+                if (!ok) {
+                    if (!softTokenFailure)
+                        req.status = httpCode._401Unauthorized;
                     logger.info("cookie missing, user=" + token2.PartitionKey);
                     return;
                 }
                 let r = orEmpty(rreq.header("referer"));
-                if (td.startsWith(r, "http://localhost:") || td.startsWith(r, core.self + "app/")) {
+                if (td.startsWith(r, "http://localhost:") || td.startsWith(r, core.self + "app/") || td.startsWith(r, core.self + "userapp/")) {
                 }
                 else {
                     req.status = httpCode._401Unauthorized;
@@ -823,8 +942,9 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
                 }
                 // minimum token expiration - 5min
                 if (orEmpty(token2.reason) != "code" && core.orZero(core.serviceSettings.tokenExpiration) > 300 && await core.nowSecondsAsync() - token2.time > core.serviceSettings.tokenExpiration) {
-                    // core.Token expired
-                    req.status = httpCode._401Unauthorized;
+                    // Token expired.
+                    if (!softTokenFailure)
+                        req.status = httpCode._401Unauthorized;
                     return;
                 }
             }

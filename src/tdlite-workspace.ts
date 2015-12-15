@@ -455,6 +455,8 @@ export async function saveScriptAsync(userid: string, body: PubBody, importTime 
         
     core.progress("save 1");
     let time = importTime;
+    if (!time && body.scriptVersion.time)
+        time = body.scriptVersion.time * 1000;
     if (!time) time = await core.redisClient.cachedTimeAsync();
     let id2 = (20000000000000 - time) + "." + userid + "." + azureTable.createRandomId(12);
     let _new = false;
@@ -562,6 +564,7 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
             pubScript.mergeids = (<string[]>[]);
         }
         let body = await workspaceForUser(req.userid).getAsync(pubVersion.baseSnapshot);
+        let isFork = false;
         pubScript.baseid = orEmpty(body["scriptId"]);
         req.rootPub = (<JsonObject>null);
         req.rootId = "";
@@ -570,6 +573,7 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
             if (baseJson != null) {
                 req.rootPub = baseJson;
                 req.rootId = pubScript.baseid;
+                isFork = (baseJson["pub"]["userid"] != req.userid);
                 pubScript.rootid = withDefault(baseJson["pub"]["rootid"], pubScript.baseid);
             }
         }
@@ -592,6 +596,7 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
 
         let jsb = {};
         jsb["currentBlob"] = pubVersion.baseSnapshot;
+        jsb["isFork"] = isFork;
         await tdliteScripts.publishScriptCoreAsync(pubScript, jsb, body["script"], req);
         // 
         let slotBuilder = td.clone(slotJson);

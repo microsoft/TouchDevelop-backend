@@ -14,6 +14,9 @@ import * as parallel from "./parallel"
 import * as core from "./tdlite-core"
 import * as search from "./tdlite-search"
 import * as cron from "./cron"
+import * as tdliteGroups from "./tdlite-groups"
+import * as indexedStore from "./indexed-store"
+import * as tdlitePointers from "./tdlite-pointers"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -65,7 +68,7 @@ export async function initAsync() : Promise<void>
     
     core.addRoute("GET", "tdtext", "*", async (req1: core.ApiRequest) => {
         if (/^[a-z]+$/.test(req1.verb)) {
-            let s = await td.downloadTextAsync("https://www.touchdevelop.com/api/" + req1.verb + "/text?original=true");
+            let s = await td.downloadTextAsync("https://api.touchdevelop.com/" + req1.verb + "/text?original=true");
             req1.response = s;
         }
         else {
@@ -93,16 +96,31 @@ export async function initAsync() : Promise<void>
     core.addRoute("POST", "import", "*", async (req2: core.ApiRequest) => {
         await importListAsync(req2);
     });
+    core.addRoute("POST", "*group", "import", async(req) => {
+        if (!core.checkPermission(req, "operator")) return;
+        req.response = await importGroupMembers(req.rootPub); 
+    })
+    
+    core.addRoute("POST", "groups", "reimportmembers", async(req: core.ApiRequest) => {
+        let store = indexedStore.storeByKind("group");
+        await tdlitePointers.reindexStoreAsync(req, store, async(v)=>{
+            let lst = await importGroupMembers(v);
+            req.response["itemsReindexed"] += lst.length; 
+        })        
+    });
+
     core.addRoute("POST", "importsync", "", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator")) return;
-            await importFromPubloggerAsync(req);
+        await importFromPubloggerAsync(req);
     });
     
-    cron.registerJob(new cron.Job("importsync", 2, async() => {
-        let req = core.buildApiRequest("/api/importsync");
-        await importFromPubloggerAsync(req)
-        logger.info(`importsync: ${req.status}; ` + (req.response ? JSON.stringify(req.response,null,2) : ""))
-    }));
+    if (false)
+        cron.registerJob(new cron.Job("importsync", 2, async() => {
+            let req = core.buildApiRequest("/api/importsync");
+            await importFromPubloggerAsync(req)
+            logger.info(`importsync: ${req.status}; ` + (req.response ? JSON.stringify(req.response,null,2) : ""))
+        }));
+
     
     /*
     core.addRoute("POST", "recimport", "*", async (req3: core.ApiRequest) => {
@@ -182,10 +200,10 @@ async function importFromPubloggerAsync(req: core.ApiRequest) : Promise<void>
         let apiRequest = await importOneAnythingAsync(v);
         if (apiRequest.status == 200 && searchable.indexOf(v["kind"]) >= 0) {
             let pub = await core.getPubAsync(v["id"], v["kind"]);
-            if (v) {
-                await search.scanAndSearchAsync(v, { skipScan: true })
-                let tick = "New_" + v["kind"]
-                if (v["kind"] == "script" && v["pub"] && v["pub"]["ishidden"])
+            if (pub) {
+                await search.scanAndSearchAsync(pub, { skipScan: true })
+                let tick = "New_" + pub["kind"]
+                if (pub["kind"] == "script" && pub["pub"] && pub["pub"]["ishidden"])
                     tick += "_hidden"
                 logger.tick(tick)
             }
@@ -246,7 +264,7 @@ async function importOneAnythingAsync(js: JsonObject) : Promise<core.ApiRequest>
     return apiRequest;
 }
 
-var tdbaseUrl = "https://www.touchdevelop.com/api/"
+var tdbaseUrl = "https://api.touchdevelop.com/"
 var allowedLists = [
     "new-scripts",
     "comments",
@@ -412,7 +430,7 @@ export async function importRecAsync(resp: RecImportResponse, id: string) : Prom
             resp.present += 1;
         }
         else {
-            let tdapi = "https://www.touchdevelop.com/api/";
+            let tdapi = "https://api.touchdevelop.com/";
             let js = await td.downloadJsonAsync(tdapi + id);
             if (js == null) {
                 resp.problems += 1;
@@ -497,4 +515,32 @@ async function importUserScriptsAsync(resp: RecImportResponse, tdapi: string, id
         }
     }
 }
+
+export async function importGroupMembers(grp: {})
+{
+    let id = grp["id"];
+    let cont = "";
+    let userList: string[] = []
+    let max = 20;
+    while (max-- > 0) {
+        let js4 = await td.downloadJsonAsync(tdbaseUrl + id + "/users?count=500" + cont);
+        for (let it of js4["items"]) userList.push(it["id"]);
+        let r = js4["continuation"];
+        if (r) cont = "&continuation=" + encodeURIComponent(r);
+        else break;
+    }
+    
+    if (max <= 0)
+        logger.error("failed to import all members of group " + id + "; got " + userList.length)
+    
+    // make unique
+    userList = Object.keys(td.toDictionary(userList, s => s));
+    
+    await parallel.forJsonAsync(userList, async(uid) => {
+        await tdliteGroups.addUserToGroupAsync(uid, grp, null);
+    }, 10)
+    
+    return userList
+}
+
 

@@ -1,0 +1,115 @@
+{% extends "_layouts/default.html" %}
+{% set title = "Touch Develop - login" %}
+
+{% block body %}
+<style>
+    .container {
+        text-align:center;
+    }
+    #consent {
+        margin: 2em 0;
+     font-size:1.5em;   
+    }
+</style>
+<div class="container">
+    
+    <h1>Authorization request</h1>
+  
+    <div style='color:#f00' id='error'>
+    </div>
+
+    <div id='consent' style='display:none;'>
+      The website which sent you here wants to use
+        <div style='margin: 0.5em 0; word-break:break-all; font-weight:bold; font-size:1.3em' id='website'></div>
+      under your TouchDevelop user name.
+
+      <div id='btn' style='margin:1.5em; '>
+       <button class='btn btn-lg btn-default' id='nope'
+                onclick='window.close();window.location="https://www.touchdevelop.com"'>
+         No! Get me out
+       </button>
+       <button class='btn btn-lg btn-success' id='agree'>
+         Yes, allow
+      </div>
+    </div>
+
+  </div>
+
+<script type="text/javascript">
+    (function () {
+        function elt(n) { return document.getElementById(n) }
+
+        var qs = {}
+        var suff = document.URL.replace(/.*?/, "")
+        suff.replace(/#.*/, "").replace(/([^?&=]*)=([^?&=]*)/g, function (m, k, v) {
+            qs[decodeURIComponent(k)] = decodeURIComponent(v)
+            return ""
+        })
+
+        if (!qs.client_id || !qs.state || !qs.redirect_uri || qs.response_type != "token") {
+            elt('error').textContent = "wrong oauth parameters: " + JSON.stringify(qs)
+            return
+        }
+
+        if (qs.client_id.length > 200) {
+            elt('error').textContent = "too long client_id"
+            return
+        }
+
+        var atok = window.localStorage["access_token"]||"TEST REMOVE ME"
+        var userid = window.localStorage["userid"]
+
+        if (!atok) {
+            var m = /#.*access_token=([A-Za-z0-9%]+).*&id=([a-z]+).*&state=foobar/.exec(window.location.href)
+            if (m) {
+                atok = m[1]
+                userid = m[2]
+            } else {
+                //var pp = window.location.href.replace(/.*:\/\/[^\/]*/, "")
+                var url = "https://www.touchdevelop.com/oauth/dialog?response_type=token&client_id=webapp" +
+                    "&redirect_uri=" + encodeURIComponent(window.location.href) +
+                    "&state=foobar"
+                window.location.href = url
+                //"/login?path=" + encodeURIComponent(pp)
+                return
+            }
+        }
+
+        function agree() {
+            elt('btn').innerHTML = "working...";
+
+            var client = new XMLHttpRequest()
+            client.onreadystatechange = function () {
+                if (client.readyState == 4)
+                    if (client.status == 200) {
+                        var tok = JSON.parse(client.responseText)
+                        window.location = qs.redirect_uri +
+                              "#state=" + encodeURIComponent(qs.state) +
+                              "&access_token=" + encodeURIComponent(tok.jwt)
+                        "&userid=" + encodeURIComponent(userid)
+                    } else {
+                        elt('error').textContent = "JWT error: " + client.status + ", " + client.responseText
+                    }
+            }
+            client.open("POST", "/api/me/jwt")
+            client.setRequestHeader("x-td-access-token", atok);                          
+            client.send(JSON.stringify({
+                aud: qs.client_id
+            }))
+        }
+
+        function q(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+
+        elt("website").innerHTML = q(qs.client_id);
+        elt("agree").onclick = agree;
+        elt("consent").style.display = "block";
+
+
+    })();
+</script>
+
+</div> <!-- /.container -->
+
+{% endblock %}
+
+

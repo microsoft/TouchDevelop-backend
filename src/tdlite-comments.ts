@@ -79,6 +79,19 @@ async function resolveCommentsAsync(entities: indexedStore.FetchResult) : Promis
     entities.items = td.arrayToJson(coll);
 }
 
+export async function getRootPubAsync(js: {})
+{
+    let max = 3;
+    
+    while (max-- > 0) {
+        let cmt = PubComment.createFromJson(js["pub"])
+        js = await core.getPubAsync(cmt.publicationid, cmt.publicationkind);
+        if (!js || cmt.publicationkind != "comment")
+            return js;    
+    }
+    
+    return <{}>null;
+}
 
 async function postCommentAsync(req: core.ApiRequest) : Promise<void>
 {

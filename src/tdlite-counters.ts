@@ -76,13 +76,13 @@ async function sendLoopAsync()
     }    
 }
 
-function dayAligned(time: number)
+export function dayAligned(time: number)
 {
     let day = Math.floor(time / (24 * 3600))
     return day * 24 * 3600;    
 }
 
-function dayIdForTime(time: number) {
+export function dayIdForTime(time: number) {
     let dayalignedMs = dayAligned(time) * 1000;
     return (20000000000000 - dayalignedMs).toString();
 }
@@ -111,7 +111,7 @@ async function flushCountersAsync()
     await countersContainer.updateAsync("total", async(v) => {
         addCounters(v, redisCounters);
         v["min"] = v["min"] ? Math.min(v["min"], alignedTime) : alignedTime;
-        v["max"] = v["max"] ? Math.min(v["max"], alignedTime) : alignedTime;
+        v["max"] = v["max"] ? Math.max(v["max"], alignedTime) : alignedTime;
     })    
 }
 

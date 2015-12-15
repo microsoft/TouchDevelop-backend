@@ -1,0 +1,58 @@
+{% extends "_layouts/default.html" %}
+{% set title = "@name@" %}
+{% set description = "@name@: @body@" %}
+
+{% block body %}
+<style>
+   .jumbotron .message {
+       font-size:14px;
+   }
+   .jumbotron {
+       background: #fcf8e3;
+       margin-top: 45px;
+   }
+   .lead {
+       margin-top: 2em;
+   }
+   .smile {
+       font-size: 230px;
+       line-height: 1em;
+       float: left;
+       margin-right: 50px;
+       margin-bottom: 100px;
+       opacity: 0.3;
+       display: none;
+   }
+   @media screen and (min-width: 768px){
+       .smile {
+           display: block;
+       }
+   }
+</style>
+<div class="container">
+    <div class="row">
+        <div class="col-xs-12">
+
+            <div class='jumbotron bg-warning'>
+                <div class='smile'>
+                    :(
+                 </div>
+
+                <h1 dir="auto">Houston, we have a problem.</h1>
+                
+                <h2 dir="auto">@name@</h2>
+
+                <p dir="auto" class='lead'>
+                    You can go back to <a href="/">touchdevelop.com</a> or <a href="/contact">contact us</a>.
+                </p>
+
+                <p dir="auto" class='message'>@body@</p>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

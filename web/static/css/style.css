@@ -9,7 +9,10 @@
       padding-top: 70px;
     }
 }
-img.logo, img.avatar { margin-top: -10px; height:32px;}
+img.logo, img.avatar { 
+    margin-top: -7px; 
+    height:32px;
+}
 img.checker {
 background-image: url(/static/images/checker.png);
 background-repeat: repeat;

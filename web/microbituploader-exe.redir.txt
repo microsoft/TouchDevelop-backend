@@ -1,0 +1,1 @@
+/static/uploader/Microbit.Uploader.exe

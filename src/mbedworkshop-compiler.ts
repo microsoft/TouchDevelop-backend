@@ -11,7 +11,8 @@ type JsonBuilder = td.JsonBuilder;
 
 var logger: td.AppLogger;
 var options: IOptions;
-
+//var authHeaderName = "Ocp-Apim-Subscription-Key";
+var authHeaderName = "x-api-key";
 
 export interface IOptions {
     apikey?: string;
@@ -51,8 +52,8 @@ export class CompilationRequest
         let payload = td.clone(jsb);
         req.setContentAsJson(payload);
         logger.debug(JSON.stringify(payload, null, 2));
-        req.setMethod("post");
-        req.setHeader("Ocp-Apim-Subscription-Key", options.apikey);
+        req.setMethod("post");        
+        req.setHeader(authHeaderName, options.apikey);
         logger.debug(req + "");
         let response = await req.sendAsync();
         logger.debug("compile status: " + response.statusCode());
@@ -62,7 +63,7 @@ export class CompilationRequest
             success = true;
         }
         else {
-            logger.warning("compile failed, status: " + response.statusCode() + ", content: " + response.content());
+            logger.warning(`compile failed, status: ${response.statusCode()}, key: ${options.apikey.substr(0,3)}, content: ${response.content()}`);
             success = false;
         }
         return success;
@@ -75,8 +76,8 @@ export class CompilationRequest
     {
         let result: CompilationResult;
         assert(this != null, "missing compilation");
-        let request = td.createRequest(this.taskId + "?block=" + block);
-        request.setHeader("Ocp-Apim-Subscription-Key", options.apikey);
+        let request = td.createRequest(this.taskId + "?block=" + block);        
+        request.setHeader(authHeaderName, options.apikey);
         let response = await request.sendAsync();
         result = this.readResult(response);
         return result;
@@ -174,7 +175,7 @@ export function init(options_: IOptions = {}) : void
     if (!options.apiurl) {
         options.apiurl = td.serverSetting("MBED_API_URL", true);
         if (!options.apiurl) {
-            options.apiurl = "https://mbedworkshop.azure-api.net";
+            options.apiurl = "https://workshop.mbed.com";
         }
         options.apiurl = options.apiurl.replace(/\/+$/, "");
     }

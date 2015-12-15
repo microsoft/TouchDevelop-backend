@@ -62,7 +62,7 @@ async function secondarySearchEntryAsync(obj: JsonBuilder, body: string): Promis
         let promo = obj["promo"]
         if (!promo) return <JsonBuilder>null;
 
-        let promotags: string[] = promo || []
+        let promotags: string[] = promo["tags"] || []
         if (promotags.length == 0)
             return <JsonBuilder>null;
         
@@ -161,7 +161,7 @@ export async function initAsync() : Promise<void>
 {
     disableSearch = orEmpty(td.serverSetting("DISABLE_SEARCH", true)) == "true";
     core.executeSearchAsync = executeSearchAsync;
-
+    
     await initAcsAsync();
 
     azureSearch.init({
@@ -175,9 +175,8 @@ export async function initAsync() : Promise<void>
             await executeSearchAsync("web", orEmpty(req.queryOptions["q"]), req);
         }
     });
-    core.addRoute("GET", "search", "", async (req: core.ApiRequest) => {
-        // this may be a bit too much to ask
-        core.checkPermission(req, "global-list");
+    core.addRoute("GET", "search", "", async (req: core.ApiRequest) => {        
+        core.checkRelexedGlobalList(req);        
         if (req.status == 200) {
             await executeSearchAsync("", orEmpty(req.queryOptions["q"]), req);
         }
@@ -224,27 +223,63 @@ export async function initAsync() : Promise<void>
     core.addRoute("GET", "admin", "countpubs", async(req) => {        
         if (!core.checkPermission(req, "root")) return;
         let store = indexedStore.storeByKind(req.argument);
-        
         let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
-        let numhidden = 0
-        for (let e of lst.items) {
-            if (e["pub"] && e["pub"]["ishidden"])
-                numhidden++;
-            else if (/^code/.test(e["login"]))
-                numhidden++;
+        let counters = {
+            total: 0,
+            hidden: 0,
+            loginCode: 0,
+            badLogin: 0,
+            picture: 0,
+            noShield: 0,
+            emptyPerm: 0,
+            safeArt: 0,
+            unsafeArt: 0,
+            unknownArt: 0,
+            continuation: lst.continuation
         }
-        req.response = {
-            continuation: lst.continuation,
-            itemCount: lst.items.length,            
-            hiddenItemCount: numhidden,
-        }           
+        for (let e of lst.items) {
+            counters.total++;
+            if (e["pub"] && e["pub"]["ishidden"])
+                counters.hidden++;
+            else if (e["kind"] == "user" && !e["permissions"]) {
+                counters.emptyPerm++;
+                counters[e["id"]] = "X";
+            }
+            else if (/^code/.test(e["login"])) {
+                counters.loginCode++;
+                //logger.warning("logincode: " + e["id"])
+            }
+            else if (e["login"] && /undefined/.test(e["login"])) {
+                counters.badLogin++;
+                logger.warning("badlogin: " + e["id"])
+            }
+            else if (e["arttype"] == "picture") {
+                counters.picture++;
+                let sh =e["shieldinfo"] 
+                if (!sh) {
+                    counters.noShield++;
+                } else {
+                    if (sh["acssafe"] == "1" || sh["webpurifysafe"] == "1") {
+                        counters.safeArt++;
+                    } else if (sh["acssafe"] == "0") {
+                        counters.unsafeArt++;
+                    } else {
+                        counters.unknownArt++;
+                    }
+                }
+            }
+            else if (e["kind"] == "script") {
+                let t = tdliteScripts.scriptTick(e);
+                counters[t] = (counters[t] || 0) + 1;
+            }
+        }
+        req.response = counters
     })
 
-    
     core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");        
         if (req.status != 200) return;
-        await scanAndSearchAsync(req.rootPub, { skipSearch: true })
+        await scanAndSearchAsync(req.rootPub, {  })
         req.response = {}
     });
 
@@ -336,7 +371,7 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
     let response = await request.sendAsync();
     let js = response.contentAsJson();
     let searchResults: JsonObject[] = js["value"];
-    if (true || searchResults == null) {
+    if (searchResults == null) {
         logger.debug("js: " + qurl + " -> " + JSON.stringify(js, null, 2));
     }
     let ids0:string[] = searchResults.map(e => e["id"]);    
@@ -349,6 +384,7 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
             jsons[i]["kind"] = "promo";
         }
     }
+    //logger.debug("jsrch: " + qurl + " -> " + JSON.stringify(js, null, 2) + " - " + JSON.stringify(jsons,null,2));
     if ( ! core.callerHasPermission(req, "global-list")) {
         jsons = jsons.filter(elt => core.isAbuseSafe(elt));
     }
@@ -399,10 +435,11 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
 }
 
 async function initAcsAsync() : Promise<void>
-{
-    if (false && core.hasSetting("ACS_PASSWORD")) {
+{    
+    if (core.fullTD && core.hasSetting("ACS_PASSWORD")) {
         acsCallbackToken = core.sha256(core.tokenSecret + ":acs");
-        acsCallbackUrl = core.self + "api/acscallback?token=" + acsCallbackToken + "&anon_token=" + encodeURIComponent(core.basicCreds);
+        let selfx = td.serverSetting("ACS_SELF", true) || core.self;        
+        acsCallbackUrl = selfx + "api/acscallback?token=" + acsCallbackToken + "&anon_token=" + encodeURIComponent(core.basicCreds);
         await acs.initAsync();
     }
     core.addRoute("POST", "acscallback", "", async (req: core.ApiRequest) => {
@@ -412,37 +449,30 @@ async function initAcsAsync() : Promise<void>
             for (let stat of results) {
                 if (stat["Status"] == "3000") {
                     let pubid = stat["Id"];
+                        await core.pubsContainer.updateAsync(pubid, async(entry: JsonBuilder) => {
+                            let curr = entry["acsJobId"]
+                            if (curr) curr += "," + jobid;
+                            else curr = jobid;
+                            entry["acsJobId"] = curr;
+                            if (!stat["Safe"]) {
+                                entry["acsFlag"] = stat;    
+                            }
+                    });
+                    
                     if (stat["Safe"]) {
                         logger.debug("acsok: " + JSON.stringify(stat, null, 2));
-                        await core.pubsContainer.updateAsync(pubid, async (entry: JsonBuilder) => {
-                            entry["acsJobId"] = jobid;
-                        });
                     }
                     else {
                         logger.info("acsflag: " + JSON.stringify(stat, null, 2));
-                        await core.pubsContainer.updateAsync(pubid, async (entry1: JsonBuilder) => {
-                            entry1["acsFlag"] = stat;
-                            entry1["acsJobId"] = jobid;
-                        });
-                        let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
-                        if (uid != "") {
-                            await core.setReqUserIdAsync(req, uid);
-                            req.rootPub = await core.pubsContainer.getAsync(pubid);
-                            if (core.isGoodEntry(req.rootPub)) {
-                                let jsb = {};
-                                jsb["text"] = "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"]);
-                                req.body = td.clone(jsb);
-                                req.rootId = pubid;
-                                await tdliteAbuse.postAbusereportAsync(req);
-                            }
-                        }
+                        let msg = "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"]); 
+                        await tdliteAbuse.postAcsReport(pubid, msg, jobid, req);                          
                     }
                 }
                 else {
                     logger.warning("bad results from ACS: " + JSON.stringify(req.body, null, 2));
                 }
             }
-            req.response = ({});
+            req.response = {};
         }
         else {
             logger.debug("acs, wrong token: " + JSON.stringify(req.queryOptions));

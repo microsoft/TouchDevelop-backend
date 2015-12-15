@@ -109,6 +109,7 @@ export class Container
             let isNew = false;
             if (text == null && info.error() == "404") {
                 text = "{}";
+                isNew = true;
             }
             let jsb = {};
             try {
@@ -400,7 +401,8 @@ export class Container
      */
     public async justInsertAsync(name: string, data_: JsonBuilder) : Promise<void>
     {
-        data_["__version"] = 1;
+        let ver = await redisClient.cachedTimeAsync();
+        data_["__version"] = ver;
         let text = JSON.stringify(data_);
         if (this.blob != null) {
             let result = await this.blob.createBlockBlobFromTextAsync(name, text, {
@@ -410,7 +412,7 @@ export class Container
             });
             let ok = result.succeded();
         }
-        await this.saveCacheAsync(name, text, 1);
+        await this.saveCacheAsync(name, text, ver);
     }
 
     private saveMemCache(name: string, val: string) : void
@@ -462,7 +464,7 @@ export async function createContainerAsync(name: string, options: ICreateOptions
         container.blob = await options.blobService.createContainerIfNotExistsAsync(name, options.access);
     }
     container.cacheEnabled = ! options.noCache;
-    container.cacheValidity = options.redisCacheSeconds || 0;
+    container.cacheValidity = options.redisCacheSeconds || 7200;
     options.inMemoryCacheSeconds = options.inMemoryCacheSeconds || 0;
     if (options.inMemoryCacheSeconds > 0) {
         container.memCacheValidity = options.inMemoryCacheSeconds * 1000;

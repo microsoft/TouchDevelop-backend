@@ -129,8 +129,17 @@ export async function initAsync() : Promise<void>
     await initScreenshotsAsync();
 }
 
-async function initScreenshotsAsync() : Promise<void>
+export async function getPubScreenshotsAsync(pubid: string, num:number)
 {
+    let req = core.buildApiRequest("/api")
+    req.queryOptions = { count: num.toString() }
+    let res = await core.fetchAndResolveAsync(screenshots, req, "publicationid", pubid)
+    return res.items;
+}
+
+async function initScreenshotsAsync(): Promise<void>
+{
+    core.anyListAsync
     screenshots = await indexedStore.createStoreAsync(core.pubsContainer, "screenshot");
     core.registerPubKind({
         store: screenshots,
@@ -145,7 +154,7 @@ async function initScreenshotsAsync() : Promise<void>
         byUserid: true,
         byPublicationid: true
     });
-    core.addRoute("POST", "screenshots", "", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "*pub", "screenshots", async (req: core.ApiRequest) => {
         await core.canPostAsync(req, "screenshot");
         if (req.status == 200) {
             await postScreenshotAsync(req);
@@ -175,25 +184,25 @@ async function resolveArtAsync(entities: indexedStore.FetchResult, req: core.Api
             queueUpgradeTask(req, /* async */ redownloadArtAsync(jsb));
         }
         if (jsb["isImage"]) {
-            pubArt.pictureurl = artContainer.url() + id;
-            pubArt.thumburl = thumbContainers[0].container.url() + id;
-            pubArt.mediumthumburl = thumbContainers[1].container.url() + id;
-            pubArt.bloburl = pubArt.pictureurl;
+            pubArt.pictureurl = core.cdnUrl(artContainer.url() + id);
+            pubArt.thumburl = core.cdnUrl(thumbContainers[0].container.url() + id);
+            pubArt.mediumthumburl = core.cdnUrl(thumbContainers[1].container.url() + id);
+            pubArt.bloburl = core.cdnUrl(pubArt.pictureurl);
             pubArt.arttype = "picture";
         }
         else if (! pubArt.arttype || pubArt.arttype == "sound") {
-            pubArt.wavurl = artContainer.url() + id;
+            pubArt.wavurl = core.cdnUrl(artContainer.url() + id);
             if (orFalse(jsb["hasAac"])) {
-                pubArt.aacurl = aacContainer.url() + id + ".m4a";
+                pubArt.aacurl = core.cdnUrl(aacContainer.url() + id + ".m4a");
             }
             else {
                 pubArt.aacurl = "";
             }
-            pubArt.bloburl = withDefault(pubArt.aacurl, pubArt.wavurl);
+            pubArt.bloburl = core.cdnUrl(withDefault(pubArt.aacurl, pubArt.wavurl));
             pubArt.arttype = "sound";
         }
         else {
-            pubArt.bloburl = artContainer.url() + "/" + jsb["filename"];
+            pubArt.bloburl = core.cdnUrl(artContainer.url() + "/" + jsb["filename"]);
         }
     }
     await awaitUpgradeTasksAsync(req);
@@ -258,8 +267,8 @@ async function resolveScreenshotAsync(entities: indexedStore.FetchResult, req: c
         let screenshot = PubScreenshot.createFromJson(js["pub"]);
         coll.push(screenshot);
         let id = "/" + screenshot.id;
-        screenshot.pictureurl = artContainer.url() + id;
-        screenshot.thumburl = thumbContainers[0].container.url() + id;
+        screenshot.pictureurl = core.cdnUrl(artContainer.url() + id);
+        screenshot.thumburl = core.cdnUrl(thumbContainers[0].container.url() + id);
         if (req.isUpgrade) {
             queueUpgradeTask(req, /* async */ redownloadScreenshotAsync(js));
         }
@@ -369,8 +378,11 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
             await core.generateIdAsync(jsb, 8);
             let filename = jsb["id"];
             if (arttype == "blob" || arttype == "text") {
-                let s = orEmpty(jsb["pub"]["name"]).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+/g, "").replace(/-+$/g, "");
-                filename = filename + "/" + withDefault(s, "file") + "." + ext;
+                let s = orEmpty(jsb["pub"]["name"]).replace(/[^a-zA-Z0-9\._]+/g, "-").replace(/^-+/g, "").replace(/-+$/g, "");
+                s = withDefault(s, "file")
+                if (!s.endsWith("." + ext))
+                    s += "." + ext
+                filename = filename + "/" + s;
             }
             jsb["filename"] = filename;
             let result = await artContainer.createGzippedBlockBlobFromBufferAsync(filename, buf, {
@@ -381,6 +393,13 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
             });
             if ( ! result.succeded()) {
                 req.status = httpCode._424FailedDependency;
+            }
+            else if (ext == "mp3") {
+                // this for backward compat
+                result = await aacContainer.createBlockBlobFromBufferAsync(filename + ".m4a", buf, {
+                    contentType: contentType,
+                    cacheControl: "public, max-age=900",
+                });                
             }
             else if (jsb["isImage"]) {
                 await rethumbOneAsync(req, filename, contentType);
