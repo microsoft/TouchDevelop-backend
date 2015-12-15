@@ -287,6 +287,7 @@ function listBlobs(st, cb) {
        })
        log("list blobs, " + tot + " entries; last " + last)
        ct = isApp ? null : resp.continuationToken
+       resp = null
        if (ct) loop(ct)
        else cb(null)
     })
@@ -863,7 +864,20 @@ function setupKeys(cb) {
         dataKey = hashString(env.ENCKEY_BACKUP0)
 
         downloadSecret(keyUrl, function(err,env) {
-            if(bad(err,cb))return
+            if(bad(err,cb))return;
+
+            if (env["AZURE_STORAGE_ACCOUNT"] != "microbit0") {
+                accountNames = [
+                    env["AUDIT_BLOB_ACCOUNT"],
+                    env["AZURE_STORAGE_ACCOUNT"],
+                    env["NOTIFICATIONS_ACCOUNT"],
+                    env["WORKSPACE_ACCOUNT"],
+                    env["WORKSPACE_BLOB_ACCOUNT0"],
+                    env["WORKSPACE_BLOB_ACCOUNT1"],
+                    env["WORKSPACE_BLOB_ACCOUNT2"],
+                    env["WORKSPACE_BLOB_ACCOUNT3"],
+                ]
+            }
 
             Object.keys(env).forEach(function(k) {
                 var k2 = k.replace("ACCOUNT", "KEY")
@@ -886,3 +900,5 @@ async.series([
     setupKeys, 
     main,
 ], finalCb)
+
+// vim: ai
