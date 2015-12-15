@@ -931,6 +931,7 @@ export async function createNewUserAsync(username: string, email: string, profil
         entry["userid"] = userjs["id"];
     });
     await sendPermissionNotificationAsync(core.emptyRequest, userjs);
+    await search.scanAndSearchAsync(userjs, {});
     return userjs;
 }
 
