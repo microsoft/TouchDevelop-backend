@@ -195,7 +195,8 @@ export async function cacheCloudCompilerDataAsync(ver: string) : Promise<void>
 {
     if (cloudRelid != ver) {
         let resp2 = /* async */ queryCloudCompilerAsync("css");
-        doctopics = (await queryCloudCompilerAsync("doctopics"))["topicsExt"];
+        //doctopics = (await queryCloudCompilerAsync("doctopics"))["topicsExt"];
+        doctopics = {};
         let jsb = {};
         for (let js of asArray(doctopics)) {
             jsb[js["id"]] = js;
