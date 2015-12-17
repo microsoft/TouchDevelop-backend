@@ -103,6 +103,7 @@ export async function logAsync(req: core.ApiRequest, type: string, options_0: IP
 
 async function cleanLogAsync(): Promise<void>
 {
+    if (core.fullTD) return; // no audit aging in full TD
     // only try this in 10% of cases
     if (td.randomInt(10) == 0) return;    
     let timestamp = Math.floor(Date.now()/1000 - auditLogMaxAgeDays * 24 * 3600)
@@ -127,10 +128,6 @@ export async function queryPubLogAsync(req: core.ApiRequest)
 
 export async function initAsync() : Promise<void>
 {
-    // no audit aging in full TD
-    if (core.fullTD)
-        auditLogMaxAgeDays = 100 * 365;
-
     let auditTableClient = await core.specTableClientAsync("AUDIT_BLOB");
     let auditBlobService = azureBlobStorage.createBlobService({
         storageAccount: td.serverSetting("AUDIT_BLOB_ACCOUNT", false),
