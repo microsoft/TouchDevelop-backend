@@ -255,7 +255,9 @@ export async function initAsync() : Promise<void>
             let perm = td.toString(req.body["permissions"]);
             if (perm != null) {
                 perm = core.normalizePermissions(perm);
-                core.checkPermission(req, "root");
+                core.checkPermission(req, "permission-mgmt");
+                core.checkPermission(req, perm); // need to have all permissions given
+                core.checkPermission(req, req.rootUser().permissions); // also needs to have all permissions taken
                 if (req.status != 200) {
                     return;
                 }
