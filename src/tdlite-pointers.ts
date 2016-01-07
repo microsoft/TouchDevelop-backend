@@ -820,6 +820,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 }
             } else if (ptr.htmlartid) {
                 v.text = await getHtmlArtAsync(ptr.htmlartid);
+                if (/-txt$/.test(ptr.id)) {
+                    v.contentType = "text/plain; charset=utf-8"
+                }
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
