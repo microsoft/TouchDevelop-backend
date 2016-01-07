@@ -59,4 +59,24 @@
 
 </div> <!-- /.container -->
 
+<script>
+    $(document).ready(function() {
+        $('.md-video-link').on("click", function () {
+            var name = $(this).data("playerurl") || $(this).data("videosrc"); 
+            $(this).find("img").remove();
+            $(this).find("svg").remove();
+            var outer = $('<div />', {
+                "class": 'embed-responsive embed-responsive-16by9'
+            });
+            outer.appendTo($(this));
+            $('<iframe>', {
+                class: 'embed-responsive-item',
+                src: name,
+                frameborder: 0,
+                scrolling: 'no'
+            }).appendTo(outer);
+        });
+    });
+</script>
+
 {% endblock %}
