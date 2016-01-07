@@ -88,7 +88,7 @@ export async function initAsync() : Promise<void>
         let offsetHours = Math.round(td.clamp(-200000, 1000000, core.orZero(promo["priority"])));
         let newtime = Math.round(req3.rootPub["pub"]["time"] + offsetHours * 3600);
         let newId = (10000000000 - newtime) + "." + req3.rootId;
-        await core.pubsContainer.updateAsync(req3.rootId, async (entry: JsonBuilder) => {
+        await tdliteSearch.updateAndUpsertAsync(core.pubsContainer, req3, async (entry: JsonBuilder) => {
             entry["promo"] = promo;
             entry["promoId"] = newId;
         });

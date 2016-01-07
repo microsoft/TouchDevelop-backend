@@ -62,7 +62,7 @@ async function secondarySearchEntryAsync(obj: JsonBuilder, body: string): Promis
         let promo = obj["promo"]
         if (!promo) return <JsonBuilder>null;
 
-        let promotags: string[] = promo || []
+        let promotags: string[] = promo["tags"] || []
         if (promotags.length == 0)
             return <JsonBuilder>null;
         
@@ -279,7 +279,7 @@ export async function initAsync() : Promise<void>
     core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");        
         if (req.status != 200) return;
-        await scanAndSearchAsync(req.rootPub, { skipSearch: true })
+        await scanAndSearchAsync(req.rootPub, {  })
         req.response = {}
     });
 
@@ -384,6 +384,7 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
             jsons[i]["kind"] = "promo";
         }
     }
+    //logger.debug("jsrch: " + qurl + " -> " + JSON.stringify(js, null, 2) + " - " + JSON.stringify(jsons,null,2));
     if ( ! core.callerHasPermission(req, "global-list")) {
         jsons = jsons.filter(elt => core.isAbuseSafe(elt));
     }
