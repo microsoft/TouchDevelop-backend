@@ -690,7 +690,7 @@ export async function initAsync() : Promise<void>
     core.addRoute("GET", "users", "admin", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator,user-mgmt")) return;
         let lst = await users.getIndex("all").fetchAsync("all", req.queryOptions);        
-        lst.items = lst.items.filter((u: IUser) => core.isAlarming(u.permissions));
+        lst.items = lst.items.filter((u: IUser) => core.isAlarming(u.permissions) && !!u.login);        
         let dict = td.toDictionary(lst.items, e => td.toString(e["id"]))
         await core.resolveAsync(users, lst, req);
         for (let it of lst.items) {
