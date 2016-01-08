@@ -32,14 +32,14 @@
         <h3>STAY IN TOUCH</h3>
         <p>and receive our newsletter to get the latest news and tips.</p>
         <button id="subscribe" class="btn btn-success btn-sm btn-block" data-toggle="modal" data-target="#subscribeModal">SUBSCRIBE NOW</button>
-        <!--
+        
         <hr />
         <div class="bs-sidebar hidden-print" role="complementary">          
           <form class="bs-search" role="search">
             <input type="search" dir="auto" class="form-control" id="searchInput" placeholder="search docs..." />
           </form>
-          @topiclist@
-        </div> -->
+          <!-- @topiclist@ -->
+        </div>
     </div>
 
     <div id="contentBody" class="col-xs-12 col-sm-8 col-md-9 col-lg-9" dir="auto">
@@ -60,23 +60,55 @@
 </div> <!-- /.container -->
 
 <script>
-    $(document).ready(function() {
-        $('.md-video-link').on("click", function () {
-            var name = $(this).data("playerurl") || $(this).data("videosrc"); 
-            $(this).find("img").remove();
-            $(this).find("svg").remove();
-            var outer = $('<div />', {
-                "class": 'embed-responsive embed-responsive-16by9'
-            });
-            outer.appendTo($(this));
-            $('<iframe>', {
-                class: 'embed-responsive-item',
-                src: name,
-                frameborder: 0,
-                scrolling: 'no'
-            }).appendTo(outer);
-        });
-    });
+var topicId = '@id@';
 </script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.10.4/typeahead.bundle.min.js"></script>
+<script src="/static/js/docs.js" type="text/javascript"></script>
+
+<style>
+    /* First level of nav */
+.bs-search {
+    margin-bottom: 1em;
+}
+.bs-sidenav {
+  margin-top: 4px;
+  margin-bottom: 30px;
+  padding-top:    10px;
+  padding-bottom: 10px;
+  text-shadow: 0 1px 0 #fff;
+  background-color: #f7f5fa;
+  border-radius: 5px;
+}
+
+/* All levels of nav */
+.bs-sidebar .nav { margin-left:8px; }
+.bs-sidebar .nav > li > a,
+.tt-suggestion {
+  display: block;
+  padding: 5px 20px;
+}
+.bs-sidebar .nav > li > a:hover,
+.bs-sidebar .nav > li > a:focus{
+  text-decoration: none;
+  background-color: #e5e3e9;
+  border-right: 1px solid #dbd8e0;
+}
+.bs-sidebar .nav > .active > a,
+.bs-sidebar .nav > .active:hover > a,
+.bs-sidebar .nav > .active:focus > a {
+  font-weight: bold;
+  background-color: transparent;
+  border-right: 1px solid #563d7c;
+}
+.tt-dropdown-menu {
+    background-color:white;
+    border: 1px solid #ddd;
+    padding:0.5em;
+    height: 30em;
+    overflow-y: auto;
+}
+.tt-suggestion {
+}
+</style>
 
 {% endblock %}
