@@ -83,6 +83,7 @@ $(document).ready(function () {
                     var a = document.createElement('a');
                     a.href = '/' + item.path;
                     a.innerText = item.scriptname;
+                    a.title = item.scriptdescription;
                     return a;
                 }
             }
