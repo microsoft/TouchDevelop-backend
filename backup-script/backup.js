@@ -1,3 +1,5 @@
+"use strict";
+
 var crypto = require("crypto");
 var azure = require("azure-storage");
 var async = require("async");
@@ -275,27 +277,37 @@ function listBlobs(st, cb) {
 
   var isApp = st.container == "app"
 
-  function loop(ct) {
-    retry(function(cb) { st.svc.listBlobsSegmented(st.container, ct, { 
+  function loop() {
+    st.svc.listBlobsSegmented(st.container, st.ct, { 
         maxResults: isApp ? 3000 : 5000,
         include: "metadata"
-    }, cb) }, function(err, resp) {
+    }, function(err, resp) {
        if (bad(err, cb)) return
        tot += resp.entries.length
        st.total = tot
        var last = ""
+       var len = 0
+       var tmp = []
        resp.entries.forEach(function (it) {
-         st.entries[it.name] = it.properties.etag
+         len += 64 + it.name.length * 2 + it.properties.etag.length * 2
+         tmp.push(it.name)
+         tmp.push(it.properties.etag)
          last = it.name
        })
-       log("list blobs, " + tot + " entries; last " + last)
-       ct = isApp ? null : resp.continuationToken
+       // without the re-parse we get a memory leak; go figure
+       tmp = JSON.parse(JSON.stringify(tmp))
+       for (var i = 0; i < tmp.length; i += 2)
+           st.entries[tmp[i]] = tmp[i+1]
+       //global.gc();
+       log("list blobs, " + tot + " entries; last " + last + "; " + len)
+       st.ct = isApp ? null : resp.continuationToken
        resp = null
-       if (ct) loop(ct)
+       if (st.ct) process.nextTick(loop)
        else cb(null)
     })
   }
-  loop(null)
+  st.ct = null
+  loop()
 }
 
 function makeEntry(buf, info, httpres)
@@ -684,6 +696,7 @@ function backupAccount(name, cb) {
             function(cb) { fetchNew(st, cb) },
             function(cb) { flushBuf(st, cb) },
             function(cb) { saveStatus(st, cb) },
+            function(cb) { st.entries = {}; cb(null) },
           ], cb)
         })
     })
@@ -832,9 +845,9 @@ function main(cb) {
         return
     }
 
-
     trg.createContainer(trgContainer, {}, function(err) {
       if(bad(err, cb)) return
+
       async.series([
         function(cb) { async.each(accountNames, backupTableAccount, cb) },
         function(cb) { async.eachSeries(accountNames, backupAccount, cb) },
