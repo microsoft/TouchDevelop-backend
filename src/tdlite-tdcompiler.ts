@@ -23,8 +23,8 @@ var orEmpty = td.orEmpty;
 var logger = core.logger;
 var httpCode = core.httpCode;
 var cacheCompiler: cachedStore.Container;
-var doctopics: JsonObject;
-var doctopicsByTopicid: JsonObject;
+var doctopics = {};
+var doctopicsByTopicid = {};
 export var doctopicsCss: string = "";
 var cloudRelid: string = "";
 
@@ -195,12 +195,6 @@ export async function cacheCloudCompilerDataAsync(ver: string) : Promise<void>
 {
     if (cloudRelid != ver) {
         let resp2 = /* async */ queryCloudCompilerAsync("css");
-        doctopics = (await queryCloudCompilerAsync("doctopics"))["topicsExt"];
-        let jsb = {};
-        for (let js of asArray(doctopics)) {
-            jsb[js["id"]] = js;
-        }
-        doctopicsByTopicid = td.clone(jsb);
         doctopicsCss = (await resp2)["css"];
         cloudRelid = ver;
     }

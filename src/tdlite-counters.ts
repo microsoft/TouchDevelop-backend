@@ -115,6 +115,41 @@ async function flushCountersAsync()
     })    
 }
 
+export async function fetchDaysAsync(container: cachedStore.Container, pref: string, query: {})
+{
+    let maxlen = 366;
+    let now = await core.nowSecondsAsync();
+    let startTime = core.orZero(query["start"])
+    let len = td.clamp(1, maxlen, core.orZero(query["length"]));
+    if (startTime <= 0) startTime = now - len * 24 * 3600;
+    let totals = await container.getAsync(pref + "total");
+    let vals: {}[] = null;
+    
+    if (totals && (!pref || query["start"] || query["length"])) {
+        let max = totals["max"]
+        if (max == totals["min"])
+            max = now; // we used to have a bug, where max wasn't updated    
+        startTime = td.clamp(totals["min"], totals["max"], startTime)
+        startTime = dayAligned(startTime)
+        let ids: string[] = []
+        for (let i = 0; i < len; ++i) {
+            let curr = startTime + i * 24 * 3600;
+            if (curr > max)
+                break;
+            ids.push(pref + dayIdForTime(curr))
+        }
+        len = ids.length;
+
+        vals = await container.getManyAsync(ids);
+    }    
+
+    return {
+        totals: totals,
+        vals: vals,
+        startTime: startTime
+    }
+}
+
 export async function initAsync(include: string[]): Promise<void> {
     countersContainer = await cachedStore.createContainerAsync("counters")   
     includeCats = td.toDictionary(include, v => v);
@@ -134,29 +169,14 @@ export async function initAsync(include: string[]): Promise<void> {
         if (!core.checkPermission(req, "stats"))
             return;
         
-        let maxlen = 366;
-        let now = await core.nowSecondsAsync();
-        let startTime = core.orZero(req.body["start"])
-        if (startTime <= 0) startTime = now - maxlen * 24 * 3600;
-        let len = td.clamp(1, maxlen, core.orZero(req.body["length"]));
+        let days = await fetchDaysAsync(countersContainer, "", req.body);
+        let vals = days.vals;
+        let len = vals.length;
+        
+        let res = {}
         let fields = td.toStringArray(req.body["fields"]) ||
                      ["New_script", "New_script_hidden", "New_art", "New_comment", "PubUser@federated"]
         
-        let totals = await countersContainer.getAsync("total");
-        
-        startTime = td.clamp(totals["min"], totals["max"], startTime)
-        startTime = dayAligned(startTime)
-        let ids: string[] = []
-        for (let i = 0; i < len; ++i) {
-            let curr = startTime + i * 24 * 3600;
-            if (curr > totals["max"])
-                break;
-            ids.push(dayIdForTime(curr))
-        }
-        len = ids.length;
-        
-        let vals = await countersContainer.getManyAsync(ids);
-        let res = {}
         for (let fld of fields) {
             let arr = []            
             for (let j = 0; j < len; ++j) {
@@ -165,12 +185,12 @@ export async function initAsync(include: string[]): Promise<void> {
                     v = core.orZero(vals[j]["counters"][fld])
                 arr.push(v)
             }
-            arr.push(core.orZero(totals["counters"][fld]))
+            arr.push(core.orZero(days.totals["counters"][fld]))
             res[fld] = arr
         }
         
         req.response = {
-            start: startTime,
+            start: days.startTime,
             length: len,
             values: res,
         }     

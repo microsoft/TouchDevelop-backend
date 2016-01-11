@@ -149,7 +149,7 @@ async function storeOneInfoAsync()
     await progressContainer.updateAsync(scriptId + "/total", async(v) => {
         addMeasure(v);
         v["min"] = v["min"] ? Math.min(v["min"], alignedTime) : alignedTime;
-        v["max"] = v["max"] ? Math.min(v["max"], alignedTime) : alignedTime;
+        v["max"] = v["max"] ? Math.max(v["max"], alignedTime) : alignedTime;
     })        
     
     return false;
@@ -287,14 +287,31 @@ export async function initAsync(): Promise<void> {
     
     core.addRoute("GET", "*script", "progressstats", async(req) => {
         // TODO special permission?
-        let data = await progressContainer.getAsync(req.rootId + "/total")
+        let days = await counters.fetchDaysAsync(progressContainer, req.rootId + "/", req.queryOptions)
+        
         let resp = {
             kind: "progressstats",
+            startTime: days.startTime,
+            numdays: -1,
             publicationId: req.rootId,
             count: 0,
             steps: []
         }
         req.response = resp
+        
+        let data = {}
+        
+        if (days.vals) {
+            data["measures"] = {}
+            for (let day of days.vals) {
+                if (day && day["measures"])
+                    addToMultiMeasure(data["measures"], day["measures"])
+            }
+            resp.numdays = days.vals.length;
+        } else {
+            data = days.totals;
+        }
+        
         if (data && data["measures"]) {
             let m: MultiMeasure = data["measures"]             
             for (let idx = 0; idx < 100; ++idx) {
