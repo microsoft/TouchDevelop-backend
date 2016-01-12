@@ -1584,7 +1584,7 @@ export function getSettings(name: string): JsonObject
     assert(settingsObjects.indexOf(name) >= 0)
     if (settingsCache.hasOwnProperty(name))
         return settingsCache[name];
-    return null;
+    return {};
 }
 
 export async function getSettingsNoCacheAsync(name: string): Promise<JsonObject>

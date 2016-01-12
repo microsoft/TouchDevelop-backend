@@ -236,7 +236,7 @@ async function initSubsystems() : Promise<void>
     await tdliteWorkspace.initAsync();
     await tdliteCppCompiler.initAsync();
     await tdliteProgress.initAsync();
-    if (core.fullTD) {
+    if (core.fullTD && core.hasSetting("LEGACY_ACCOUNT")) {
         await tdliteLegacy.initAsync();
     }    
 }
