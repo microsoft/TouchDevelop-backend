@@ -253,6 +253,7 @@ export class ClientConfig
     @td.json public altCdnUrls: string[];
     @td.json public tickFilter: JsonObject;
     @td.json public doNothingText: string;
+    @td.json public cloudId: string;
     static createFromJson(o:JsonObject) { let r = new ClientConfig(); r.fromJson(o); return r; }
 }
 
@@ -1501,6 +1502,10 @@ export async function initFinalAsync()
         currClientConfig.altCdnUrls.push("https://az31353.vo.msecnd.net")
     }
     currClientConfig.anonToken = basicCreds;
+    
+    currClientConfig.cloudId =
+        td.serverSetting("SELF").replace(/^https?:\/\//, "").replace(/\/.*/, "")
+            .replace(/^((test|stage|live|www|alpha|beta)\.)/, "")
     
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();
