@@ -52,7 +52,7 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 234;
+export var rewriteVersion: number = 236;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
@@ -1584,7 +1584,7 @@ export function getSettings(name: string): JsonObject
     assert(settingsObjects.indexOf(name) >= 0)
     if (settingsCache.hasOwnProperty(name))
         return settingsCache[name];
-    return {};
+    return null;
 }
 
 export async function getSettingsNoCacheAsync(name: string): Promise<JsonObject>
@@ -1647,7 +1647,7 @@ export async function refreshSettingsAsync(): Promise<void> {
     
     let tmp = await settingsContainer.getManyAsync(settingsObjects);
     settingsObjects.forEach((o, i) => {        
-        settingsCache[o] = tmp[i] || null 
+        settingsCache[o] = tmp[i] || null
     })
 
     for (let f of settingsCleanups) {

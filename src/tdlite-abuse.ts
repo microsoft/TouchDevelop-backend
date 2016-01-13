@@ -476,10 +476,10 @@ function scanCore(tree: {}, str: string) {
 
 function initScanner() {
     if (wordRecognizer) return;
-    let sett = core.getSettings("scanner")    
+    let sett = core.getSettings("scanner") || {} 
     wordRecognizer = buildRecognizer(sett["words"] || [])
     scannerRegexes = {}
-    let reg = sett["regexps"]
+    let reg = sett["regexps"] || {}
     for (let rxname of Object.keys(reg)) {
         scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b", "g");        
     }
