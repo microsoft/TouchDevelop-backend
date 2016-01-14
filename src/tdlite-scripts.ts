@@ -276,6 +276,20 @@ async function canSeeRootpubScriptAsync(req: core.ApiRequest) : Promise<boolean>
     return seeIt2;
 }
 
+export async function updateScriptAsync(pub: JsonBuilder)
+{
+    let id = pub["updateKey"]
+    let upd = await core.pubsContainer.getAsync(id)
+    if (upd) {
+        if (pub["pub"]["time"] < upd["scriptTime"]) {
+            let newone = await core.getPubAsync(upd["scriptId"], "script")
+            if (newone)
+                return newone;    
+        }
+    }
+    return pub
+}
+
 async function insertScriptAsync(jsb: JsonBuilder, pubScript: PubScript, scriptText_: string, isImport: boolean): Promise<void> {
     pubScript.scripthash = core.sha256(scriptText_).substr(0, 32);
     jsb["pub"] = pubScript.toJson();

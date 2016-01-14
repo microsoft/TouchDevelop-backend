@@ -14,7 +14,8 @@ import * as azureTable from "./azure-table"
 import * as azureBlobStorage from "./azure-blob-storage"
 import * as raygun from "./raygun"
 import * as core from "./tdlite-core"
-import * as tdcompiler from "./tdlite-tdcompiler"
+import * as tdliteTdcompiler from "./tdlite-tdcompiler"
+import * as tdliteScripts from "./tdlite-scripts"
 import * as mbedworkshopCompiler from "./mbedworkshop-compiler"
 import * as cachedStore from "./cached-store"
 
@@ -121,15 +122,21 @@ export async function initAsync()
     }, { noSizeCheck: true })
     
     core.addRoute("GET", "*script", "hex", async(req) => {
-        if (req.rootPub["pub"]["unmoderated"]) {
+        let pub = req.rootPub
+        
+        if (core.orFalse(req.queryOptions["applyupdates"])) {
+            pub = await tdliteScripts.updateScriptAsync(pub) 
+        }
+        
+        if (pub["pub"]["unmoderated"]) {
             req.status = httpCode._400BadRequest
             return
         }
         
         let ver = await core.getCloudRelidAsync(false);
         // include some randomness (TDC_ACCESS_TOKEN) to make these non-predictable just in case
-        let key = core.sha256(ver + "." + req.rootId + "." + core.rewriteVersion + "." + td.serverSetting("TDC_ACCESS_TOKEN"))
-        let name = req.rootPub["pub"]["name"] || "script"
+        let key = core.sha256(ver + "." + pub["id"] + "." + core.rewriteVersion + "." + td.serverSetting("TDC_ACCESS_TOKEN"))
+        let name = pub["pub"]["name"] || "script"
         name = name.replace(/[^a-zA-Z0-9]+/g, "-")
         let blobName = key + "/microbit-" + name + ".hex"
         
@@ -147,7 +154,7 @@ export async function initAsync()
                 // race detected; wait a while and then redirect - hopefully the other guy is ready by now
                 await td.sleepAsync(10)
             } else {
-                let json = await tdcompiler.queryCloudCompilerAsync("q/" + req.rootId + "/hexcompile");
+                let json = await tdliteTdcompiler.queryCloudCompilerAsync("q/" + pub["id"] + "/hexcompile");
                 if (json["compiled"]) {
                     let res = await compileContainer.createGzippedBlockBlobFromBufferAsync(blobName, new Buffer(json["data"], "utf8"), {
                         contentType: json["contentType"],
