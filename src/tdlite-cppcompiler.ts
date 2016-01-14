@@ -14,6 +14,7 @@ import * as azureTable from "./azure-table"
 import * as azureBlobStorage from "./azure-blob-storage"
 import * as raygun from "./raygun"
 import * as core from "./tdlite-core"
+import * as tdcompiler from "./tdlite-tdcompiler"
 import * as mbedworkshopCompiler from "./mbedworkshop-compiler"
 import * as cachedStore from "./cached-store"
 
@@ -118,6 +119,51 @@ export async function initAsync()
         //if (!core.checkPermission(req, "root")) return;
         await mbedCompileExtAsync(req);
     }, { noSizeCheck: true })
+    
+    core.addRoute("GET", "*script", "hex", async(req) => {
+        if (req.rootPub["pub"]["unmoderated"]) {
+            req.status = httpCode._400BadRequest
+            return
+        }
+        
+        let ver = await core.getCloudRelidAsync(false);
+        // include some randomness (TDC_ACCESS_TOKEN) to make these non-predictable just in case
+        let key = core.sha256(ver + "." + req.rootId + "." + core.rewriteVersion + "." + td.serverSetting("TDC_ACCESS_TOKEN"))
+        let name = req.rootPub["pub"]["name"] || "script"
+        name = name.replace(/[^a-zA-Z0-9]+/g, "-")
+        let blobName = key + "/microbit-" + name + ".hex"
+        
+        let curr = await cppCache.getAsync(key + "-hexstatus")
+        if (curr == null) {
+            if (await core.throttleAsync(req, "compile", 20))
+                return;
+            // create status file first to avoid races
+            let doIt = false
+            curr = await cppCache.updateAsync(key + "-hexstatus", async(v) => {
+                doIt = !v["url"]
+                v["url"] = core.currClientConfig.primaryCdnUrl + "/compile/" + blobName
+            })
+            if (!doIt) {
+                // race detected; wait a while and then redirect - hopefully the other guy is ready by now
+                await td.sleepAsync(10)
+            } else {
+                let json = await tdcompiler.queryCloudCompilerAsync("q/" + req.rootId + "/hexcompile");
+                if (json["compiled"]) {
+                    let res = await compileContainer.createGzippedBlockBlobFromBufferAsync(blobName, new Buffer(json["data"], "utf8"), {
+                        contentType: json["contentType"],
+                        smartGzip: false
+                    })
+                }
+            }
+        }
+        
+        req.headers = {
+            "location": curr["url"]
+        }
+        req.status = httpCode._302MovedTemporarily;
+    });
+    
+
 }
 
 
