@@ -51,6 +51,7 @@ export class LoginSession
     @td.json public termsOk: boolean = false;
     @td.json public codeOk: boolean = false;    
     @td.json public nickname: string = "";
+    @td.json public realname: string = "";
     
     @td.json public askLegacy = false;
     @td.json public legacyCodes: {}; // code -> userid; there may be multiple accounts attached to an email    
@@ -134,14 +135,16 @@ export class LoginSession
         let profile = this.federatedUserInfo;
     
         let username = core.fullTD ? profile.name : profile.name.replace(/\s.*/g, "");
+        let realname = /^0x/.test(profile.name) ? "" : profile.name 
         
         if (this.nickname) username = this.nickname;
+        if (this.realname) realname = this.realname;
 
         logger.tick("PubUser@federated");
         let perms = ""
         if (core.fullTD)
             perms = "user";
-        let userjs = await tdliteUsers.createNewUserAsync(username, profile.email, this.profileId, perms, profile.name, false);
+        let userjs = await tdliteUsers.createNewUserAsync(username, profile.email, this.profileId, perms, realname, false);
         this.userid = userjs["id"];
         await this.saveAsync();
         
@@ -783,6 +786,9 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                     msg = core.translateMessage("This nickname is not allowed.", lang);
                 } else {
                     session.nickname = username;
+                    let realname = (req.query()["td_realname"] || "").slice(0, 60)
+                    if (realname)
+                        session.realname = realname
                     await session.saveAsync();
                 }    
             }
@@ -795,6 +801,10 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 inner = "newadult";
                 params["EXAMPLES"] = "";
                 params["SESSION"] = session.state;
+                if (!session.federatedUserInfo.name || /^0x/.test(session.federatedUserInfo.name))
+                    params["REALNAMESTYLE"] = "display:block";
+                else
+                    params["REALNAMESTYLE"] = "display:none";                
                 let uentry = await tdliteUsers.getAsync(session.userid);
                 if (uentry) {
                     let nm = uentry["pub"].name

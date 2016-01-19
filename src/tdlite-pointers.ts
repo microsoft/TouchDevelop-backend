@@ -756,6 +756,15 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         id = id + templateSuffix;
     }
     id = id + lang;
+    
+    if (!core.fullTD && req.query()["update"] == "true" && /^[a-z]+$/.test(fn)) {
+        let entry = await core.getPubAsync(fn, "script")
+        if (entry) {
+            entry = await tdliteScripts.updateScriptAsync(entry)
+            res.redirect(httpCode._302MovedTemporarily, "/app/#pub:" + entry["id"])
+            return
+        }
+    }
 
     await rewriteAndCachePointerAsync(id, res, async (v: CachedPage) => {
         let pubdata = {};
@@ -820,6 +829,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 }
             } else if (ptr.htmlartid) {
                 v.text = await getHtmlArtAsync(ptr.htmlartid);
+                if (/-txt$/.test(ptr.id)) {
+                    v.contentType = "text/plain; charset=utf-8"
+                }
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);

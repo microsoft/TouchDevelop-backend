@@ -11,7 +11,7 @@
         "module": "commonjs",
         "sourceMap": true
     },
-    "files": [
+    "x-files": [
         "src/td.ts",
         "src/test-service.ts",
         "src/tdlite.ts",

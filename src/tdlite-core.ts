@@ -52,7 +52,7 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 234;
+export var rewriteVersion: number = 236;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
@@ -253,6 +253,7 @@ export class ClientConfig
     @td.json public altCdnUrls: string[];
     @td.json public tickFilter: JsonObject;
     @td.json public doNothingText: string;
+    @td.json public cloudId: string;
     static createFromJson(o:JsonObject) { let r = new ClientConfig(); r.fromJson(o); return r; }
 }
 
@@ -1502,6 +1503,10 @@ export async function initFinalAsync()
     }
     currClientConfig.anonToken = basicCreds;
     
+    currClientConfig.cloudId =
+        td.serverSetting("SELF").replace(/^https?:\/\//, "").replace(/\/.*/, "")
+            .replace(/^((test|stage|live|www|alpha|beta)\.)/, "")
+    
     addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();
     });
@@ -1647,7 +1652,7 @@ export async function refreshSettingsAsync(): Promise<void> {
     
     let tmp = await settingsContainer.getManyAsync(settingsObjects);
     settingsObjects.forEach((o, i) => {        
-        settingsCache[o] = tmp[i] || null 
+        settingsCache[o] = tmp[i] || null
     })
 
     for (let f of settingsCleanups) {
