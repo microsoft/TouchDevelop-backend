@@ -91,10 +91,10 @@ async function uploadArtAsync(fn: string): Promise<string> {
 
     if (/\.html/.test(fn)) {
         let tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
-        
+
         if (tmp.indexOf("<!-- TD-NO-TRANSLATE -->") == -1)
             i18nPtrs[fn] = 1;
-        
+
         buf = new Buffer(tmp, "utf8")
     }
 
@@ -143,8 +143,7 @@ async function uploadArtAsync(fn: string): Promise<string> {
     return id
 }
 
-function pathToPtr(path:string)
-{
+function pathToPtr(path: string) {
     return "ptr-" + path.replace(/\.html$/, "").replace(/^\/+/, "").replace(/[^a-zA-Z0-9@]/g, "-")
 }
 
@@ -255,7 +254,7 @@ async function uploadAsync() {
         pointers: ptrs
     })
     let resp2 = await req.sendAsync();
-    console.log(`i18n: ${resp2.statusCode()} ${util.inspect(resp2.contentAsJson())}`)
+    console.log(`i18n: ${resp2.statusCode() } ${util.inspect(resp2.contentAsJson()) }`)
 
     fs.writeFileSync(cachepath, JSON.stringify(uploadCache, null, 2))
 }
@@ -296,6 +295,20 @@ async function serveAsync() {
     await restify.startAsync();
 }
 
+function i18n() {
+    let res = "";
+    for (let fn of fs.readdirSync("src")) {
+        if (/\.ts$/.test(fn)) {
+            let str = fs.readFileSync("src/" + fn, "utf8")
+            str.replace(/translateMessage\("([^"]+)"/g, (full: string, msg: string) => {
+                res += "<div>" + msg + "</div>\n"
+                return ""
+            })
+        }
+    }
+    fs.writeFileSync("web/i18n-messages.html", res, "utf8")
+}
+
 async function main() {
     nunjucks.configure("web", {
         autoescape: true,
@@ -308,6 +321,8 @@ async function main() {
         await serveAsync();
     else if (cmd == "upload" || cmd == "push")
         await uploadAsync();
+    else if (cmd == "i18n")
+        i18n();
     else
         console.log("bad usage")
 }
