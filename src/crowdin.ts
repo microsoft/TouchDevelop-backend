@@ -11,8 +11,11 @@ var logger: td.AppLogger;
 var apiRoot = "https://api.crowdin.com/api/project/touchdevelop/"
 var suff = ""
 
-function init(): Promise<void> {
+export var enabled = false;
+
+export function init(): Promise<void> {
     if (logger != null) return;
+    enabled = true;
     logger = td.createLogger("crowdin");
     suff = "?key=" + td.serverSetting("CROWDIN_KEY");
     logger.info("initialized");
@@ -21,8 +24,6 @@ function init(): Promise<void> {
 export async function multipartPostAsync(uri: string, data: any, filename: string = null, filecontents: string = null) {
     // tried and failed to use request module...
     
-    init();
-
     var boundry = "--------------------------0461489f461126c5"
     var form = ""
 
@@ -55,8 +56,6 @@ export async function multipartPostAsync(uri: string, data: any, filename: strin
 }
 
 export async function uploadTranslationAsync(filename: string, jsondata: {}) {
-    init();
-
     let cnt = 0
 
     function incr() {
@@ -182,3 +181,15 @@ export function translate(html: string, locale: td.SMap<string>) {
     }
 }
 
+export async function downloadTranslationAsync(filename: string, lang: string) {
+    let req = td.createRequest(apiRoot + "export-file" + suff +
+        "&file=" + encodeURIComponent(filename) +
+        "&language=" + encodeURIComponent(lang))
+    let resp = await req.sendAsync()
+    let data = resp.contentAsJson()
+    let res: td.SMap<string> = {}
+    for (let k of Object.keys(data))
+        if (data[k] != "")
+            res[k] = data[k];
+    return res;
+}

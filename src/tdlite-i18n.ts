@@ -9,11 +9,42 @@ import * as core from "./tdlite-core"
 import * as tdlitePointers from "./tdlite-pointers"
 import * as crowdin from "./crowdin"
 import * as parallel from "./parallel"
+import * as cachedStore from "./cached-store"
 
 var logger = core.logger;
 var httpCode = core.httpCode;
+var i18nCache:cachedStore.Container;
+
+async function downloadCachedTranslationAsync(filename:string, lang:string)
+{
+	let key = "i18n:" + filename + ":" + lang
+	let f = await core.redisClient.getAsync(key)
+	if (f)
+		return JSON.parse(f)
+	let dat = await crowdin.downloadTranslationAsync(filename, lang)
+	dat = dat || {}
+	await core.redisClient.setpxAsync(key, JSON.stringify(dat), 10*60*1000)
+	return dat
+}
+
+export async function translateHtmlAsync(html:string, lang:string)
+{
+	if (!crowdin.enabled) return html;
+	
+    lang = core.normalizeLang(lang);
+    if (!lang)
+        return html;
+	
+	let trdata = await downloadCachedTranslationAsync("website.json", lang)
+	let res = crowdin.translate(html, trdata)
+	return res.text
+}
 
 export async function initAsync() {
+	if (core.hasSetting("CROWDIN_KEY"))
+		crowdin.init();
+	else return;
+	
 	core.addRoute("POST", "i18n", "upload", async(req) => {
 		if (!core.checkPermission(req, "i18n"))
 			return;
