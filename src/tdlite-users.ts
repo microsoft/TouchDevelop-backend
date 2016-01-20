@@ -432,7 +432,11 @@ export async function initAsync() : Promise<void>
         let codes = req11.body["codes"];
         await parallel.forBatchedAsync(codes.length, 50, async (x1: number) => {
             let s5 = td.toString(codes[x1]);
-            await passcodesContainer.updateAsync(core.normalizeAndHash(s5), async (entry8: JsonBuilder) => {
+            let normalized = s5
+            if (!/^code\//.test(normalized)) {
+                normalized = core.normalizeAndHash(normalized)
+            }
+            await passcodesContainer.updateAsync(normalized, async (entry8: JsonBuilder) => {
                 assert(td.stringContains(entry8["permissions"], ","), "");
                 entry8["permissions"] = req11.body["permissions"];
             });
