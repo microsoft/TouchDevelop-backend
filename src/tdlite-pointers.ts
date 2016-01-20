@@ -437,14 +437,11 @@ async function getHtmlArtAsync(templid: string) {
 
 }
 
-async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
+export async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
 {
     let r: string;
     let id = pathToPtr(templatename.replace(/:.*/g, ""));
-    let entry3 = (<JsonObject>null);
-    if (entry3 == null) {
-        entry3 = await core.getPubAsync(id + lang, "pointer");
-    }
+    let entry3 = await core.getPubAsync(id + lang, "pointer"); 
     if (entry3 == null && lang != "") {
         entry3 = await core.getPubAsync(id, "pointer");
     }

@@ -98,7 +98,7 @@
             }))
         }
 
-        function q(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
+        function q(s) { return s.replace(/&/g, "&amp;").replace(/\u003C/g, "&lt;").replace(/>/g, "&gt;") }
 
         elt("website").innerHTML = q(qs.client_id);
         elt("agree").onclick = agree;
