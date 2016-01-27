@@ -771,7 +771,7 @@ export function orFalse(s: boolean) : boolean
 
 export var htmlQuote = tdliteDocs.htmlQuote;
 
-export function handleBasicAuth(req: restify.Request, res: restify.Response) : void
+export function handleBasicAuth(req: restify.Request, res: restify.Response, relaxed = false) : void
 {
     if (res.finished()) {
         return;
@@ -793,7 +793,8 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response) : v
             }
         }
     }
-    if ( ! res.finished() && basicCreds != "") {
+    if (!res.finished() && basicCreds != "") {
+        if (relaxed) return
         if (orEmpty(req.query()["anon_token"]) == basicCreds) {
             // OK
         }
