@@ -528,6 +528,10 @@ async function handleFacebookAsync(session: tdliteLogin.LoginSession) {
 // TODO throttling for emails etc
 
 export async function handleLegacyAsync(req: restify.Request, session: tdliteLogin.LoginSession, params: {}): Promise<void> {
+    if (!identityTable) {
+        session.askLegacy = false
+        return
+    }
     if (session.askLegacy) {
         params["SESSION"] = session.state;
         params["LEGACYMSG"] = "";
