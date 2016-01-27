@@ -186,7 +186,7 @@ export async function downloadTranslationAsync(filename: string, lang: string) {
         "&file=" + encodeURIComponent(filename) +
         "&language=" + encodeURIComponent(lang))
     let resp = await req.sendAsync()
-    let data = resp.contentAsJson()
+    let data = resp.contentAsJson() || {}
     let res: td.SMap<string> = {}
     for (let k of Object.keys(data))
         if (data[k] != "")
