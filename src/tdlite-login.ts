@@ -318,11 +318,10 @@ export async function initAsync(): Promise<void> {
         serverAuth.validateOauthParameters(req1, res1);
         core.handleBasicAuth(req1, res1);
         if (!res1.finished()) {
-            let links = serverAuth.providerLinks(req1.query());
             let lang2 = await tdlitePointers.handleLanguageAsync(req1);
             let html = await getLoginHtmlAsync("providers", lang2);
-            for (let k of Object.keys(links)) {
-                html = td.replaceAll(html, "@" + k + "-url@", links[k]);
+            for (let k of serverAuth.providerLinks(req1.query())) {
+                html = td.replaceAll(html, "@" + k.id + "-url@", k.href);
             }
             res1.html(html);
         }
