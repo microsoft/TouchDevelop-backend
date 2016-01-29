@@ -111,7 +111,8 @@ export var artContentTypes: td.SMap<string> =
       "application/x-msdownload": "exe",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+      "application/x-microbit-hex": "hex"
     };
 
 export var tdLegacyKinds: td.SMap<number> = {
