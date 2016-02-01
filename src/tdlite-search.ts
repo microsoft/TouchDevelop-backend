@@ -125,7 +125,8 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
         for (let fldname of ["about", "grade", "school"]) {
             text = text + " " + orEmpty(pub[fldname]);
         }
-        let desc = orEmpty(pub["description"]) + " " + orEmpty(pub["name"]) 
+        let desc = orEmpty(pub["description"]) + " " + orEmpty(pub["name"])
+        //logger.debug("scanning desc: " + desc)
         
         // TODO this was alrady fetched in "resolve" above...
         let userjson = await tdliteUsers.getAsync(pub["userid"]);        

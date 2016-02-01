@@ -24,6 +24,7 @@ import * as tdliteData from "./tdlite-data"
 import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteArt from "./tdlite-art"
 import * as tdliteUsers from "./tdlite-users"
+import * as tdliteI18N from "./tdlite-i18n"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
@@ -418,7 +419,7 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     }
 }
 
-async function getHtmlArtAsync(templid: string) {
+async function getHtmlArtAsync(templid: string, lang:string) {
     let artjs = await core.getPubAsync(templid, "art");
     if (artjs == null) {
         return "Template art missing";
@@ -431,20 +432,17 @@ async function getHtmlArtAsync(templid: string) {
             return "Art text not found.";
         }
         else {
-            return textObj;
+            return tdliteI18N.translateHtmlAsync(textObj, lang);
         }
     }
 
 }
 
-async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
+export async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
 {
     let r: string;
     let id = pathToPtr(templatename.replace(/:.*/g, ""));
-    let entry3 = (<JsonObject>null);
-    if (entry3 == null) {
-        entry3 = await core.getPubAsync(id + lang, "pointer");
-    }
+    let entry3 = await core.getPubAsync(id + lang, "pointer"); 
     if (entry3 == null && lang != "") {
         entry3 = await core.getPubAsync(id, "pointer");
     }
@@ -452,7 +450,7 @@ async function getTemplateTextAsync(templatename: string, lang: string) : Promis
         return "Template pointer leads to nowhere";
     }
     else if (entry3["pub"]["htmlartid"]) {
-        return await getHtmlArtAsync(entry3["pub"]["htmlartid"]);
+        return await getHtmlArtAsync(entry3["pub"]["htmlartid"], lang);
     }
     else {
         let templid = entry3["pub"]["scriptid"];
@@ -828,7 +826,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                 }
             } else if (ptr.htmlartid) {
-                v.text = await getHtmlArtAsync(ptr.htmlartid);
+                v.text = await getHtmlArtAsync(ptr.htmlartid, lang);
                 if (/-txt$/.test(ptr.id)) {
                     v.contentType = "text/plain; charset=utf-8"
                 }

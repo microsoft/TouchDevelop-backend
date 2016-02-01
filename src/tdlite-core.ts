@@ -771,7 +771,7 @@ export function orFalse(s: boolean) : boolean
 
 export var htmlQuote = tdliteDocs.htmlQuote;
 
-export function handleBasicAuth(req: restify.Request, res: restify.Response) : void
+export function handleBasicAuth(req: restify.Request, res: restify.Response, relaxed = false) : void
 {
     if (res.finished()) {
         return;
@@ -793,7 +793,8 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response) : v
             }
         }
     }
-    if ( ! res.finished() && basicCreds != "") {
+    if (!res.finished() && basicCreds != "") {
+        if (relaxed) return
         if (orEmpty(req.query()["anon_token"]) == basicCreds) {
             // OK
         }
@@ -1702,11 +1703,18 @@ export async function refreshSettingsAsync(): Promise<void> {
     settingsPermissions = td.clone(permMap);
 }
 
-export function translateMessage(msg: string, lang: string):string
+export function normalizeLang(lang:string)
 {
     lang = lang || "";
     lang = lang.replace(/^@/, "");    
-    if (!lang || lang == serviceSettings.defaultLang)
+    if (lang == serviceSettings.defaultLang) lang = "";
+    return lang;    
+}
+
+export function translateMessage(msg: string, lang: string):string
+{
+    lang = normalizeLang(lang);
+    if (!lang)
         return msg;
     var s = settingsCache["translations"] || {};
     if (!s[lang]) return msg;

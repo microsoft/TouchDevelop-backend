@@ -211,7 +211,7 @@ export async function initAsync()
         let encode = (s: string) => s.replace(/[^a-zA-Z0-9\.]/g, m => "%" + ("000" + m.charCodeAt(0).toString(16).toUpperCase()).slice(-4))
         let ent = await identityTable.getEntityAsync(encode(name), encode(idprov))
         if (!ent) {            
-            session.storedMessage = "Cannot find that user account in the legacy system. Maybe try linking other provider?"
+            session.storedMessage = core.translateMessage("Cannot find that user account in the legacy system. Maybe try linking other provider?", null)
             logger.tick("Login_legacyNotFound")
             logger.warning("cannot find ACS user: " + encode(name) + ":" + encode(idprov))
             await session.saveAndRedirectAsync(req);
@@ -229,7 +229,7 @@ export async function initAsync()
 
         let ok = await session.setMigrationUserAsync(userjson["id"], true)
         if (!ok) {
-            session.storedMessage = "This user account was already bound to identity in the new system. Maybe try linking other provider?"
+            session.storedMessage = core.translateMessage("This user account was already bound to identity in the new system. Maybe try linking other provider?", null)
             logger.tick("Login_legacyBound")
         } else {
             logger.tick("Login_legacyOK")
@@ -528,6 +528,10 @@ async function handleFacebookAsync(session: tdliteLogin.LoginSession) {
 // TODO throttling for emails etc
 
 export async function handleLegacyAsync(req: restify.Request, session: tdliteLogin.LoginSession, params: {}): Promise<void> {
+    if (!identityTable) {
+        session.askLegacy = false
+        return
+    }
     if (session.askLegacy) {
         params["SESSION"] = session.state;
         params["LEGACYMSG"] = "";
@@ -544,10 +548,10 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     let legId = sett("legacyid")
     let legCode = sett("legacyemailcode")
     let lang = params["LANG"];
-    let err = m => params["LEGACYMSG"] = core.translateMessage(m, lang);
+    let err = m => params["LEGACYMSG"] = m
     let tokM = /^1([a-z]+)\.\w+$/.exec(session.oauthU)
     
-    let alreadyBound = () => err("This user account was already tied to the new system.");
+    let alreadyBound = () => err(core.translateMessage("This user account was already tied to the new system.", lang));
     
     let sendCodeEmailAsync = async(users: {}[]) => {
         let email = users[0]["settings"]["email"];
@@ -582,7 +586,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     };
     
     if (session.storedMessage) {
-        err(session.storedMessage);
+        err(core.translateMessage(session.storedMessage, lang));
         params["INNER"] = "legacy";
         session.storedMessage = null; // only show once
         await session.saveAsync();
@@ -603,7 +607,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
             }
             logger.tick("Login_migrationtoken")
         } else {
-            err("Invalid migration code. Please start over.")
+            err(core.translateMessage("Invalid migration code. Please start over.", lang))
             return;
         }
     } else if (sett("legacyskip")) {
@@ -623,7 +627,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     } else if (emailLinkingEnabled && legEmail) {
         let users = await tdliteUsers.users.getIndex("email").fetchAllAsync(legEmail)
         if (users.length == 0) {
-            err("We couldn't find this email.")
+            err(core.translateMessage("We couldn't find this email.", lang))
             return;
         }
         
@@ -631,13 +635,13 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
     } else if (emailLinkingEnabled && legId) {
         legId = legId.replace(/^\/+/, "")
         if (!/^[a-z]+$/.test(legId)) {
-            err("Invalid characters in legacy user ID.")
+            err(core.translateMessage("Invalid characters in legacy user ID.", lang))
             return
         }
         
         let u = await tdliteUsers.getAsync(legId);
         if (!u) {
-            err("We couldn't find this user ID.")
+            err(core.translateMessage("We couldn't find this user ID.", lang))
             return;
         }
         
@@ -646,14 +650,14 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
         u = await tdliteUsers.getAsync(legId);        
         
         if (!u["settings"] || !u["settings"]["email"]) {
-            err("No email associated with that user ID. Please go to www.touchdevelop.com and set your email first.")
+            err(core.translateMessage("No email associated with that user ID. Please go to www.touchdevelop.com and set your email first.", lang))
             return;
         }
         
         await sendCodeEmailAsync([u]);
     } else if (emailLinkingEnabled && legCode) {
         if (!/^\d+$/.test(legCode)) {
-            err("Invalid characters in legacy email code")
+            err(core.translateMessage("Invalid characters in legacy email code", lang))
             return
         }
         
@@ -666,7 +670,7 @@ export async function handleLegacyAsync(req: restify.Request, session: tdliteLog
             }
             
         } else {
-            err("The code is invalid; please try again")
+            err(core.translateMessage("The code is invalid; please try again", lang))
             return            
         }
     } else {

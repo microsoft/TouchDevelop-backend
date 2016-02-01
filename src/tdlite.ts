@@ -51,6 +51,7 @@ import * as tdliteStatus from "./tdlite-status"
 import * as tdliteLegacy from "./tdlite-legacy"
 import * as tdliteCounters from "./tdlite-counters"
 import * as tdliteProgress from "./tdlite-progress"
+import * as tdliteI18N from "./tdlite-i18n"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -236,6 +237,7 @@ async function initSubsystems() : Promise<void>
     await tdliteWorkspace.initAsync();
     await tdliteCppCompiler.initAsync();
     await tdliteProgress.initAsync();
+    await tdliteI18N.initAsync();
     if (core.fullTD && core.hasSetting("LEGACY_ACCOUNT")) {
         await tdliteLegacy.initAsync();
     }    

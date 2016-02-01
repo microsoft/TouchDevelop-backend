@@ -9,24 +9,23 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as zlib from 'zlib';
 import * as restify from './restify';
-import * as parallel from './parallel'; 
-import * as tdliteData from './tdlite-data'; 
+import * as parallel from './parallel';
+import * as tdliteData from './tdlite-data';
 
 var uploadCache: td.SMap<string> = {};
 var uploadPromises: td.SMap<Promise<string>> = {};
 var nunjucks = require("nunjucks");
 var clientConfig: any;
+var i18nPtrs = {}
 
-function mimeType(fn: string)
-{
-    let ext = fn.replace(/.*\./, "").toLowerCase()      
-    return Object.keys(tdliteData.artContentTypes).filter(k => tdliteData.artContentTypes[k] == ext)[0] 
+function mimeType(fn: string) {
+    let ext = fn.replace(/.*\./, "").toLowerCase()
+    return Object.keys(tdliteData.artContentTypes).filter(k => tdliteData.artContentTypes[k] == ext)[0]
 }
 
-function getFiles()
-{
+function getFiles() {
     let res = []
-    function loop(path:string) {
+    function loop(path: string) {
         for (let fn of fs.readdirSync(path)) {
             if (fn[0] == ".") continue;
             let fp = path + "/" + fn
@@ -34,7 +33,7 @@ function getFiles()
             if (st.isDirectory()) loop(fp)
             else if (st.isFile()) res.push(fp.replace(/^web/, ""))
         }
-    }   
+    }
     loop("web")
     return res
 }
@@ -46,19 +45,17 @@ function tdliteKey() {
         process.exit(1)
     }
 
-    return {liteUrl: mm[1], key: mm[2]}
+    return { liteUrl: mm[1], key: mm[2] }
 }
 
-function mkReq(path: string)
-{
+function mkReq(path: string) {
     let k = tdliteKey();
     let r = td.createRequest(k.liteUrl + "api/" + path)
     r.setHeader("X-TD-Access-Token", k.key);
     return r;
 }
 
-function error(msg: string)
-{
+function error(msg: string) {
     console.log("ERROR: " + msg)
     process.exit(1)
 }
@@ -81,23 +78,26 @@ function rewriteUrl(id: string): string {
     return id;
 }
 
-async function uploadArtAsync(fn:string):Promise<string>
-{
+async function uploadArtAsync(fn: string): Promise<string> {
     await td.sleepAsync(0.001);
-    
-    let contentType = mimeType(fn.replace(/\.html/, ".txt"))    
+
+    let contentType = mimeType(fn.replace(/\.html/, ".txt"))
     if (!contentType) {
         error("content type not understood: " + fn)
         return ""
     }
-    
+
     let buf = fs.readFileSync("web" + fn)
-    
+
     if (/\.html/.test(fn)) {
         let tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
+
+        if (tmp.indexOf("<!-- TD-NO-TRANSLATE -->") == -1)
+            i18nPtrs[fn] = 1;
+
         buf = new Buffer(tmp, "utf8")
     }
-    
+
     if (/^text/.test(contentType)) {
         let str = buf.toString("utf8");
         let waitFor: Promise<any>[] = [];
@@ -106,11 +106,11 @@ async function uploadArtAsync(fn:string):Promise<string>
         str = replContent(str, null);
         buf = new Buffer(str, "utf8");
     }
-    
+
     let sha = td.sha256(buf).slice(0, 32)
     if (uploadCache[sha])
         return uploadCache[sha];
-    
+
     let r = await mkReq("arthash/" + sha).sendAsync()
     let it = r.contentAsJson()["items"][0]
     if (it) {
@@ -119,32 +119,37 @@ async function uploadArtAsync(fn:string):Promise<string>
         uploadCache[sha] = id0
         return id0
     }
-    
+
     let ext = fn.replace(/.*\./, "").toLowerCase()
     if (ext == "html") ext = "txt";
-    
+
     let req = mkReq("art");
     req.setContentAsJson({
         content: buf.toString("base64"),
         contentType: contentType,
         description: "#template",
-        name: fn.replace(/.*\//, "")       
-    })  
+        name: fn.replace(/.*\//, "")
+    })
     req.setMethod("post")
     let resp = await req.sendAsync();
     if (resp.statusCode() != 200) {
         error("bad status code: " + resp.toString())
         return ""
     }
-    
+
     let id = rewriteUrl(resp.contentAsJson()["bloburl"])
     console.log(`upload: ${fn} -> ${id}`)
     uploadCache[sha] = id
     return id
 }
 
+function pathToPtr(path: string) {
+    return "ptr-" + path.replace(/\.html$/, "").replace(/^\/+/, "").replace(/[^a-zA-Z0-9@]/g, "-")
+}
+
 async function getPtrAsync(path: string) {
-    let rdreq = mkReq("ptr" + path.replace(/[^a-zA-Z0-9@]/g, "-"))
+    let id = pathToPtr(path)
+    let rdreq = mkReq(id)
     let curr = await rdreq.sendAsync();
 
     if (curr.statusCode() == 200) {
@@ -163,7 +168,7 @@ async function uploadRedirectAsync(fn: string) {
     let curr = await getPtrAsync(path);
     let artid = ""
     let target = url
-    
+
     if (/^\/static\//.test(url)) {
         await td.sleepAsync(1);
         let task = uploadPromises[url]
@@ -190,7 +195,7 @@ async function uploadRedirectAsync(fn: string) {
         artid: artid
     })
     let resp = await req.sendAsync();
-    console.log(`${fn}: ${target} -> ${resp.statusCode()}`)
+    console.log(`${fn}: ${target} -> ${resp.statusCode() }`)
 }
 
 async function uploadFileAsync(fn: string) {
@@ -238,8 +243,19 @@ async function uploadAsync() {
 
     let resp = await mkReq("clientconfig").sendAsync()
     clientConfig = resp.contentAsJson()
-    
+
     await parallel.forJsonAsync(files, uploadFileAsync)
+
+    let ptrs = Object.keys(i18nPtrs).map(pathToPtr)
+    ptrs.sort()
+    let req = mkReq("i18n/pointers")
+    req.setMethod("post")
+    req.setContentAsJson({
+        pointers: ptrs
+    })
+    let resp2 = await req.sendAsync();
+    console.log(`i18n: ${resp2.statusCode() } ${util.inspect(resp2.contentAsJson()) }`)
+
     fs.writeFileSync(cachepath, JSON.stringify(uploadCache, null, 2))
 }
 
@@ -263,11 +279,11 @@ async function serveAsync() {
             if (fs.existsSync("web" + fn)) {
                 if (/^\/static\//.test(fn)) {
                     res.sendBuffer(fs.readFileSync("web" + fn),
-                        mimeType(fn) || "application/octet-stream", {});                    
+                        mimeType(fn) || "application/octet-stream", {});
                 } else {
                     let tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
                     res.html(tmp)
-                }   
+                }
             } else {
                 res.sendError(404, "No such file");
             }
@@ -277,6 +293,20 @@ async function serveAsync() {
     })
 
     await restify.startAsync();
+}
+
+function i18n() {
+    let res = "";
+    for (let fn of fs.readdirSync("src")) {
+        if (/\.ts$/.test(fn)) {
+            let str = fs.readFileSync("src/" + fn, "utf8")
+            str.replace(/translateMessage\("([^"]+)"/g, (full: string, msg: string) => {
+                res += "<div>" + msg + "</div>\n"
+                return ""
+            })
+        }
+    }
+    fs.writeFileSync("web/i18n-messages.html", res, "utf8")
 }
 
 async function main() {
@@ -290,7 +320,9 @@ async function main() {
     if (cmd == "serve")
         await serveAsync();
     else if (cmd == "upload" || cmd == "push")
-            await uploadAsync();    
+        await uploadAsync();
+    else if (cmd == "i18n")
+        i18n();
     else
         console.log("bad usage")
 }
