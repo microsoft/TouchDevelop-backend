@@ -216,8 +216,8 @@ export async function performRoutingAsync(req: restify.Request, res: restify.Res
     if (apiRequest.userid == "") {
         apiRequest.throttleIp = core.sha256(req.remoteIp());
     }
-    if ( ! apiRequest.isCached && apiRequest.userinfo.token == null) {
-        core.handleBasicAuth(req, res);
+    if (!apiRequest.isCached && apiRequest.userinfo.token == null) {
+        core.handleBasicAuth(req, res, core.fullTD);
     }
     else {
         core.handleHttps(req, res);

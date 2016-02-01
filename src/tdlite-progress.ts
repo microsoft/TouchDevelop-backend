@@ -278,6 +278,9 @@ export async function initAsync(): Promise<void> {
             r[k] = v
         }
         
+        if (d.index == 0)
+            logger.tick("Tutorial_step0")
+        
         let data = JSON.stringify(r)
         logger.debug(`saving progress: ${d.progressId} ${data} #${numEntries}`)
         await core.redisClient.evalAsync(addLua, [idxKey, prefix + d.progressId], [data])

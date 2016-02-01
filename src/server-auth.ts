@@ -278,7 +278,6 @@ export interface IInitOptions {
     federationTargets?: string;
     self?: string;
     requestEmail?: boolean;
-    getProviderTemplate?: GetProviderTemplate;
     errorCallback?: ErrorCallback;
     redirectOnError?: string;
 }
@@ -913,24 +912,10 @@ async function oauthLoginAsync(req: restify.Request, res: restify.Response) : Pr
                 provider = coll2[0];
             }
             else {
-                let links = providerLinks(req.query());
-                let s = Object.keys(links).map<string>((elt: string) => {
-                    let result: string;
-                    clientOauth.provider = elt;
-                    let link = links[elt];
-                    return "<a class=provider href=\"" + link + "\">" + elt + "</a><br>\n";
-                    return result;
+                let s = providerLinks(req.query()).map<string>(info => {
+                    return "<a class=provider href=\"" + info.href + "\">" + info.name + "</a><br>\n";
                 }).join("");
                 let html = td.replaceAll(chooseProvider_html, "@BODY@", s);
-                if (globalOptions.getProviderTemplate != null) {
-                    let s2 = orEmpty(await globalOptions.getProviderTemplate());
-                    if (s2 != "") {
-                        html = s2;
-                        for (let k of Object.keys(links)) {
-                            html = td.replaceAll(html, "@" + k + "-url@", links[k]);
-                        }
-                    }
-                }
                 res.html(html);
             }
         }
@@ -1017,17 +1002,26 @@ function setSelf(req: restify.Request) : void
     }
 }
 
-export function providerLinks(query: JsonObject) : JsonBuilder
+export interface ProviderLink {
+    href: string;
+    name: string;
+    shortname: string;
+    id: string;
+}
+
+export function providerLinks(query: JsonObject) : ProviderLink[]
 {
     let clientOauth = ClientOauth.createFromJson(query);
     let coll2 = ProviderIndex.all();
-    let links = {};
-    for (let elt of td.orderedBy(coll2, elt1 => elt1.order)) {
+    return td.orderedBy(coll2, elt1 => elt1.order).map(elt => {
         clientOauth.provider = elt.id;
-        let link = "/oauth/login?" + toQueryString(clientOauth.toJson());
-        links[elt.id] = link;
-    }
-    return links;
+        return <ProviderLink>{
+            href: "/oauth/login?" + toQueryString(clientOauth.toJson()),
+            name: elt.name,
+            shortname: elt.shortname,
+            id: elt.id
+        }
+    })
 }
 
 

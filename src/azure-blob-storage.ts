@@ -368,7 +368,7 @@ export class Container
     public async createGzippedBlockBlobFromBufferAsync(blobName: string, buffer:Buffer, options?: ICreateOptions) : Promise<BlobInfo>
     {
         let result: BlobInfo;
-        if ( ! options.smartGzip || /(text\/|javascript|xml|font\/ttf)/.test(options.contentType)) {
+        if ( ! options.smartGzip || /(text\/|javascript|xml|font\/ttf|microbit-hex)/.test(options.contentType)) {
             let opts = prepOptions(options);
             await new Promise(resume => {
                       opts.contentEncoding = "gzip"
