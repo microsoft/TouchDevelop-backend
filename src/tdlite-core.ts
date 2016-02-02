@@ -108,6 +108,7 @@ export class ServiceSettings
     @td.json public termsversion: string = "";
     @td.json public blockedNicknameRx: string = "";
     @td.json public tokenExpiration: number = 0;
+    @td.json public sensitiveTokenExpiration: number = 0;
     @td.json public defaultLang: string = "";
     @td.json public langs: JsonObject;
     @td.json public envrewrite: JsonObject;
