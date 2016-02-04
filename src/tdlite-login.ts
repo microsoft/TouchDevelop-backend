@@ -926,9 +926,10 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
         let token2 = await lookupTokenAsync(token);
      
         if (token2 == null) {
-            req.status = httpCode._401Unauthorized;
-        }
-        else {
+            if (!softTokenFailure)
+                req.status = httpCode._401Unauthorized;
+            return
+        } else {
             if (core.orZero(token2.version) < 2) {
                 req.status = httpCode._401Unauthorized;
                 return;
