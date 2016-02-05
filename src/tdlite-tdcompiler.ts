@@ -71,7 +71,7 @@ export async function initAsync()
             req.status = httpCode._400BadRequest;
         else
             req.response = resp.resp;        
-    })
+    }, { noSizeCheck: true })
 }
 
 export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: string) : Promise<void>
