@@ -90,7 +90,7 @@ function handleReq(req, res) {
         enciph.pipe(res);
         res.writeHead(200);
 
-        if (js.op == "build")
+        if (js.op == "buildex")
             build(js, enciph)
         else
             enciph.end(JSON.stringify({err:"Wrong OP"}))
