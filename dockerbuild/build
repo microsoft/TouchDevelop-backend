@@ -1,0 +1,16 @@
+#!/bin/bash
+
+cat > f.cpp <<EOF
+#include "MicroBit.h"
+
+void app_main()
+{
+  while (1)
+  {
+          uBit.display.scroll("$RANDOM BELLO! :)");
+          uBit.sleep(1000);
+  }
+}
+EOF
+
+./run build 321b65091279752bba174bb258800068020165e154af93c3ac0908de9cd09bd5 < f.cpp

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+b=8b0c24a027fa4c041cab37d0368e8c9814bd50d5c3b937ebb000729af2660e33
+
+cmd="$1"
+if [ "X$cmd" = X ] ; then
+  :
+else
+  shift
+fi
+
+case $cmd in
+sh)
+if [ "X$1" = X ] ; then
+  exit 1
+fi
+  docker run -w /build -u build -it $1 bash -l
+  ;;
+save)
+  id=`docker ps -l | tail -1 | awk '{print $1}'`
+  cid=`docker commit $id`
+  docker save $cid | tar --delete $b | gzip > $cid.tgz
+  docker rmi -f $cid
+  ls -l $cid.tgz
+  echo "IMGID $cid"
+  ;;
+update)
+  set -e
+  docker run -i -u build $b bash -c "set -x; set -e; cat >/build/go.js; cd /build/microbit-touchdevelop; git checkout source/main.cpp; git pull --tags; $1 yt update; cp yotta_modules/microbit-dal/source/CortexContextSwitch.s{.gcc,}; yt build" < go.js
+  $0 save
+  ;;
+build)
+  docker run -i -u build -w /build/microbit-touchdevelop $1 sh -c "cat >source/main.cpp; cd build/bbc-microbit-classic-gcc; ninja"
+  ;;
+*)
+  echo "Usage: $0 command"
+  echo "Command is:"
+  echo "sh -> run bash"
+  echo "save -> save most recent container to tgz file"
+  echo "update -> update yotta and save"
+  ;;
+esac
