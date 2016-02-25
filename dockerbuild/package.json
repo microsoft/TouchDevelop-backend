@@ -1,0 +1,12 @@
+{
+  "name": "dockerbuild",
+  "version": "1.0.0",
+  "private": true,
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "async": "^1.5.2",
+    "azure-storage": "^0.8.0",
+    "request": "^2.69.0"
+  }
+}
