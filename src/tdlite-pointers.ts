@@ -735,7 +735,7 @@ function legacyKindPrefix(name: string)
 export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
 {
     let lang = await handleLanguageAsync(req);
-    let fn = req.url().replace(/\?.*/g, "").replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
+    let fn = req.url().replace(/\?mbedcode=.*/, "-mbedcode").replace(/\?.*/g, "").replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
     if (fn == "") {
         fn = "home";
     }
