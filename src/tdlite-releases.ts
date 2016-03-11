@@ -355,6 +355,8 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             res.sendText(s, "application/javascript");
         }
         else if (fn == "") {
+            if (core.kindScript && (rel == "current" || rel == "latest" || rel == "beta"))
+                res.redirect(httpCode._302MovedTemporarily, "/microbit");
             await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async(text: string) => {
                 return await rewriteIndexAsync(rel, relid, text)
             });
