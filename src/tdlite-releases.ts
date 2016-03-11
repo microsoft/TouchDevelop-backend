@@ -121,11 +121,11 @@ export async function initAsync(): Promise<void> {
                 entry[core.releaseVersionPrefix] = x;
                 rel1.version = core.releaseVersionPrefix + "." + x + "." + rel1.buildnumber;
             });
-            let key = "rel-" + rel1.releaseid;
             let jsb = {};
             await core.generateIdAsync(jsb, 5);
             if (!rel1.releaseid) rel1.releaseid = jsb["id"];
             jsb["pub"] = rel1.toJson();
+            let key = "rel-" + rel1.releaseid;
             let ok = await core.tryInsertPubPointerAsync(key, jsb["id"]);
             if (ok) {
                 await releases.insertAsync(jsb);
