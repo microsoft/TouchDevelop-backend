@@ -34,8 +34,7 @@ export var cacheRewritten: cachedStore.Container;
 var appContainer: azureBlobStorage.Container;
 
 export class PubRelease
-    extends core.Publication
-{
+    extends core.Publication {
     @td.json public releaseid: string = "";
     @td.json public labels: IReleaseLabel[];
     @td.json public commit: string = "";
@@ -43,7 +42,8 @@ export class PubRelease
     @td.json public buildnumber: number = 0;
     @td.json public version: string = "";
     @td.json public name: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubRelease(); r.fromJson(o); return r; }
+    @td.json public cdnUrl: string = "";
+    static createFromJson(o: JsonObject) { let r = new PubRelease(); r.fromJson(o); return r; }
 }
 
 export interface IReleaseLabel {
@@ -55,8 +55,7 @@ export interface IReleaseLabel {
     numpokes: number;
 }
 
-export function appContainerUrl()
-{
+export function appContainerUrl() {
     return appContainer.url();
 }
 
@@ -91,11 +90,12 @@ export async function initAsync(): Promise<void> {
             else {
                 rel.name = withDefault(rel.branch, rel.releaseid.replace(/.*-\d*/g, "")) + " " + ver;
             }
+            rel.cdnUrl = core.currClientConfig.primaryCdnUrl + "/app/" + rel.releaseid + "/c/"
             coll.push(rel);
         }
         fetchResult.items = td.arrayToJson(coll);
     }, { byUserid: true });
-    
+
     core.addRoute("POST", "releases", "", async(req1: core.ApiRequest) => {
         core.checkPermission(req1, "upload");
         if (req1.status == 200) {
@@ -153,7 +153,7 @@ export async function initAsync(): Promise<void> {
             req2.response = ({ "status": "ok" });
         }
     }, { sizeCheckExcludes: "content" });
-    
+
     core.addRoute("POST", "*release", "label", async(req3: core.ApiRequest) => {
         let name = orEmpty(req3.body["name"]);
         if (!isKnownReleaseName(name)) {
@@ -205,7 +205,7 @@ export async function initAsync(): Promise<void> {
             });
             req4.response = ({ "status": "ok" });
         }
-    }, {  sizeCheckExcludes: "content"  });
+    }, { sizeCheckExcludes: "content" });
 
     core.addRoute("GET", "language", "touchdevelop.tgz", async(req: core.ApiRequest) => {
         let r = core.getSettings("releases")["ids"] || {}
@@ -222,8 +222,7 @@ export async function initAsync(): Promise<void> {
 }
 
 
-function looksLikeReleaseId(s: string) : boolean
-{
+function looksLikeReleaseId(s: string): boolean {
     let b: boolean;
     b = /^\d\d\d\d\d\d\d\d\d\d[a-zA-Z\d\.\-]+$/.test(s);
     return b;
@@ -276,21 +275,21 @@ export async function serveWebAppAsync(req: restify.Request, res: restify.Respon
         res.redirect(httpCode._302MovedTemporarily, "/no-such-webapp")
         return;
     }
-    
+
     let userjson = await tdliteUsers.getAsync(scr["pub"]["userid"]);
     if (!userjson) {
         // strange...
         res.redirect(httpCode._302MovedTemporarily, "/no-such-webapp-user")
         return;
     }
-    
+
     let uname = userjson.pub.name.replace(/[^A-Za-z0-9]/g, "") || "someone"
-    
+
     if (usernameInUrl != uname) {
         res.redirect(httpCode._302MovedTemporarily, "/userapp/" + uname + "/" + wid + eq)
-        return;        
+        return;
     }
-    
+
     if (!eq) {
         let ujson = await core.pubsContainer.getAsync(scr["updateKey"])
         let uid = ujson["scriptId"]
@@ -300,7 +299,7 @@ export async function serveWebAppAsync(req: restify.Request, res: restify.Respon
                 scr = uscr;
         }
     }
-    
+
     wid = scr["id"];
 
     await rewriteAndCacheAsync(rel + "-" + wid, relid, "webapp.html", "text/html", res, async(text) => {
@@ -310,8 +309,7 @@ export async function serveWebAppAsync(req: restify.Request, res: restify.Respon
     });
 }
 
-export async function serveReleaseAsync(req: restify.Request, res: restify.Response) : Promise<void>
-{
+export async function serveReleaseAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let coll = (/^([^\?]+)(\?.*)$/.exec(req.url()) || []);
     let fn = req.url();
     let query = "";
@@ -354,7 +352,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
     if (relid != "") {
         if (fn == "" && relid == "2519967637668242448-920d9e58.a88e.4fa8.bcd1.9be5ba29da9f-workerjs") {
             let s = await tdlitePointers.simplePointerCacheAsync("/worker.js", "") || "";
-            res.sendText(s, "application/javascript");            
+            res.sendText(s, "application/javascript");
         }
         else if (fn == "") {
             await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async(text: string) => {
@@ -362,7 +360,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             });
         }
         else if (/\.manifest$/.test(fn)) {
-            await rewriteAndCacheAsync(rel, relid, "app.manifest", "text/cache-manifest", res, async (text: string) => {
+            await rewriteAndCacheAsync(rel, relid, "app.manifest", "text/cache-manifest", res, async(text: string) => {
                 let result1: string;
                 text = td.replaceAll(text, "../../../", core.currClientConfig.primaryCdnUrl + "/");
                 text = td.replaceAll(text, "./", core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
@@ -378,12 +376,12 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             res.redirect(httpCode._301MovedPermanently, "/app/error.html");
         }
         else if (fn == "error.html" || fn == "browsers.html") {
-            await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async (text2: string) => {                
+            await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async(text2: string) => {
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
         else if (fn == "worker.js") {
-            await rewriteAndCacheAsync(rel, relid, fn, "application/javascript", res, async (text2: string) => {                
+            await rewriteAndCacheAsync(rel, relid, fn, "application/javascript", res, async(text2: string) => {
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
@@ -393,15 +391,39 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
     }
 }
 
-function isKnownReleaseName(fn: string) : boolean
-{
+function isKnownReleaseName(fn: string): boolean {
     let b: boolean;
     b = /^(beta|current|latest|cloud)$/.test(fn);
     return b;
 }
 
-async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string, contentType: string, res: restify.Response, rewrite: StringTransformer) : Promise<void>
-{
+export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile = "index.html") {
+    let relpub = await core.getPubAsync(id, "release");
+    if (!relpub) return "Release deleted."
+
+    let prel = PubRelease.createFromJson(relpub["pub"]);
+
+    let info = await appContainer.getBlobToTextAsync(prel.releaseid + "/" + srcFile);
+    let text = info.text()
+    
+    if (!info.text()) return srcFile + " missing"
+
+    let ccfg = clientConfigForRelease(prel);
+    ccfg.releaseLabel = rellbl;
+    let ver = orEmpty(relpub["pub"]["version"]);
+    if (core.basicCreds == "") {
+        text = td.replaceAll(text, "data-manifest=\"\"", "manifest=\"/app/app.manifest?r=" + encodeURIComponent(id) + "\"");
+    }
+    let suff = "?r=" + encodeURIComponent(id) + "\"";
+    //text = td.replaceAll(text, "\"browsers.html\"", "\"/app/browsers.html" + suff);
+    //text = td.replaceAll(text, "\"error.html\"", "\"/app/error.html" + suff);
+    text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/");
+    let verPref = "var tdVersion = \"" + ver + "\";\n" + "var tdConfig = " + JSON.stringify(ccfg.toJson(), null, 2) + ";\n";
+    text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
+    return text;
+}
+
+async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string, contentType: string, res: restify.Response, rewrite: StringTransformer): Promise<void> {
     let path = relid + "/" + rel + "/" + core.myChannel + "/" + srcFile;
     let entry2 = await cacheRewritten.getAsync(path);
     if (entry2 == null || entry2["version"] != core.rewriteVersion) {
@@ -414,7 +436,7 @@ async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string,
         let info = await appContainer.getBlobToTextAsync(relid + "/" + srcFile);
         if (info.succeded()) {
             let text = await rewrite(info.text());
-            await cacheRewritten.updateAsync(path, async (entry: JsonBuilder) => {
+            await cacheRewritten.updateAsync(path, async(entry: JsonBuilder) => {
                 entry["version"] = core.rewriteVersion;
                 entry["text"] = text;
             });
@@ -431,17 +453,15 @@ async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string,
     logger.measure("ServeApp@" + srcFile, logger.contextDuration());
 }
 
-export async function pokeReleaseAsync(relLabel: string, delay: number) : Promise<void>
-{
+export async function pokeReleaseAsync(relLabel: string, delay: number): Promise<void> {
     await td.sleepAsync(delay);
-    await core.updateSettingsAsync("releases", async (entry: JsonBuilder) => {
+    await core.updateSettingsAsync("releases", async(entry: JsonBuilder) => {
         let jsb = entry["ids"][relLabel];
         jsb["numpokes"] = jsb["numpokes"] + 1;
     });
 }
 
-export function clientConfigForRelease(prel: PubRelease) : core.ClientConfig
-{
+export function clientConfigForRelease(prel: PubRelease): core.ClientConfig {
     let ccfg: core.ClientConfig;
     ccfg = core.ClientConfig.createFromJson(core.currClientConfig.toJson());
     ccfg.tdVersion = prel.version;

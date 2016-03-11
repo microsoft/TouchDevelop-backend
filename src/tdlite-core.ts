@@ -36,6 +36,7 @@ export var blobService: azureBlobStorage.BlobService;
 export var cachedApiContainer: cachedStore.Container;
 export var emptyRequest: ApiRequest;
 export var fullTD: boolean = false;
+export var kindScript: boolean = false;
 export var hasHttps: boolean = false;
 export var httpCode = restify.http();
 export var myChannel: string = "";
@@ -1446,6 +1447,7 @@ export async function initAsync()
     throttleDisabled = orEmpty(td.serverSetting("DISABLE_THROTTLE", true)) == "true";
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
+    kindScript = td.serverSetting("KIND_SCRIPT", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
     self = td.serverSetting("SELF", false).toLowerCase();
     myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();
