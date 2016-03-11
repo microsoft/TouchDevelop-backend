@@ -106,28 +106,34 @@ export async function initAsync(): Promise<void> {
             rel1.commit = orEmpty(req1.body["commit"]);
             rel1.branch = orEmpty(req1.body["branch"]);
             rel1.buildnumber = core.orZero(req1.body["buildnumber"]);
-            if (looksLikeReleaseId(rel1.releaseid)) {
-                await core.updateSettingsAsync("releaseversion", async(entry: JsonBuilder) => {
-                    let x = core.orZero(entry[core.releaseVersionPrefix]) + 1;
-                    entry[core.releaseVersionPrefix] = x;
-                    rel1.version = core.releaseVersionPrefix + "." + x + "." + rel1.buildnumber;
-                });
-                let key = "rel-" + rel1.releaseid;
-                let jsb1 = {};
-                jsb1["pub"] = rel1.toJson();
-                await core.generateIdAsync(jsb1, 5);
-                let ok = await core.tryInsertPubPointerAsync(key, jsb1["id"]);
-                if (ok) {
-                    await releases.insertAsync(jsb1);
-                    await core.returnOnePubAsync(releases, td.clone(jsb1), req1);
-                }
-                else {
-                    let entry1 = await core.getPointedPubAsync(key, "release");
-                    await core.returnOnePubAsync(releases, entry1, req1);
+
+            if (core.kindScript) {
+                rel1.releaseid = ""
+            } else {
+                if (!looksLikeReleaseId(rel1.releaseid)) {
+                    req1.status = httpCode._412PreconditionFailed;
+                    return
                 }
             }
+
+            await core.updateSettingsAsync("releaseversion", async(entry: JsonBuilder) => {
+                let x = core.orZero(entry[core.releaseVersionPrefix]) + 1;
+                entry[core.releaseVersionPrefix] = x;
+                rel1.version = core.releaseVersionPrefix + "." + x + "." + rel1.buildnumber;
+            });
+            let key = "rel-" + rel1.releaseid;
+            let jsb = {};
+            await core.generateIdAsync(jsb, 5);
+            if (!rel1.releaseid) rel1.releaseid = jsb["id"];
+            jsb["pub"] = rel1.toJson();
+            let ok = await core.tryInsertPubPointerAsync(key, jsb["id"]);
+            if (ok) {
+                await releases.insertAsync(jsb);
+                await core.returnOnePubAsync(releases, td.clone(jsb), req1);
+            }
             else {
-                req1.status = httpCode._412PreconditionFailed;
+                let entry1 = await core.getPointedPubAsync(key, "release");
+                await core.returnOnePubAsync(releases, entry1, req1);
             }
         }
     });
@@ -407,7 +413,7 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
 
     let info = await appContainer.getBlobToTextAsync(prel.releaseid + "/" + srcFile);
     let text = info.text()
-    
+
     if (!info.text()) return srcFile + " missing"
 
     let ccfg = clientConfigForRelease(prel);
