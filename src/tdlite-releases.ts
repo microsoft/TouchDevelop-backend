@@ -382,6 +382,11 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
+        else if (fn == "worker.js") {
+            await rewriteAndCacheAsync(rel, relid, fn, "application/javascript", res, async (text2: string) => {                
+                return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
+            });
+        }
         else {
             res.sendError(404, "get file from CDN");
         }
