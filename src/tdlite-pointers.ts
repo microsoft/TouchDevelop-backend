@@ -420,6 +420,16 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     }
 }
 
+async function renderMarkdownAsync(artobj: {}, lang: string) {
+    let url = tdliteArt.getBlobUrl(artobj)
+    let resp = await td.createRequest(url).sendAsync();
+    let textObj = resp.content();
+    if (!textObj) textObj = "Art object not found."
+    let vars = tdliteDocs.renderMarkdown(textObj)
+    let templ = await getTemplateTextAsync("templates/docs", lang)
+    return tdliteDocs.injectHtml(templ, vars)
+}
+
 async function getHtmlArtAsync(templid: string, lang: string) {
     let artjs = await core.getPubAsync(templid, "art");
     if (artjs == null) {
@@ -818,7 +828,11 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 if (!artobj) {
                     await errorAsync("No such art: /" + ptr.artid)
                 } else {
-                    v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
+                    if (artobj["contentType"] == "text/markdown") {
+                        v.text = await renderMarkdownAsync(artobj, lang)
+                    } else {
+                        v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
+                    }
                 }
             } else if (ptr.htmlartid) {
                 v.text = await getHtmlArtAsync(ptr.htmlartid, lang);
