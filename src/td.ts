@@ -21,12 +21,12 @@ import * as assert from 'assert';
 export type JsonObject = {};
 export type JsonBuilder = {};
 export type StringMap = {};
-export type Action1<T> = (v:T) => Promise<void>;
+export type Action1<T> = (v: T) => Promise<void>;
 export type Action = () => Promise<void>;
 export type NumberAction = Action1<number>;
 export type JsonAction = Action1<JsonObject>;
 
-export type SMap<T> = { [s:string]: T; };
+export type SMap<T> = { [s: string]: T; };
 
 export interface LogMessage {
     timestamp: number;
@@ -44,11 +44,10 @@ export namespace App {
     export var INFO = 6;
     export var DEBUG = 7;
 
-    export function createInfoMessage(s: string) : LogMessage {
+    export function createInfoMessage(s: string): LogMessage {
         return createLogMessage(App.INFO, "", s, undefined);
     }
-    export function createLogMessage(level : number, category : string, s:string, meta: any) : LogMessage
-    {
+    export function createLogMessage(level: number, category: string, s: string, meta: any): LogMessage {
         var m = <LogMessage>{
             timestamp: Date.now(),
             level: level,
@@ -61,11 +60,10 @@ export namespace App {
 
     class Logger {
         logIdx = -1;
-        logMsgs:LogMessage[] = [];
+        logMsgs: LogMessage[] = [];
         logSz = 2000;
 
-        addMsg(level : number, category : string, s:string, meta: any = null)
-        {
+        addMsg(level: number, category: string, s: string, meta: any = null) {
             var m = createLogMessage(level, category, s, meta);
             if (this.logIdx >= 0) {
                 this.logMsgs[this.logIdx++] = m;
@@ -79,13 +77,11 @@ export namespace App {
             console.log(category + ": " + s);
         }
 
-        log(msg:string)
-        {
+        log(msg: string) {
             this.addMsg(INFO, "TD", msg)
         }
 
-        getMsgs():LogMessage[]
-        {
+        getMsgs(): LogMessage[] {
             var i = this.logIdx;
             var res = [];
             var wrapped = false;
@@ -115,14 +111,13 @@ export namespace App {
 
     var logger = new Logger();
 
-    export function getMsgs():LogMessage[]
-    {
+    export function getMsgs(): LogMessage[] {
         return logger.getMsgs()
     }
 
 
     export interface AppLogTransport {
-        log? : (level : number, category : string, msg: string, meta?: any) => void;
+        log?: (level: number, category: string, msg: string, meta?: any) => void;
         logException?: (err: any, meta?: any) => void;
         logTick?: (category: string, id: string, meta: any) => void;
         logMeasure?: (category: string, id: string, value: number, meta: any) => void;
@@ -136,13 +131,12 @@ export namespace App {
         transports.push(transport)
     }
 
-    export function transportFailed(t:AppLogTransport, tp:string, err:any) {
+    export function transportFailed(t: AppLogTransport, tp: string, err: any) {
         if (t.id) tp = " (" + t.id + ")"
         logger.log(tp + ": transport failed. " + (err.stack || err.message || err))
     }
 
-    function runTransports(id:string, run:(t:AppLogTransport) => void)
-    {
+    function runTransports(id: string, run: (t: AppLogTransport) => void) {
         transports.forEach(transport => {
             var d = transport.domain
             if (!d) {
@@ -162,7 +156,7 @@ export namespace App {
         })
     }
 
-    export function logException(err: any, meta? : any): void {
+    export function logException(err: any, meta?: any): void {
         if (err.tdSkipReporting) {
             logEvent(DEBUG, "skipped-crash", err.message || err + "", null)
             return
@@ -199,14 +193,14 @@ export namespace App {
         runTransports("logEvent", t => t.log && t.log(level, category, message, meta))
     }
 
-    export function logTick(category: string, id: string, meta:any) {
+    export function logTick(category: string, id: string, meta: any) {
         runTransports("logTick", t => t.logTick && t.logTick(category, id, meta))
         if (!meta || !meta.skipLog)
             App.logEvent(App.INFO, category, id, meta);
     }
 
-    export function logMeasure(category:string, id: string, value: number, meta: any) {
-        var lmeta:any = clone(meta) || {};
+    export function logMeasure(category: string, id: string, value: number, meta: any) {
+        var lmeta: any = clone(meta) || {};
         lmeta.measureId = id
         lmeta.measureValue = value
         runTransports("logMeasure", t => t.logMeasure && t.logMeasure(category, id, value, meta))
@@ -220,25 +214,21 @@ export function perfNow() {
     return t[0] * 1e3 + t[1] * 1e-6;
 }
 
-export function sleepAsync(seconds:number)
-{
+export function sleepAsync(seconds: number) {
     return new Promise((r) => {
-        setTimeout(() => r(), seconds*1000)
+        setTimeout(() => r(), seconds * 1000)
     })
 }
 
-export function startsWith(s:string, pref:string)
-{
+export function startsWith(s: string, pref: string) {
     return s.indexOf(pref) == 0
 }
 
-export function stringContains(s:string, what:string)
-{
+export function stringContains(s: string, what: string) {
     return s.indexOf(what) >= 0
 }
 
-export function serverSetting(sett:string, optional:boolean = false)
-{
+export function serverSetting(sett: string, optional: boolean = false) {
     if (process.env.hasOwnProperty(sett))
         return process.env[sett]
     if (optional) return null
@@ -250,33 +240,28 @@ export function replaceAll(self: string, old: string, new_: string): string {
     return self.split(old).join(new_);
 }
 
-export function replaceFn(self:string, regexp:RegExp, f:(m:string[]) => string)
-{
-    return self.replace(regexp, function () {
+export function replaceFn(self: string, regexp: RegExp, f: (m: string[]) => string) {
+    return self.replace(regexp, function() {
         var arr = []
         for (var i = 0; i < arguments.length; ++i) arr.push(arguments[i])
         return f(arr)
     })
 }
 
-export function arrayToJson(arr:any[]):JsonObject[]
-{
+export function arrayToJson(arr: any[]): JsonObject[] {
     return arr.map(e => e.toJson ? e.toJson() : e)
 }
 
-export function awaitAtMostAsync<T>(p:Promise<T>, s:number):Promise<T>
-{
-    return (<any>p).timeout(s*1000).then(v => v, e => null)
+export function awaitAtMostAsync<T>(p: Promise<T>, s: number): Promise<T> {
+    return (<any>p).timeout(s * 1000).then(v => v, e => null)
 }
 
-export function pushRange<T>(trg:T[], src:T[])
-{
+export function pushRange<T>(trg: T[], src: T[]) {
     for (let e of src)
         trg.push(e)
 }
 
-export function jsonCopyFrom(trg:JsonBuilder, src:JsonObject)
-{
+export function jsonCopyFrom(trg: JsonBuilder, src: JsonObject) {
     var v = clone(src)
     Object.keys(src).forEach(k => {
         trg[k] = v[k]
@@ -284,8 +269,7 @@ export function jsonCopyFrom(trg:JsonBuilder, src:JsonObject)
 }
 
 //? Return numbers between `start` and `start + length - 1` inclusively
-export function range(start:number, length:number) : number[]
-{
+export function range(start: number, length: number): number[] {
     var r = []
     for (var i = 0; i < length; ++i)
         r.push(start + i)
@@ -299,47 +283,40 @@ export function toDictionary<T>(arr: T[], f: (t: T) => string): SMap<T> {
     return r
 }
 
-export function toNumber(v:any) : number
-{
+export function toNumber(v: any): number {
     if (v == null) return null
 
     if (typeof v == "number") return v
     return parseFloat(v)
 }
 
-export function toString(v:any) : string
-{
+export function toString(v: any): string {
     if (v == null) return null
     return v + "";
 }
 
-export function toStringArray(v:any) : string[]
-{
+export function toStringArray(v: any): string[] {
     if (Array.isArray(v))
         return v.map(e => toString(e))
     return null
 }
 
-export function toBoolean(v:any) : boolean
-{
+export function toBoolean(v: any): boolean {
     if (typeof v == "string") return (v.toLowerCase() == "true")
     return !!v;
 }
 
-export function orEmpty(s: any) : string
-{
+export function orEmpty(s: any): string {
     if (s == null) return "";
     return toString(s);
 }
 
-export function clamp(min : number, max : number, value : number) : number
-{
-    return value < min ? min : value > max ? max : value; 
+export function clamp(min: number, max: number, value: number): number {
+    return value < min ? min : value > max ? max : value;
 }
 
 
-export function asArray(o:JsonObject) : JsonObject[]
-{
+export function asArray(o: JsonObject): JsonObject[] {
     return <any>o;
 }
 
@@ -350,37 +327,35 @@ export function json(className: any, fieldName: string) {
     }
     var e: any = { name: fieldName }
     switch (t.name) {
-    case "String":
-        e.toJson = v => toString(v);
-        e.fromJson = v => toString(v);
-        break;
-    case "Number":
-        e.toJson = v => toNumber(v);
-        e.fromJson = v => toNumber(v);
-        break;
-    case "Boolean":
-        e.toJson = v => toBoolean(v);
-        e.fromJson = v => toBoolean(v);
-        break;
-    case "Array":
-    case "Object":
-        e.toJson = v => v;
-        e.fromJson = v => v;
-        break;
-    default:
-        throw new Error("Type " + t.name + " not supported for @td.json")
-        e.toJson = v => v;
-        e.fromJson = v => v;
-        break;    
+        case "String":
+            e.toJson = v => toString(v);
+            e.fromJson = v => toString(v);
+            break;
+        case "Number":
+            e.toJson = v => toNumber(v);
+            e.fromJson = v => toNumber(v);
+            break;
+        case "Boolean":
+            e.toJson = v => toBoolean(v);
+            e.fromJson = v => toBoolean(v);
+            break;
+        case "Array":
+        case "Object":
+            e.toJson = v => v;
+            e.fromJson = v => v;
+            break;
+        default:
+            throw new Error("Type " + t.name + " not supported for @td.json")
+            e.toJson = v => v;
+            e.fromJson = v => v;
+            break;
     }
 
     className.__fields.push(e)
 }
 
-export class JsonRecord
-{
-    toJson():JsonObject
-    {
+export class JsonRecord {
+    toJson(): JsonObject {
         var r = {}
         for (let f of (<any>this).__fields || []) {
             if (!this.hasOwnProperty(f.name)) continue;
@@ -391,8 +366,7 @@ export class JsonRecord
         return r
     }
 
-    fromJson(o:JsonObject):void
-    {
+    fromJson(o: JsonObject): void {
         for (let f of (<any>this).__fields || []) {
             delete this[f.name];
             if (!o.hasOwnProperty(f.name)) continue;
@@ -402,13 +376,11 @@ export class JsonRecord
         }
     }
 
-    equals(other:JsonRecord)
-    {
+    equals(other: JsonRecord) {
         return this === other;
     }
 
-    load(o:any):void
-    {
+    load(o: any): void {
         for (let f of (<any>this).__fields || []) {
             if (!o.hasOwnProperty(f.name)) continue;
             this[f.name] = f.fromJson(o[f.name]);
@@ -418,8 +390,7 @@ export class JsonRecord
 
 
 /** Generate a random id consisting of upper and lower case letters */
-export function createRandomId(size: number) : string
-{
+export function createRandomId(size: number): string {
     let buf = crypto.randomBytes(size * 2)
     let s = buf.toString("base64").replace(/[^a-zA-Z]/g, "");
     if (s.length < size) {
@@ -431,12 +402,11 @@ export function createRandomId(size: number) : string
     }
 }
 
-export function clone(e:JsonObject):JsonObject
-{
+export function clone(e: JsonObject): JsonObject {
     return JSON.parse(JSON.stringify(e))
 }
 
-export function flatClone(e: any): any{
+export function flatClone(e: any): any {
     let r = {}
     for (let f of Object.keys(e)) {
         r[f] = e[f];
@@ -444,39 +414,34 @@ export function flatClone(e: any): any{
     return r;
 }
 
-export function randomUint32():number
-{
+export function randomUint32(): number {
     var b = crypto.randomBytes(4)
-    return (b[0] | (b[1]<<8) | (b[2]<<16) | ((b[3]<<24) >>> 0)) >>> 0
+    return (b[0] | (b[1] << 8) | (b[2] << 16) | ((b[3] << 24) >>> 0)) >>> 0
 }
 
-export function strcmp(a: string, b: string)
-{
+export function strcmp(a: string, b: string) {
     if (a == b) return 0;
     if (a < b) return -1;
     return 1;
 }
 
-export function sha256(b:Buffer):string
-{
+export function sha256(b: Buffer): string {
     let h = crypto.createHash('sha256')
     h.update(b)
     return h.digest('hex').toLowerCase()
 }
 
-export function permute<T>(arr: T[])
-{
+export function permute<T>(arr: T[]) {
     for (let i = 0; i < arr.length; ++i) {
         let x = randomInt(arr.length);
         let y = randomInt(arr.length);
         let tmp = arr[x];
         arr[x] = arr[y];
         arr[y] = tmp;
-    }        
+    }
 }
 
-export function orderedBy<T>(arr:T[], key:(e:T)=>number)
-{
+export function orderedBy<T>(arr: T[], key: (e: T) => number) {
     arr = arr.slice(0)
     arr.sort((x, y) => key(x) - key(y))
     return arr
@@ -485,8 +450,7 @@ export function orderedBy<T>(arr:T[], key:(e:T)=>number)
 var m32 = 1 / 0x100000000;
 var m64 = 1 / 0x10000000000000000;
 
-export function randomNormalized()
-{
+export function randomNormalized() {
     return randomUint32() * m32 + randomUint32() * m64;
 }
 
@@ -504,20 +468,23 @@ export function randomRange(min: number, max: number): number {
     return min + r;
 }
 
-export function checkAndLog(err:any, meta?: any):boolean
-{
+export function checkAndLog(err: any, meta?: any): boolean {
     if (!err) return true
     App.logException(err, meta)
     return false
 }
 
-export function log(msg:string)
-{
+export function log(msg: string) {
     App.logEvent(App.INFO, "APP", msg, {});
 }
 
-export function mkAgent(proto:string):http.Agent
-{
+export function lookup<T>(m: SMap<T>, key: string): T {
+    if (m.hasOwnProperty(key))
+        return m[key]
+    return null
+}
+
+export function mkAgent(proto: string): http.Agent {
     var Agent = http.Agent
     var AgentSSL = https.Agent
     var maxSock = 15
@@ -530,14 +497,14 @@ export function mkAgent(proto:string):http.Agent
 var httpAgent = http.globalAgent = mkAgent("http:")
 var httpsAgent = https.globalAgent = mkAgent("https:")
 
-export var TD:any = {};
+export var TD: any = {};
 
 export class AppLogger {
     public created: number;
     public parent: AppLogger;
     public minLevel = App.DEBUG;
 
-    constructor(public category : string) {
+    constructor(public category: string) {
         this.category = this.category || "";
         this.created = perfNow()
     }
@@ -549,17 +516,16 @@ export class AppLogger {
         // capture stack trace at the point where it was called
         try { throw new Error(this.category + ": " + message) }
         catch (e) {
-            this.log("error", message, { tdException: e });    
-        }        
+            this.log("error", message, { tdException: e });
+        }
     }
 
-    private stringToLevel(level:string)
-    {
+    private stringToLevel(level: string) {
         switch (level.trim().toLowerCase()) {
-        case 'debug': return App.DEBUG;
-        case 'warning': return App.WARNING;
-        case 'error': return App.ERROR;
-        default: return App.INFO;
+            case 'debug': return App.DEBUG;
+            case 'warning': return App.WARNING;
+            case 'error': return App.ERROR;
+            default: return App.INFO;
         }
     }
 
@@ -578,21 +544,19 @@ export class AppLogger {
 
     //? Get the current logging level for this logger (defaults to "debug").
     //@ betaOnly
-    public verbosity() : string {
+    public verbosity(): string {
         if (this.minLevel == App.DEBUG) return "debug";
         if (this.minLevel == App.WARNING) return "warning";
         if (this.minLevel == App.ERROR) return "error";
         return "info";
     }
 
-    static findContext(): any 
-    {
+    static findContext(): any {
         if ((<any>process).domain)
             return (<any>process).domain.tdLogger;
     }
 
-    public contextInfo() : any
-    {
+    public contextInfo(): any {
         var c = AppLogger.findContext()
         if (!c) {
             return null
@@ -607,8 +571,7 @@ export class AppLogger {
         }
     }
 
-    public setMetaFromContext(v: any)
-    {
+    public setMetaFromContext(v: any) {
         var i = this.contextInfo()
         if (i) {
             v.contextId = i.contextId
@@ -617,8 +580,7 @@ export class AppLogger {
         }
     }
 
-    private augmentMeta(meta: JsonObject) : any
-    {
+    private augmentMeta(meta: JsonObject): any {
         var v = meta
 
         if (!AppLogger.findContext()) return v || {}
@@ -632,32 +594,28 @@ export class AppLogger {
     }
 
     //? Get the userid attached to the current context, or empty.
-    public setContextUser(userid:string)
-    {
+    public setContextUser(userid: string) {
         var c = AppLogger.findContext()
         if (!c) throw new Error("No current context")
         if (c) c.userid = userid
     }
 
     //? Get the userid attached to the current context, or empty.
-    public contextUser() : string
-    {
+    public contextUser(): string {
         var i = this.contextInfo()
         if (!i || !i.contextUser) return ""
         return i.contextUser
     }
 
     //? The unique id of current context, or empty if in global scope.
-    public contextId() : string
-    {
+    public contextId(): string {
         var i = this.contextInfo()
         if (!i) return ""
         return i.contextId
     }
 
     //? Stop counting time in all current contexts
-    public contextPause()
-    {
+    public contextPause() {
         var c = AppLogger.findContext()
         if (c) {
             c.root.pauseStart = perfNow()
@@ -665,8 +623,7 @@ export class AppLogger {
     }
 
     //? Start counting time again in all current contexts
-    public contextResume()
-    {
+    public contextResume() {
         var c = AppLogger.findContext()
         if (c) {
             c = c.root
@@ -678,14 +635,12 @@ export class AppLogger {
     }
 
     //? How long the current logger has been executing for in milliseconds.
-    public loggerDuration() : number
-    {
+    public loggerDuration(): number {
         return perfNow() - this.created
     }
 
     //? How long the current context has been executing for in milliseconds.
-    public contextDuration() : number
-    {
+    public contextDuration(): number {
         var i = this.contextInfo()
         if (i)
             return i.contextDuration
@@ -693,35 +648,31 @@ export class AppLogger {
     }
 
     //? Log a custom event tick in any registered performance logger.
-    public tick(id: string)
-    {
+    public tick(id: string) {
         if (!id) return;
         App.logTick(this.category, id, this.augmentMeta(null));
     }
 
     //? Log a custom event tick, including specified meta information, in any registered performance logger.
-    public customTick(id: string, meta: JsonObject)
-    {
+    public customTick(id: string, meta: JsonObject) {
         if (!id) return;
         App.logTick(this.category, id, this.augmentMeta(meta));
     }
 
     //? Log a measure in any registered performance logger.
-    public measure(id: string, value: number)
-    {
+    public measure(id: string, value: number) {
         if (!id) return;
         App.logMeasure(this.category, id, value, this.augmentMeta(null))
     }
 
     //? Start new logging context when you're starting a new task (eg, handling a request)
-    public newContext()
-    {
+    public newContext() {
         var prev = AppLogger.findContext()
-        var ctx:any = { 
+        var ctx: any = {
             id: prev && prev.root ? prev.root.id + "." + ++prev.root.numCh : createRandomId(8),
             prev: prev,
-            created: perfNow(), 
-            numCh: 0, 
+            created: perfNow(),
+            numCh: 0,
         }
         if (prev)
             ctx.root = prev.root
@@ -732,14 +683,12 @@ export class AppLogger {
 
 }
 
-export function createLogger(n:string)
-{
+export function createLogger(n: string) {
     return new AppLogger(orEmpty(process.env["TD_LOGGER_PREFIX"]) + n);
 }
 
-export function httpRequestStreamAsync(url_:string, method:string = "GET", body:string = undefined, contentType:any = null) : Promise<http.IncomingMessage>
-{
-    var parsed:any = url.parse(url_)
+export function httpRequestStreamAsync(url_: string, method: string = "GET", body: string = undefined, contentType: any = null): Promise<http.IncomingMessage> {
+    var parsed: any = url.parse(url_)
     parsed.method = method.toUpperCase()
 
     var req;
@@ -787,9 +736,8 @@ export function httpRequestStreamAsync(url_:string, method:string = "GET", body:
             req.end()
     })
 }
-    
-export class WebRequest
-{
+
+export class WebRequest {
     private _method: string;
     private _url: string;
     private _headers: JsonObject = {};
@@ -843,10 +791,9 @@ export class WebRequest
         this.setHeader("Content-Type", type);
     }
 
-    public sendAsync(): Promise<WebResponse>
-    {
+    public sendAsync(): Promise<WebResponse> {
         var r = this;
-        var parsed:any = url.parse(r.url())
+        var parsed: any = url.parse(r.url())
         parsed.method = r.method().toUpperCase()
         parsed.headers = clone(this._headers)
 
@@ -957,8 +904,7 @@ export class WebRequest
     }
 }
 
-export class WebResponse
-{
+export class WebResponse {
     private _request: WebRequest;
     private _content: string;
     private _statusCode: number;
@@ -966,8 +912,7 @@ export class WebResponse
 
     private _headers: JsonBuilder = {};
 
-    static mkProxy(request: WebRequest, proxyResponse: any) : WebResponse
-    {
+    static mkProxy(request: WebRequest, proxyResponse: any): WebResponse {
         var r = new WebResponse();
         r._request = request;
         r._statusCode = proxyResponse.code;
@@ -997,8 +942,7 @@ export class WebResponse
     }
 
     //? Reads the response body as a JSON tree
-    public contentAsJson(): JsonObject
-    {
+    public contentAsJson(): JsonObject {
         if (this.content())
             try {
                 return JSON.parse(this.content())
@@ -1018,35 +962,31 @@ export class WebResponse
     public headerNames(): string[] { return Object.keys(this._headers); }
 }
 
-export function createRequest(url: string): WebRequest
-{
+export function createRequest(url: string): WebRequest {
     return WebRequest.mk(url);
 }
 
-export async function downloadJsonAsync(url: string): Promise<JsonObject>
-{
+export async function downloadJsonAsync(url: string): Promise<JsonObject> {
     var r = createRequest(url)
     r.setAccept('application/json');
     return (await r.sendAsync()).contentAsJson()
 }
 
-export async function downloadTextAsync(url: string): Promise<string>
-{
+export async function downloadTextAsync(url: string): Promise<string> {
     var r = createRequest(url)
     return (await r.sendAsync()).content()
 }
 
-function fixupSockets()
-{
+function fixupSockets() {
     var origConnect = net.Socket.prototype.connect
-    net.Socket.prototype.connect = function (options) {
+    net.Socket.prototype.connect = function(options) {
         if (options && typeof options.host == "string")
             this.tdHost = options.host
         return origConnect.apply(this, arguments)
     }
 
     var origDestroy = net.Socket.prototype._destroy
-    net.Socket.prototype._destroy = function (exn) {
+    net.Socket.prototype._destroy = function(exn) {
         if (typeof exn == "object" && (this.tdHost || this.tdUnrefed)) {
             if (!exn.tdMeta) exn.tdMeta = {}
             exn.tdMeta.socketHost = this.tdHost
@@ -1062,19 +1002,18 @@ function fixupSockets()
     }
 
     var origRef = net.Socket.prototype.ref
-    net.Socket.prototype.ref = function () {
+    net.Socket.prototype.ref = function() {
         this.tdUnrefed = false
         return origRef.apply(this, arguments)
     }
     var origUnref = net.Socket.prototype.unref
-    net.Socket.prototype.unref = function () {
+    net.Socket.prototype.unref = function() {
         this.tdUnrefed = true
         return origUnref.apply(this, arguments)
     }
 }
 
-function initTd()
-{
+function initTd() {
     process.on('uncaughtException', err => {
         App.logException(err);
     })
