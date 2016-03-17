@@ -79,7 +79,7 @@ export async function initAsync(): Promise<void> {
     core.registerPubKind({
         store: pointers,
         deleteWithAuthor: true,
-        specialDeleteAsync: clearPtrCacheAsync,
+        specialDeleteAsync: (id, entry) => /* async */ clearPtrCacheAsync(entry)
     })
     await core.setResolveAsync(pointers, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await core.addUsernameEtcAsync(fetchResult);
@@ -186,7 +186,7 @@ export async function initAsync(): Promise<void> {
                     await pointers.insertAsync(jsb1);
                     await notifications.storeAsync(req, jsb1, "");
                     await search.scanAndSearchAsync(jsb1);
-                    await clearPtrCacheAsync(ptr1.id);
+                    await clearPtrCacheAsync(jsb1);
                     await audit.logAsync(req, "post-ptr", {
                         newvalue: td.clone(jsb1)
                     });
@@ -415,7 +415,7 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
             oldvalue: req.rootPub,
             newvalue: td.clone(bld)
         });
-        await clearPtrCacheAsync(req.rootId);
+        await clearPtrCacheAsync(bld);
         await core.returnOnePubAsync(pointers, td.clone(bld), req);
     }
 }
@@ -503,26 +503,35 @@ export async function getTemplateTextAsync(templatename: string, lang: string): 
     return r;
 }
 
-async function clearPtrCacheAsync(id: string): Promise<void> {
-    if (false) {
-        await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + id, async(entry: JsonBuilder) => {
-            entry["version"] = "outdated";
-        });
-    }
-    for (let chname of deployChannels) {
-        await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id, async(entry1: JsonBuilder) => {
-            entry1["version"] = "outdated";
-        });
-        if (! /@\w+$/.test(id)) {
-            for (let lang of Object.keys(core.serviceSettings.langs)) {
-                await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id + "@" + lang, async(entry2: JsonBuilder) => {
-                    entry2["version"] = "outdated";
-                });
+async function clearPtrCacheAsync(entry: { }): Promise<void> {
+    let id = td.toString(entry["id"])
+    
+    async function clearIdAsync(id: string) {
+        logger.debug("Clear PTR " + id)
+        for (let chname of deployChannels) {
+            await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id, async(entry1: JsonBuilder) => {
+                entry1["version"] = "outdated";
+            });
+            if (! /@\w+$/.test(id)) {
+                for (let lang of Object.keys(core.serviceSettings.langs)) {
+                    await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id + "@" + lang, async(entry2: JsonBuilder) => {
+                        entry2["version"] = "outdated";
+                    });
+                }
             }
         }
     }
+    
+    await clearIdAsync(id)    
     if (td.startsWith(id, "ptr-templates-")) {
         await tdliteReleases.pokeReleaseAsync("cloud", 0);
+    }
+    
+    let relid = td.toString(entry["pub"]["releaseid"])
+    if (relid) {
+        for (let suff of Object.keys(subFiles)) {
+            await clearIdAsync(id + "---" + suff)
+        }
     }
 }
 
@@ -737,6 +746,10 @@ function legacyKindPrefix(name: string) {
     return null;
 }
 
+var subFiles = {
+    embed: "embed.js"
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let lang = await handleLanguageAsync(req);
     let urlFile = req.url().replace(/\?.*/g, "")
@@ -780,6 +793,14 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         v.customtick = null;
         pubdata["webpath"] = fn;
         pubdata["ptrid"] = id;
+
+        let subfile = ""
+        let mm = /^(.*)---(.*)$/.exec(id)
+        if (mm && subFiles.hasOwnProperty(mm[2])) {
+            id = mm[1]
+            subfile = subFiles[mm[2]]
+        }
+
         let existing = await core.getPubAsync(id, "pointer");
         if (existing == null && /@[a-z][a-z]$/.test(id)) {
             existing = await core.getPubAsync(id.replace(/@..$/g, ""), "pointer");
@@ -840,7 +861,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     v.contentType = "text/plain; charset=utf-8"
                 }
             } else if (ptr.releaseid) {
-                v.text = await tdliteReleases.getRewrittenIndexAsync(ptr.path, ptr.releaseid)
+                v.text = await tdliteReleases.getRewrittenIndexAsync(ptr.path, ptr.releaseid, subfile || "index.html")
+                if (subfile.endsWith(".js"))
+                    v.contentType = "application/javascript; charset=utf-8"
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
