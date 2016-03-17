@@ -503,9 +503,9 @@ export async function getTemplateTextAsync(templatename: string, lang: string): 
     return r;
 }
 
-async function clearPtrCacheAsync(entry: { }): Promise<void> {
+async function clearPtrCacheAsync(entry: {}): Promise<void> {
     let id = td.toString(entry["id"])
-    
+
     async function clearIdAsync(id: string) {
         logger.debug("Clear PTR " + id)
         for (let chname of deployChannels) {
@@ -521,12 +521,12 @@ async function clearPtrCacheAsync(entry: { }): Promise<void> {
             }
         }
     }
-    
-    await clearIdAsync(id)    
+
+    await clearIdAsync(id)
     if (td.startsWith(id, "ptr-templates-")) {
         await tdliteReleases.pokeReleaseAsync("cloud", 0);
     }
-    
+
     let relid = td.toString(entry["pub"]["releaseid"])
     if (relid) {
         for (let suff of Object.keys(subFiles)) {
@@ -795,16 +795,23 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         pubdata["ptrid"] = id;
 
         let subfile = ""
-        let mm = /^(.*)---(.*)$/.exec(id)
-        if (mm && subFiles.hasOwnProperty(mm[2])) {
-            id = mm[1]
-            subfile = subFiles[mm[2]]
-        }
 
         let existing = await core.getPubAsync(id, "pointer");
         if (existing == null && /@[a-z][a-z]$/.test(id)) {
             existing = await core.getPubAsync(id.replace(/@..$/g, ""), "pointer");
         }
+
+        if (!existing && id.indexOf("---") > 0) {
+            let mm = /^(.*)---(.*)$/.exec(id)
+            if (mm && subFiles.hasOwnProperty(mm[2].replace(/@..$/, ""))) {
+                id = mm[1]
+                subfile = subFiles[mm[2]]
+            }
+            existing = await core.getPubAsync(id, "pointer");
+            if (existing && !existing["pub"]["releaseid"])
+                existing = null
+        }
+
         if (existing)
             v.customtick = existing["pub"]["customtick"]
 
