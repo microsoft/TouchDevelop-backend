@@ -545,7 +545,7 @@ function fixArtProps(contentType: string, jsb: JsonBuilder) : void
     jsb["ext"] = ext;
     jsb["contentType"] = contentType;
     let arttype = "blob";
-    if (ext == "jpg" || ext == "png" || ext == "svg") {
+    if (ext == "jpg" || ext == "png") {
         arttype = "picture";
     }
     else if (ext == "wav" || ext == "mp3" || ext == "aac") {
