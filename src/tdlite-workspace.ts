@@ -553,7 +553,10 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
     }
     else if (slotJson["currentBlob"] != pubVersion.baseSnapshot) {
         req.status = httpCode._409Conflict;
+    } else if (!/^[a-z\-]*$/.test(orEmpty(slotJson["target"]))) {
+        req.status == httpCode._400BadRequest
     }
+
 
     if (req.status == 200) {
         let pubScript = new tdliteScripts.PubScript();

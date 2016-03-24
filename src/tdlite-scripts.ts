@@ -427,6 +427,11 @@ export async function initAsync() : Promise<void>
         if (req3.status == 200 && forceid != "") {
             core.checkPermission(req3, "pub-mgmt");
         }
+        
+        if (!/^[a-z\-]*$/.test(orEmpty(req3.body["target"]))) {
+            req3.status == httpCode._400BadRequest
+            return
+        }
 
         if (req3.status == 200) {
             let scr = new PubScript();
