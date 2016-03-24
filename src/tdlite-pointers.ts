@@ -304,6 +304,19 @@ export async function initAsync(): Promise<void> {
             res.html(text)
         }
     })
+    
+    if (core.kindScript)
+        restify.server().get("/:scriptid/embed", async(req, res) => {
+            let lang = await handleLanguageAsync(req);
+            let sid = req.param("scriptid")
+            let script = await core.getPubAsync(sid, "script")
+            if (script && script["pub"]["target"]) {
+                res.redirect(302, "/" + script["pub"]["target"] + "---run?id=" + script["id"])
+            } else {
+                let tmp = await errorHtmlAsync("Script not found", "No such script: /" + sid, lang)
+                res.html(tmp, { status: httpCode._404NotFound })
+            }    
+        })    
 }
 
 export function pathToPtr(fn: string): string {
@@ -747,7 +760,8 @@ function legacyKindPrefix(name: string) {
 }
 
 var subFiles = {
-    embed: "embed.js"
+    embed: "embed.js",
+    run: "run.html"
 }
 
 export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {

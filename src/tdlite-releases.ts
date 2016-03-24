@@ -423,9 +423,11 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
     if (core.basicCreds == "") {
         text = td.replaceAll(text, "data-manifest=\"\"", "manifest=\"/app/app.manifest?r=" + encodeURIComponent(id) + "\"");
     }
-    let suff = "?r=" + encodeURIComponent(id) + "\"";
+    let suff = "?r=" + encodeURIComponent(id);
     //text = td.replaceAll(text, "\"browsers.html\"", "\"/app/browsers.html" + suff);
-    //text = td.replaceAll(text, "\"error.html\"", "\"/app/error.html" + suff);
+    //text = td.replaceAll(text, "\"error.html\"", "\"/app/error.html" + suff);    
+    text = td.replaceAll(text, '"embed.js"', '"/app/embed.js' + suff + '"');
+    //logger.debug(`after repl: ${text}`)
     text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/");
     let verPref = "var tdVersion = \"" + ver + "\";\n" + "var tdConfig = " + JSON.stringify(ccfg.toJson(), null, 2) + ";\n";
     text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
