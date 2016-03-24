@@ -71,6 +71,7 @@ export class PubEntry
     @td.json public features: string[];
     @td.json public time: number = 0;
     @td.json public editor: string = "";
+    @td.json public target: string = "";
     @td.json public artkind: string = "";
     @td.json public arttype: string = "";
     static createFromJson(o:JsonObject) { let r = new PubEntry(); r.fromJson(o); return r; }
@@ -102,6 +103,7 @@ export interface IPubEntry {
     features?: string[];
     time?: number;
     editor?: string;
+    target?: string;
     artkind?: string;
     arttype?: string;
 }
@@ -423,6 +425,10 @@ async function initPubSearchIndexAsync(noCreate:boolean) : Promise<void>
     editor.setFilterable(true);
     editor.setSearchable(false);
     editor.setSortable(false);
+    let target = schema.addField("target", "Edm.String");
+    target.setFilterable(true);
+    target.setSearchable(false);
+    target.setSortable(false);
     let body = schema.addField("body", "Edm.String");
     body.setRetrievable(false);
     let userid = schema.addField("userid", "Edm.String");

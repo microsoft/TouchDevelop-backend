@@ -243,6 +243,7 @@ All of these are private to the user in question.
         publishAsHidden:boolean;// used in publication flow
         recentUse: number;      // seconds since epoch
         editor?: string;        // empty if Touch Develop
+        target?: string;        // for KS
     }
     export interface InstalledHeaders {
         headers: Header[];

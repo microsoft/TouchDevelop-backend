@@ -64,6 +64,7 @@ export class PubScript
     @td.json public screenshoturl: string = "";
     @td.json public mergeids: string[];
     @td.json public editor: string = "";
+    @td.json public target: string = "";
     @td.json public meta: JsonObject;
     @td.json public iconArtId: string = "";
     @td.json public splashArtId: string = "";
@@ -450,6 +451,7 @@ export async function initAsync() : Promise<void>
             scr.capabilities = (<string[]>[]);
             scr.flows = (<string[]>[]);
             scr.editor = orEmpty(req3.body["editor"]);
+            scr.target = orEmpty(req3.body["target"]);
             scr.meta = req3.body["meta"];
             if (typeof scr.meta != "object" || Array.isArray(scr.meta))
                 scr.meta = {};

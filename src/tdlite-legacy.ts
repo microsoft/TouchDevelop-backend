@@ -386,6 +386,7 @@ async function importHeaderAsync(v: WorkspaceEntry) {
         },
         recentUse: toTime(v.RecentUse),
         editor: "",
+        target: "",
         meta: {},
         script: script,
         editorState: editorState,

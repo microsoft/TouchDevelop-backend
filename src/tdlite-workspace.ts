@@ -65,6 +65,7 @@ export class PubHeader
     @td.json public hasErrors: string = "";
     @td.json public recentUse: number = 0;
     @td.json public editor: string = "";
+    @td.json public target: string = "";
     @td.json public meta: JsonObject;
     static createFromJson(o:JsonObject) { let r = new PubHeader(); r.fromJson(o); return r; }
 }
@@ -82,6 +83,7 @@ export interface IPubHeader {
     hasErrors?: string;
     recentUse: number;
     editor: string;
+    target: string;
     meta: JsonObject;
 }
 
@@ -118,6 +120,7 @@ export class PubBody
     @td.json public script: string = "";
     @td.json public editorState: string = "";
     @td.json public editor: string = "";
+    @td.json public target: string = "";
     @td.json public meta: JsonObject;
     static createFromJson(o:JsonObject) { let r = new PubBody(); r.fromJson(o); return r; }
 }
@@ -133,6 +136,7 @@ export interface IPubBody {
     script: string;
     editorState: string;
     editor: string;
+    target: string;
     meta: JsonObject;
 }
 
@@ -588,6 +592,7 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
         pubScript.capabilities = (<string[]>[]);
         pubScript.flows = (<string[]>[]);
         pubScript.editor = orEmpty(slotJson["editor"]);
+        pubScript.target = orEmpty(slotJson["target"]);
         pubScript.iconArtId = td.toString(req.body["iconArtId"]);
         pubScript.splashArtId = td.toString(req.body["splashArtId"]);
         pubScript.meta = req.body["meta"];

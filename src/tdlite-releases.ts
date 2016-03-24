@@ -18,6 +18,7 @@ import * as audit from "./tdlite-audit"
 import * as tdliteTdCompiler from "./tdlite-tdcompiler"
 import * as tdlitePointers from "./tdlite-pointers"
 import * as tdliteUsers from "./tdlite-users"
+import * as tdliteScripts from "./tdlite-scripts"
 
 export type StringTransformer = (text: string) => Promise<string>;
 
