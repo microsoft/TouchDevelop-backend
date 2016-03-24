@@ -304,8 +304,8 @@ export async function initAsync(): Promise<void> {
             res.html(text)
         }
     })
-    
-    if (core.kindScript)
+
+    if (core.kindScript) {
         restify.server().get("/:scriptid/embed", async(req, res) => {
             let lang = await handleLanguageAsync(req);
             let sid = req.param("scriptid")
@@ -315,8 +315,74 @@ export async function initAsync(): Promise<void> {
             } else {
                 let tmp = await errorHtmlAsync("Script not found", "No such script: /" + sid, lang)
                 res.html(tmp, { status: httpCode._404NotFound })
-            }    
-        })    
+            }
+        })
+
+        core.addRoute("GET", "oembed", "", async(req: core.ApiRequest) => {
+            let id = orEmpty(req.queryOptions["url"]).replace(/^[a-z]+:\/\/[^\/]+/, "").replace(/^\/+/, "")
+            let fmt = withDefault(req.queryOptions["format"], "json")
+            if (fmt != "json" && fmt != "xml") {
+                req.status = httpCode._501NotImplemented
+                return
+            }
+            if (!/^[a-z]+$/.test(id)) {
+                req.status = httpCode._404NotFound
+                return
+            }
+            let scr = await core.getPubAsync(id, "script")
+            if (!scr) {
+                req.status = httpCode._404NotFound
+                return
+            }
+            let target = scr["pub"]["target"]
+            if (!target) {
+                req.status = httpCode._404NotFound
+                return
+            }
+            let aspect = 1.2 // TODO fetch from target            
+            let w = parseInt(req.queryOptions["maxwidth"] || "0") || 0
+            let h = parseInt(req.queryOptions["maxheight"] || "0") || 0
+            if (w && h) {
+                if (h * aspect > w)
+                    h = w / aspect
+                else
+                    w = h * aspect
+            } else if (w) {
+                h = w / aspect
+            } else if (h) {
+                w = h * aspect
+            } else {
+                w = 480
+                h = w / aspect
+            }
+            w = Math.floor(w)
+            h = Math.floor(h)
+
+            req.response = {
+                "version": "1.0",
+                "type": "rich",
+                "provider_name": "KindScript/" + target,
+                "provider_url": "https://kindscript.com/",
+                "width": w,
+                "height": h,
+                "title": scr["pub"]["name"],
+                // "author_name": "...", // TODO
+                "author_url": core.self + scr["pub"]["userid"],
+                "html": `<iframe width="${w}" height="${h}" src="${core.self}${scr["id"]}/embed" frameborder="0"></iframe>`
+            }
+            
+            if (fmt == "xml") {
+                let xml = `<?xml version="1.0" encoding="utf-8" standalone="yes"?><oembed>\n`
+                for (let k of Object.keys(req.response)) {
+                    let v = req.response[k] + ""
+                    xml += `<${k}>${core.htmlQuote(v)}</${k}>\n` 
+                }
+                xml += "</oembed>\n"
+                req.response = xml
+                req.responseContentType = "text/xml; charset=utf-8"
+            }
+        });
+    }
 }
 
 export function pathToPtr(fn: string): string {
