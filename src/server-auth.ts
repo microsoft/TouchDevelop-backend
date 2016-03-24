@@ -30,8 +30,8 @@ var globalOptions: IInitOptions;
 var fedTargets: string[];
 var myHost: string = "";
 
-var azureKey: string = 
-`-----BEGIN RSA PUBLIC KEY-----
+var azureKey: string =
+    `-----BEGIN RSA PUBLIC KEY-----
 MIIBCgKCAQEAvIqz+4+ER/vNWLON9yv8hIYV737JQ6rCl6XfzOC628seYUPf0TaG
 k91CFxefhzh23V9Tkq+RtwN1Vs/z57hO82kkzL+cQHZX3bMJD+GEGOKXCEXURN7V
 MyZWMAuzQoW9vFb1k3cR1RW/EW/P+C8bb2dCGXhBYqPfHyimvz2WarXhntPSbM5X
@@ -40,8 +40,8 @@ Np/KAS/qQ2Kq6TSvRHJqxRR68RezYtje9KAqwqx4jxlmVAQy0T3+T+IAbsk1wRtW
 DndhO6s1Os+dck5TzyZ/dNOhfXgelixLUQIDAQAB
 -----END RSA PUBLIC KEY-----`;
 
-var chooseProvider_html: string = 
-`<!DOCTYPE html>
+var chooseProvider_html: string =
+    `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=320.1" />
@@ -69,8 +69,7 @@ a.provider {
 
 
 export class ClientOauth
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public state: string = "";
     @td.json public client_id: string = "";
     @td.json public redirect_uri: string = "";
@@ -81,9 +80,8 @@ export class ClientOauth
     @td.json public td_state: string = "";
     @td.json public u: string = "";
     static createFromJson(o: JsonObject) { let r = new ClientOauth(); r.fromJson(o); return r; }
-    
-    public toQueryString()
-    {
+
+    public toQueryString() {
         return toQueryString({
             state: this.state,
             client_id: this.client_id,
@@ -94,8 +92,7 @@ export class ClientOauth
 }
 
 export class UserInfo
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public id: string = "";
     @td.json public name: string = "";
     @td.json public email: string = "";
@@ -103,12 +100,11 @@ export class UserInfo
     @td.json public redirectPrefix: string = "";
     @td.json public state: string = "";
     @td.json public userData: string = "";
-    static createFromJson(o:JsonObject) { let r = new UserInfo(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new UserInfo(); r.fromJson(o); return r; }
 }
 
 export class OauthRequest
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public state: string = "";
     @td.json public client_id: string = "";
     @td.json public redirect_uri: string = "";
@@ -121,10 +117,9 @@ export class OauthRequest
     @td.json public _provider: string = "";
     @td.json public _client_oauth: JsonObject;
     @td.json public _info: JsonObject;
-    static createFromJson(o:JsonObject) { let r = new OauthRequest(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new OauthRequest(); r.fromJson(o); return r; }
 
-    public async getAccessCodeAsync(code_: string, clientSecret: string, url: string) : Promise<JsonObject>
-    {
+    public async getAccessCodeAsync(code_: string, clientSecret: string, url: string): Promise<JsonObject> {
         let js: JsonObject;
         let tokenReq = new TokenReq();
         tokenReq.fromJson(this.toJson());
@@ -144,14 +139,13 @@ export class OauthRequest
         else {
             js = fromQueryString(response.content());
         }
-        if (js != null && ! js["access_token"] && ! js["id_token"]) {
+        if (js != null && !js["access_token"] && !js["id_token"]) {
             js = (<JsonObject>null);
         }
         return js;
     }
 
-    public makeRedirectUrl(token: string) : string
-    {
+    public makeRedirectUrl(token: string): string {
         let url: string;
         let hash = {};
         let clientOauth2 = ClientOauth.createFromJson(this._client_oauth);
@@ -179,14 +173,13 @@ export interface IOauthRequest {
 }
 
 export class TokenReq
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public client_id: string = "";
     @td.json public redirect_uri: string = "";
     @td.json public code: string = "";
     @td.json public client_secret: string = "";
     @td.json public grant_type: string = "";
-    static createFromJson(o:JsonObject) { let r = new TokenReq(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new TokenReq(); r.fromJson(o); return r; }
 }
 
 export interface ITokenReq {
@@ -197,8 +190,7 @@ export interface ITokenReq {
     grant_type?: string;
 }
 
-export class ProviderIndex
-{
+export class ProviderIndex {
     public id: string = "";
     public makeLoginUrl: MakeUrlCallback;
     public getProfile: GetProfile;
@@ -207,9 +199,8 @@ export class ProviderIndex
     public order: number = 0;
     public shortname: string;
 
-    static _providers:td.SMap<ProviderIndex> = {};
-    static at(n:string)
-    {
+    static _providers: td.SMap<ProviderIndex> = {};
+    static at(n: string) {
         if (!ProviderIndex._providers.hasOwnProperty(n)) {
             ProviderIndex._providers[n] = new ProviderIndex();
             ProviderIndex._providers[n].id = n;
@@ -217,36 +208,34 @@ export class ProviderIndex
         return ProviderIndex._providers[n]
     }
 
-    static all():ProviderIndex[]
-    {
+    static all(): ProviderIndex[] {
         var pp = ProviderIndex._providers
         return Object.keys(pp).map(k => pp[k]).filter(pi => !!pi.makeLoginUrl)
     }
 
-    public setupProvider(makeUrl: MakeUrlCallback, getProfile: GetProfile, defaultCustomToken: MakeUserInfo) : void
-    {
+    public setupProvider(makeUrl: MakeUrlCallback, getProfile: GetProfile, defaultCustomToken: MakeUserInfo): void {
         logger.info("adding provider: " + this.id);
         this.makeLoginUrl = makeUrl;
         this.getProfile = getProfile;
         this.shortname = this.id;
         if (this.makeCustomToken == null) {
-            this.makeCustomToken = async (profile: JsonObject) => {
+            this.makeCustomToken = async(profile: JsonObject) => {
                 let inf = await defaultCustomToken(profile);
-                if (inf != null && ! inf.id) {
+                if (inf != null && !inf.id) {
                     inf = (<UserInfo>null);
                 }
                 if (inf != null) {
-                    if (! inf.name) {
+                    if (!inf.name) {
                         // isn't this brilliant?!
                         inf.name = "0x" + td.sha256(new Buffer(inf.id, "utf8")).substr(0, 8);
                     }
-                    if (inf.email == null || ! td.stringContains(inf.email, "@")) {
+                    if (inf.email == null || !td.stringContains(inf.email, "@")) {
                         inf.email = "";
                     }
                 }
                 return inf;
             }
-            ;
+                ;
         }
         this.order = ProviderIndex.length;
     }
@@ -292,11 +281,10 @@ export interface IUserInfo {
 }
 
 
-export function init(options_: IInitOptions = {}) : void
-{
+export function init(options_: IInitOptions = {}): void {
     globalOptions = options_;
     if (globalOptions.errorCallback == null) {
-        globalOptions.errorCallback = async (res: restify.Response, msg: string) => {
+        globalOptions.errorCallback = async(res: restify.Response, msg: string) => {
             if (!globalOptions.redirectOnError) {
                 res.sendError(403, msg);
             }
@@ -306,7 +294,7 @@ export function init(options_: IInitOptions = {}) : void
         }
     }
     if (globalOptions.makeJwt == null) {
-        globalOptions.makeJwt = async (profile: UserInfo, oauthReq: OauthRequest) => {
+        globalOptions.makeJwt = async(profile: UserInfo, oauthReq: OauthRequest) => {
             let jwt: JsonBuilder;
             jwt = {};
             jwt["sub"] = profile.id;
@@ -318,12 +306,12 @@ export function init(options_: IInitOptions = {}) : void
         logger.info("using in-memory (single instance) storage");
         let d = {}
         globalOptions.getData = key => d[key];
-        globalOptions.setData = async (key1: string, value: string) => {
+        globalOptions.setData = async(key1: string, value: string) => {
             d[key1] = value;
         }
     }
     if (globalOptions.preDialog == null) {
-        globalOptions.preDialog = async (req: restify.Request, res1: restify.Response) => {
+        globalOptions.preDialog = async(req: restify.Request, res1: restify.Response) => {
             // Do nothing.
         }
     }
@@ -338,13 +326,12 @@ export function init(options_: IInitOptions = {}) : void
     logger.info("Started");
 }
 
-export function toQueryString(params: JsonObject) : string
-{
+export function toQueryString(params: JsonObject): string {
     let query: string;
     query = "";
     for (let k of Object.keys(params)) {
         let text = params[k];
-        if (orEmpty(text) != "" && ! td.startsWith(k, "_")) {
+        if (orEmpty(text) != "" && !td.startsWith(k, "_")) {
             if (query != "") {
                 query = query + "&";
             }
@@ -354,30 +341,29 @@ export function toQueryString(params: JsonObject) : string
     return query;
 }
 
-function initRestify() : void
-{
+function initRestify(): void {
     let server = restify.server();
-    server.get("/oauth/login", async (req: restify.Request, res: restify.Response) => {
+    server.get("/oauth/login", async(req: restify.Request, res: restify.Response) => {
         setSelf(req);
         await oauthLoginAsync(req, res);
     });
-    server.post("/oauth/callback", async (req1: restify.Request, res1: restify.Response) => {
+    server.post("/oauth/callback", async(req1: restify.Request, res1: restify.Response) => {
         let query = fromQueryString(req1.body());
         req1.handle.body = query;
         let state = orEmpty(query["state"]);
         logger.debug("POST at callback: " + JSON.stringify(req1.bodyAsJson()));
         await handleResponseAsync(state, req1, res1);
     });
-    server.get("/oauth/callback", async (req2: restify.Request, res2: restify.Response) => {
+    server.get("/oauth/callback", async(req2: restify.Request, res2: restify.Response) => {
         logger.debug("GET at callback: " + JSON.stringify(req2.query()));
         await handleResponseAsync(req2.query()["state"], req2, res2);
     });
     if (debug) {
-        server.get("/oauth/testlogin", async (req3: restify.Request, res3: restify.Response) => {
+        server.get("/oauth/testlogin", async(req3: restify.Request, res3: restify.Response) => {
             let s3 = req3.serverUrl() + "/oauth/login?state=foobar&response_type=token&redirect_uri=" + encodeURIComponent(req3.serverUrl() + "/oauth/testcallback");
             res3.redirect(303, s3);
         });
-        server.get("/oauth/testcallback", async (req4: restify.Request, res4: restify.Response) => {
+        server.get("/oauth/testcallback", async(req4: restify.Request, res4: restify.Response) => {
             let tok = decodeToken(req4.query()["access_token"]);
             if (tok == null) {
                 let _new = "<script>\nvar h = document.location.href\nvar h2 = h.replace(/#/, \"?\")\nif (h != h2) \n  document.location = h2\n</script>";
@@ -396,13 +382,12 @@ var orEmpty = td.orEmpty;
  * Setup Azure Active Directory (Office 365 or Corporate) authentication provider. Requires ``AZURE_AD_CLIENT_ID`` env.
  * This relies on `art->azure key` being valid and used, but doesn't require client secret (which expires every 2 years).
  */
-export function addAzureAdClientOnly(options_: IProviderOptions = {}) : void
-{
+export function addAzureAdClientOnly(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("AZURE_AD_CLIENT_ID", false);
     let prov = ProviderIndex.at("azureadcl");
     prov.name = "Office 365 or Corporate";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         p.response_type = "id_token";
@@ -412,49 +397,45 @@ export function addAzureAdClientOnly(options_: IProviderOptions = {}) : void
         url = "https://login.windows.net/common/oauth2/authorize?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;        
-        let payload = decodeJwtVerify(req1.bodyAsJson()["id_token"], "RS256", azureKey);
-        if (payload["nonce"] == p1.nonce) {
-            profile = payload;
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let payload = decodeJwtVerify(req1.bodyAsJson()["id_token"], "RS256", azureKey);
+            if (payload["nonce"] == p1.nonce) {
+                profile = payload;
+            }
+            else {
+                profile = (<JsonObject>null);
+            }
+            return profile;
         }
-        else {
-            profile = (<JsonObject>null);
-        }
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let info: UserInfo;
-        info = new UserInfo();
-        info.id = "ad:" + td.replaceAll(profile1["oid"], "-", "").toLowerCase();
-        info.name = profile1["name"];
-        info.email = profile1["unique_name"];
-        return info;
-    });
+        , async(profile1: JsonObject) => {
+            let info: UserInfo;
+            info = new UserInfo();
+            info.id = "ad:" + td.replaceAll(profile1["oid"], "-", "").toLowerCase();
+            info.name = profile1["name"];
+            info.email = profile1["unique_name"];
+            return info;
+        });
     prov.shortname = "ad";
 }
 
-function fromQueryString(body: string) : JsonObject
-{
+function fromQueryString(body: string): JsonObject {
     return querystring.parse(body)
 }
 
-function setIfEmpty(jsb: JsonBuilder, key: string, value: string) : void
-{
-    if (! jsb[key]) {
+function setIfEmpty(jsb: JsonBuilder, key: string, value: string): void {
+    if (!jsb[key]) {
         jsb[key] = value;
     }
 }
 
-function now() : number
-{
+function now(): number {
     let value: number;
     value = Math.round(new Date().getTime() / 1000);
     return value;
 }
 
-async function handleResponseAsync(state: string, req: restify.Request, res: restify.Response) : Promise<void>
-{
+async function handleResponseAsync(state: string, req: restify.Request, res: restify.Response): Promise<void> {
     setSelf(req);
     if (td.stringContains(state, ",")) {
         let stateWords = state.split(",");
@@ -530,14 +511,13 @@ async function handleResponseAsync(state: string, req: restify.Request, res: res
 /**
  * Setup Live Connect / Microsoft Account authentication. Requires ``LIVE_CLIENT_ID`` and ``LIVE_CLIENT_SECRET`` env.
  */
-export function addLiveId(options_: IProviderOptions = {}) : void
-{
+export function addLiveId(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("LIVE_CLIENT_ID", false);
     let clientSecret = td.serverSetting("LIVE_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("liveid");
     prov.name = "Microsoft Account";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         if (globalOptions.requestEmail) {
@@ -550,41 +530,40 @@ export function addLiveId(options_: IProviderOptions = {}) : void
         url = "https://login.live.com/oauth20_authorize.srf?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://login.live.com/oauth20_token.srf");
-        if (js == null) {
-            return js;
-        }
-        let request = td.createRequest("https://apis.live.net/v5.0/me?access_token=" + encodeURIComponent(js["access_token"]));
-        let response = await request.sendAsync();
-        profile = response.contentAsJson();
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let info: UserInfo;
-        let inf = new UserInfo();
-        if (!profile1["id"]) return <UserInfo>null;
-        inf.id = "live:" + profile1["id"];
-        inf.name = profile1["name"];
-        let eml = profile1["emails"];
-        if (eml != null) {
-            inf.email = orEmpty(eml["preferred"]);
-            if (inf.email == "") {
-                inf.email = eml["account"];
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://login.live.com/oauth20_token.srf");
+            if (js == null) {
+                return js;
             }
+            let request = td.createRequest("https://apis.live.net/v5.0/me?access_token=" + encodeURIComponent(js["access_token"]));
+            let response = await request.sendAsync();
+            profile = response.contentAsJson();
+            return profile;
         }
-        return inf;
-        return info;
-    });
+        , async(profile1: JsonObject) => {
+            let info: UserInfo;
+            let inf = new UserInfo();
+            if (!profile1["id"]) return <UserInfo>null;
+            inf.id = "live:" + profile1["id"];
+            inf.name = profile1["name"];
+            let eml = profile1["emails"];
+            if (eml != null) {
+                inf.email = orEmpty(eml["preferred"]);
+                if (inf.email == "") {
+                    inf.email = eml["account"];
+                }
+            }
+            return inf;
+            return info;
+        });
     prov.shortname = "live";
 }
 
 /**
  * Decode JWT token
  */
-function decodeToken(token: string) : JsonObject
-{
+function decodeToken(token: string): JsonObject {
     let tok: JsonObject;
     if (token == null || ! /.+\..+\./.test(token)) {
         tok = (<JsonObject>null);
@@ -595,14 +574,13 @@ function decodeToken(token: string) : JsonObject
     return tok;
 }
 
-function example_init() : void
-{
+function example_init(): void {
     debug = true;
     if (debug) {
         setupRestifyServer();
         // 
         init({
-            makeJwt: async (profile: UserInfo, oauthReq: OauthRequest) => {
+            makeJwt: async(profile: UserInfo, oauthReq: OauthRequest) => {
                 let jwt: JsonBuilder;
                 jwt = {};
                 jwt["sub"] = profile.id;
@@ -622,14 +600,13 @@ function example_init() : void
 /**
  * Setup Facebook login. Requires ``FACEBOOK_CLIENT_ID`` and ``FACEBOOK_CLIENT_SECRET`` env.
  */
-export function addFacebook(options_: IProviderOptions = {}) : void
-{
+export function addFacebook(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("FACEBOOK_CLIENT_ID", false);
     let clientSecret = td.serverSetting("FACEBOOK_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("facebook");
     prov.name = "Facebook";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         if (globalOptions.requestEmail) {
@@ -642,41 +619,40 @@ export function addFacebook(options_: IProviderOptions = {}) : void
         url = "https://www.facebook.com/dialog/oauth?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://graph.facebook.com/oauth/access_token");
-        if (js == null) {
-            return js;
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://graph.facebook.com/oauth/access_token");
+            if (js == null) {
+                return js;
+            }
+            let request = td.createRequest("https://graph.facebook.com/v2.2/me?access_token=" + encodeURIComponent(js["access_token"]));
+            let response = await request.sendAsync();
+            profile = response.contentAsJson();
+            return profile;
         }
-        let request = td.createRequest("https://graph.facebook.com/v2.2/me?access_token=" + encodeURIComponent(js["access_token"]));
-        let response = await request.sendAsync();
-        profile = response.contentAsJson();
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let info: UserInfo;
-        let inf = new UserInfo();
-        if (!profile1["id"]) return <UserInfo>null;
-        inf.id = "fb:" + profile1["id"];
-        inf.name = profile1["name"];
-        inf.email = profile1["email"];
-        return inf;
-        return info;
-    });
+        , async(profile1: JsonObject) => {
+            let info: UserInfo;
+            let inf = new UserInfo();
+            if (!profile1["id"]) return <UserInfo>null;
+            inf.id = "fb:" + profile1["id"];
+            inf.name = profile1["name"];
+            inf.email = profile1["email"];
+            return inf;
+            return info;
+        });
     prov.shortname = "fb";
 }
 
 /**
  * Setup Google login. Requires ``GOOGLE_CLIENT_ID`` and ``GOOGLE_CLIENT_SECRET`` env.
  */
-export function addGoogle(options_: IProviderOptions = {}) : void
-{
+export function addGoogle(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("GOOGLE_CLIENT_ID", false);
     let clientSecret = td.serverSetting("GOOGLE_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("google");
     prov.name = "Google";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         if (globalOptions.requestEmail) {
@@ -689,43 +665,42 @@ export function addGoogle(options_: IProviderOptions = {}) : void
         url = "https://accounts.google.com/o/oauth2/auth?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://www.googleapis.com/oauth2/v3/token");
-        if (js == null) {
-            return js;
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://www.googleapis.com/oauth2/v3/token");
+            if (js == null) {
+                return js;
+            }
+            let request = td.createRequest("https://www.googleapis.com/oauth2/v2/userinfo");
+            request.setHeader("Authorization", "Bearer " + js["access_token"]);
+            let response = await request.sendAsync();
+            // The JWT token doesn't have user's name
+            if (false) {
+                // profile = nodeJwtSimple.decodeNoVerify(js["id_token"]);
+            }
+            profile = response.contentAsJson();
+            return profile;
         }
-        let request = td.createRequest("https://www.googleapis.com/oauth2/v2/userinfo");
-        request.setHeader("Authorization", "Bearer " + js["access_token"]);
-        let response = await request.sendAsync();
-        // The JWT token doesn't have user's name
-        if (false) {
-            // profile = nodeJwtSimple.decodeNoVerify(js["id_token"]);
-        }
-        profile = response.contentAsJson();
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let inf = new UserInfo();
-        if (!profile1["id"]) return <UserInfo>null;
-        inf.id = "google:" + profile1["id"];
-        inf.name = profile1["name"];
-        inf.email = profile1["email"];
-        return inf;
-    });
+        , async(profile1: JsonObject) => {
+            let inf = new UserInfo();
+            if (!profile1["id"]) return <UserInfo>null;
+            inf.id = "google:" + profile1["id"];
+            inf.name = profile1["name"];
+            inf.email = profile1["email"];
+            return inf;
+        });
 }
 
 /**
  * Setup Edmodo login. Requires ``EDMODO_CLIENT_ID`` and ``EDMODO_CLIENT_SECRET`` env.
  */
-export function addEdmodo(options_: IProviderOptions = {}) : void
-{
+export function addEdmodo(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("EDMODO_CLIENT_ID", false);
     let clientSecret = td.serverSetting("EDMODO_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("edmodo");
     prov.name = "Edmodo";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         p.scope = "basic";
@@ -733,42 +708,41 @@ export function addEdmodo(options_: IProviderOptions = {}) : void
         url = "https://api.edmodo.com/oauth/authorize?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://api.edmodo.com/oauth/token");
-        if (js == null) {
-            return js;
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://api.edmodo.com/oauth/token");
+            if (js == null) {
+                return js;
+            }
+            let request = td.createRequest("https://api.edmodo.com/users/me");
+            request.setHeader("Authorization", "Bearer " + js["access_token"]);
+            let response = await request.sendAsync();
+            request = td.createRequest(response.header("Location"));
+            request.setHeader("Authorization", "Bearer " + js["access_token"]);
+            response = await request.sendAsync();
+            profile = response.contentAsJson();
+            return profile;
         }
-        let request = td.createRequest("https://api.edmodo.com/users/me");
-        request.setHeader("Authorization", "Bearer " + js["access_token"]);
-        let response = await request.sendAsync();
-        request = td.createRequest(response.header("Location"));
-        request.setHeader("Authorization", "Bearer " + js["access_token"]);
-        response = await request.sendAsync();
-        profile = response.contentAsJson();
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let info: UserInfo;
-        info = new UserInfo();
-        if (!profile1["id"]) return <UserInfo>null;
-        info.id = "edmodo:" + profile1["id"];
-        info.name = profile1["name"];
-        return info;
-    });
+        , async(profile1: JsonObject) => {
+            let info: UserInfo;
+            info = new UserInfo();
+            if (!profile1["id"]) return <UserInfo>null;
+            info.id = "edmodo:" + profile1["id"];
+            info.name = profile1["name"];
+            return info;
+        });
 }
 
 /**
  * Setup Azure Active Directory (Office 365 or Corporate) authentication provider. Requires ``AZURE_AD_CLIENT_ID`` and ``AZURE_AD_CLIENT_SECRET`` env.
  */
-export function addAzureAd(options_: IProviderOptions = {}) : void
-{
+export function addAzureAd(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("AZURE_AD_CLIENT_ID", false);
     let clientSecret = td.serverSetting("AZURE_AD_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("azuread");
     prov.name = "Office 365 or Corporate";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         p.scope = "openid";
@@ -777,35 +751,33 @@ export function addAzureAd(options_: IProviderOptions = {}) : void
         url = "https://login.windows.net/common/oauth2/authorize?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://login.windows.net/common/oauth2/token");
-        if (js == null) {
-            return js;
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://login.windows.net/common/oauth2/token");
+            if (js == null) {
+                return js;
+            }
+            logger.debug("resp: " + JSON.stringify(js));
+            profile = decodeJwt(js["id_token"]);
+            return profile;
         }
-        logger.debug("resp: " + JSON.stringify(js));
-        profile = decodeJwt(js["id_token"]);
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let info: UserInfo;
-        info = new UserInfo();
-        if (!profile1["oid"]) return <UserInfo>null;
-        info.id = "ad:" + td.replaceAll(profile1["oid"], "-", "").toLowerCase();
-        info.name = profile1["name"];
-        info.email = profile1["unique_name"];
-        return info;
-    });
+        , async(profile1: JsonObject) => {
+            let info: UserInfo;
+            info = new UserInfo();
+            if (!profile1["oid"]) return <UserInfo>null;
+            info.id = "ad:" + td.replaceAll(profile1["oid"], "-", "").toLowerCase();
+            info.name = profile1["name"];
+            info.email = profile1["unique_name"];
+            return info;
+        });
     prov.shortname = "ad";
 }
 
-export function base64urlDecode(s: string): Buffer
-{
+export function base64urlDecode(s: string): Buffer {
     return new Buffer(s.replace(/-/g, '+').replace(/_/g, '/'), "base64");
 }
 
-export function base64urlEncode(buf: Buffer): string
-{
+export function base64urlEncode(buf: Buffer): string {
     return buf.toString("base64").replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, "")
 }
 
@@ -814,7 +786,7 @@ function decodeJwt(jwt: string): JwtPayload {
     let elts = jwt.split('.');
     if (elts.length != 3) return null;
     try {
-        return JSON.parse(base64urlDecode(elts[1]).toString("utf8")); 
+        return JSON.parse(base64urlDecode(elts[1]).toString("utf8"));
     } catch (e) {
         console.log(e);
         return null;
@@ -831,8 +803,7 @@ export interface JwtPayload {
     exp?: number; // expiration time
 }
 
-export function createJwtHS256(payload: JwtPayload, shakey:Buffer)
-{
+export function createJwtHS256(payload: JwtPayload, shakey: Buffer) {
     let hd = {
         "alg": "HS256",
         "typ": "JWT"
@@ -841,11 +812,10 @@ export function createJwtHS256(payload: JwtPayload, shakey:Buffer)
     let data = enc(hd) + "." + enc(payload)
     let hash = crypto.createHmac("sha256", shakey)
     hash.update(new Buffer(data, "utf8"))
-    return data + "." + base64urlEncode(hash.digest())    
+    return data + "." + base64urlEncode(hash.digest())
 }
 
-export function createJwtRS256(payload: JwtPayload, rsakey:string)
-{
+export function createJwtRS256(payload: JwtPayload, rsakey: string) {
     let hd = {
         "alg": "RS256",
         "typ": "JWT"
@@ -853,11 +823,11 @@ export function createJwtRS256(payload: JwtPayload, rsakey:string)
     let enc = s => base64urlEncode(new Buffer(JSON.stringify(s), "utf8"))
     let data = enc(hd) + "." + enc(payload)
     let hash = crypto.createSign("RSA-SHA256")
-    hash.update(new Buffer(data, "utf8"))    
-    return data + "." + base64urlEncode(<any>hash.sign(rsakey, null))    
+    hash.update(new Buffer(data, "utf8"))
+    return data + "." + base64urlEncode(<any>hash.sign(rsakey, null))
 }
 
-export function decodeJwtVerify(jwt: string, alg:string, key: any): JwtPayload {
+export function decodeJwtVerify(jwt: string, alg: string, key: any): JwtPayload {
     if (!jwt) return null;
     let elts = jwt.split('.');
     if (elts.length != 3) return null;
@@ -876,7 +846,7 @@ export function decodeJwtVerify(jwt: string, alg:string, key: any): JwtPayload {
     let data = elts[0] + "." + elts[1]
     if (hd["alg"] == "HS256") {
         if (!Buffer.isBuffer(key))
-            throw new Error("Bad key");            
+            throw new Error("Bad key");
         let hash = crypto.createHmac("sha256", key)
         hash.update(new Buffer(data, "utf8"))
         if (base64urlEncode(hash.digest()) !== elts[2]) {
@@ -894,17 +864,16 @@ export function decodeJwtVerify(jwt: string, alg:string, key: any): JwtPayload {
     } else {
         return null;
     }
-}    
+}
 
-async function oauthLoginAsync(req: restify.Request, res: restify.Response) : Promise<void>
-{
+async function oauthLoginAsync(req: restify.Request, res: restify.Response): Promise<void> {
     validateOauthParameters(req, res);
-    if ( ! res.finished()) {
+    if (!res.finished()) {
         await globalOptions.preDialog(req, res);
     }
     let clientOauth = ClientOauth.createFromJson(req.query());
     logger.debug("login: " + JSON.stringify(clientOauth.toJson()));
-    if ( ! res.finished()) {
+    if (!res.finished()) {
         let provider = ProviderIndex.at(orEmpty(clientOauth.provider));
         if (provider.makeLoginUrl == null) {
             let coll2 = ProviderIndex.all();
@@ -941,18 +910,17 @@ async function oauthLoginAsync(req: restify.Request, res: restify.Response) : Pr
     }
 }
 
-export function validateOauthParameters(req: restify.Request, res: restify.Response) : void
-{
+export function validateOauthParameters(req: restify.Request, res: restify.Response): void {
     let clientOauth = ClientOauth.createFromJson(req.query());
     if (orEmpty(clientOauth.response_type) != "token") {
         res.sendError(400, "Only response_type=token supported.");
     }
-    else if (! clientOauth.state) {
+    else if (!clientOauth.state) {
         res.sendError(400, "state= required");
     }
     else {
         let url = orEmpty(clientOauth.redirect_uri);
-        if ( ! (td.startsWith(url, globalOptions.self) || td.startsWith(url, "http://localhost:"))) {
+        if (!(td.startsWith(url, globalOptions.self) || td.startsWith(url, "http://localhost:"))) {
             res.sendError(400, "invalid redirect_uri; expecting it to start with " + globalOptions.self + " or http://localhost");
         }
         if (orEmpty(clientOauth.client_id) == "no-cookie" && url != globalOptions.self + "/oauth/gettokencallback") {
@@ -961,13 +929,11 @@ export function validateOauthParameters(req: restify.Request, res: restify.Respo
     }
 }
 
-export function options() : IInitOptions
-{
+export function options(): IInitOptions {
     return globalOptions
 }
 
-export async function userInfoByStateAsync(state: string) : Promise<UserInfo>
-{
+export async function userInfoByStateAsync(state: string): Promise<UserInfo> {
     let info: UserInfo;
     let s = await globalOptions.getData(state);
     if (s == null || s == "") {
@@ -980,8 +946,7 @@ export async function userInfoByStateAsync(state: string) : Promise<UserInfo>
     return info;
 }
 
-export function setupRestifyServer() : void
-{
+export function setupRestifyServer(): void {
     let server = restify.server();
     server.use(restify.authorizationParser());
     server.pre(restify.sanitizePath());
@@ -992,8 +957,7 @@ export function setupRestifyServer() : void
     server.use(restify.conditionalRequest());
 }
 
-function setSelf(req: restify.Request) : void
-{
+function setSelf(req: restify.Request): void {
     if (!globalOptions.self) {
         globalOptions.self = req.serverUrl();
     }
@@ -1009,8 +973,7 @@ export interface ProviderLink {
     id: string;
 }
 
-export function providerLinks(query: JsonObject) : ProviderLink[]
-{
+export function providerLinks(query: JsonObject): ProviderLink[] {
     let clientOauth = ClientOauth.createFromJson(query);
     let coll2 = ProviderIndex.all();
     return td.orderedBy(coll2, elt1 => elt1.order).map(elt => {
@@ -1028,56 +991,54 @@ export function providerLinks(query: JsonObject) : ProviderLink[]
 /**
  * Setup Yahoo! authentication. Requires ``YAHOO_CLIENT_ID`` and ``YAHOO_CLIENT_SECRET`` env.
  */
-export function addYahoo(options_: IProviderOptions = {}) : void
-{
+export function addYahoo(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("YAHOO_CLIENT_ID", false);
     let clientSecret = td.serverSetting("YAHOO_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("yahoo");
     prov.name = "Yahoo!";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         p.response_type = "code";
         url = "https://api.login.yahoo.com/oauth2/request_auth?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://api.login.yahoo.com/oauth2/get_token");
-        if (js == null) {
-            return js;
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://api.login.yahoo.com/oauth2/get_token");
+            if (js == null) {
+                return js;
+            }
+            let request = td.createRequest("https://social.yahooapis.com/v1/user/me/profile");
+            request.setHeader("Authorization", "Bearer " + js["access_token"]);
+            request.setAccept("application/json");
+            let response = await request.sendAsync();
+            //logger.info("yahoo resp: " + response.statusCode() + ": " + response.content())        
+            profile = response.contentAsJson();
+            if (profile) profile = profile["profile"];
+            return profile;
         }
-        let request = td.createRequest("https://social.yahooapis.com/v1/user/me/profile");
-        request.setHeader("Authorization", "Bearer " + js["access_token"]);
-        request.setAccept("application/json");
-        let response = await request.sendAsync();
-        //logger.info("yahoo resp: " + response.statusCode() + ": " + response.content())        
-        profile = response.contentAsJson();
-        if (profile) profile = profile["profile"];
-        return profile;
-    }
-    , async (profile1: JsonObject) => {
-        let inf = new UserInfo();
-        if (!profile1["guid"]) return <UserInfo>null;
-        inf.id = "yahoo:" + profile1["guid"];
-        inf.name = profile1["nickname"];
-        return inf;
-    });
+        , async(profile1: JsonObject) => {
+            let inf = new UserInfo();
+            if (!profile1["guid"]) return <UserInfo>null;
+            inf.id = "yahoo:" + profile1["guid"];
+            inf.name = profile1["nickname"];
+            return inf;
+        });
 }
 
 
 /**
  * Setup GitHub authentication. Requires ``GITHUB_CLIENT_ID`` and ``GITHUB_CLIENT_SECRET`` env.
  */
-export function addGitHub(options_: IProviderOptions = {}) : void
-{
+export function addGitHub(options_: IProviderOptions = {}): void {
     let clientId = td.serverSetting("GITHUB_CLIENT_ID", false);
     let clientSecret = td.serverSetting("GITHUB_CLIENT_SECRET", false);
     let prov = ProviderIndex.at("github");
     prov.name = "GitHub";
     prov.makeCustomToken = options_.makeCustomToken;
-    prov.setupProvider(async (req: restify.Request, p: OauthRequest) => {
+    prov.setupProvider(async(req: restify.Request, p: OauthRequest) => {
         let url: string;
         p.client_id = clientId;
         p.response_type = "code";
@@ -1085,26 +1046,26 @@ export function addGitHub(options_: IProviderOptions = {}) : void
         url = "https://github.com/login/oauth/authorize?" + toQueryString(p.toJson());
         return url;
     }
-    , async (req1: restify.Request, p1: OauthRequest) => {
-        let profile: JsonObject;
-        let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://github.com/login/oauth/access_token");
-        if (js == null) {
-            return js;
-        }
-        let request = td.createRequest("https://api.github.com/user");
-        request.setHeader("Authorization", "token " + js["access_token"]);
-        request.setHeader("User-Agent", "Touch Develop backend");
-        request.setAccept("application/json");
-        let response = await request.sendAsync();
-        logger.info("gh resp: " + response.statusCode() + ": " + response.content())
-        return response.contentAsJson();
-    }, async (profile1: JsonObject) => {
-        let inf = new UserInfo();
-        if (!profile1["id"]) return <UserInfo>null;
-        inf.id = "github:" + profile1["id"];
-        inf.name = profile1["login"];
-        inf.email = profile1["email"];
-        inf.realname = profile1["name"];
-        return inf;
-    });
+        , async(req1: restify.Request, p1: OauthRequest) => {
+            let profile: JsonObject;
+            let js = await p1.getAccessCodeAsync(req1.query()["code"], clientSecret, "https://github.com/login/oauth/access_token");
+            if (js == null) {
+                return js;
+            }
+            let request = td.createRequest("https://api.github.com/user");
+            request.setHeader("Authorization", "token " + js["access_token"]);
+            request.setHeader("User-Agent", "Touch Develop backend");
+            request.setAccept("application/json");
+            let response = await request.sendAsync();
+            logger.info("gh resp: " + response.statusCode() + ": " + response.content())
+            return response.contentAsJson();
+        }, async(profile1: JsonObject) => {
+            let inf = new UserInfo();
+            if (!profile1["id"]) return <UserInfo>null;
+            inf.id = "github:" + profile1["id"];
+            inf.name = profile1["login"];
+            inf.email = profile1["email"];
+            inf.realname = profile1["name"];
+            return inf;
+        });
 }
