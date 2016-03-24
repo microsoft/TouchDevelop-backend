@@ -1165,7 +1165,8 @@ export function setHtmlHeaders(req: restify.Request) : void
     let res = req.response
     if (!req.url().startsWith("/app/"))
         res.setHeader("Cache-Control", "no-cache, no-store");    
-    res.setHeader("X-Frame-Options", "DENY");
+    if (!kindScript)
+        res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     res.setHeader("X-Content-Type-Options", "nosniff");
