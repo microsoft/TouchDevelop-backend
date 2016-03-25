@@ -306,9 +306,8 @@ async function serveAsync() {
                 } else {
                     let tmp = ""
                     if (/\.md$/.test(fn)) {
-                        let vars = tdliteDocs.renderMarkdown(fs.readFileSync("web" + fn, "utf8"))
                         let templ = nunjucks.render("templates/docs.html", { somevar: 1 })
-                        tmp = tdliteDocs.injectHtml(templ, vars)
+                        tmp = tdliteDocs.renderMarkdown(templ, fs.readFileSync("web" + fn, "utf8"))
                     } else {
                         tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
                     }    

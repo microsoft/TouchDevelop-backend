@@ -1,6 +1,7 @@
 N=tdlite
 
 all:
+	cp external/backendutils.js built/
 	node scripts/asynclint.js src/*.ts
 	node node_modules/typescript/bin/tsc
 	#node c:/dev/typescript/built/local/tsc
@@ -19,3 +20,7 @@ docs: all
 # requires TD_UPLOAD_KEY
 upload:
 	node built/templater.js push
+
+ks:
+	make -C ../kindscript
+	cp ../kindscript/built/backendutils.js external/

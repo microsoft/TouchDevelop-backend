@@ -504,9 +504,8 @@ async function renderMarkdownAsync(artobj: {}, lang: string) {
     let resp = await td.createRequest(url).sendAsync();
     let textObj = resp.content();
     if (!textObj) textObj = "Art object not found."
-    let vars = tdliteDocs.renderMarkdown(textObj)
     let templ = await getTemplateTextAsync("templates/docs", lang)
-    return tdliteDocs.injectHtml(templ, vars)
+    return tdliteDocs.renderMarkdown(templ, textObj)
 }
 
 async function getHtmlArtAsync(templid: string, lang: string) {

@@ -753,6 +753,7 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response, rel
     }
     if (!res.finished() && basicCreds != "") {
         if (relaxed) return
+        if (fullTD && req.url().startsWith("/templates")) return
         if (orEmpty(req.query()["anon_token"]) == basicCreds) {
             // OK
         }
