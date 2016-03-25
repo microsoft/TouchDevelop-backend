@@ -40,19 +40,18 @@ var initialApprovals: boolean = false;
 var tokensTable: azureTable.Table;
 
 export class LoginSession
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public state: string = "";
-    @td.json public userid: string = "";    
+    @td.json public userid: string = "";
     @td.json public groupid: string = "";
     @td.json public passwords: string[];
     @td.json public pass: string = "";
     @td.json public ownerId: string = "";
     @td.json public termsOk: boolean = false;
-    @td.json public codeOk: boolean = false;    
+    @td.json public codeOk: boolean = false;
     @td.json public nickname: string = "";
     @td.json public realname: string = "";
-    
+
     @td.json public askLegacy = false;
     @td.json public legacyCodes: {}; // code -> userid; there may be multiple accounts attached to an email    
 
@@ -66,28 +65,26 @@ export class LoginSession
     @td.json public restartQuery: string;
 
     static createFromJson(o: JsonObject) { let r = new LoginSession(); r.fromJson(o); return r; }
-    
-    public userCreated() { 
+
+    public userCreated() {
         return (this.userid && this.userid != "pending");
     }
-    
-    static async loadCoreAsync(id: string): Promise<LoginSession>
-    {
+
+    static async loadCoreAsync(id: string): Promise<LoginSession> {
         let sessionString = orEmpty(await serverAuth.options().getData(orEmpty(id)));
         logger.debug("session string: " + sessionString);
         if (sessionString != "") {
             return LoginSession.createFromJson(JSON.parse(sessionString));
-        } else return <LoginSession>null;        
+        } else return <LoginSession>null;
     }
-    
-    public getRestartQuery()
-    {
+
+    public getRestartQuery() {
         if (!this.linksecret)
             this.linksecret = td.createRandomId(12);
         return this.restartQuery + "&u=2" + this.state + "." + this.linksecret
     }
-    
-    public async getLinkedSessionAsync():Promise<LoginSession> {
+
+    public async getLinkedSessionAsync(): Promise<LoginSession> {
         let tokM2 = /^2(\w+)\.(\w+)$/.exec(this.oauthU);
         if (tokM2) {
             let othersession = await LoginSession.loadCoreAsync(tokM2[1])
@@ -95,26 +92,24 @@ export class LoginSession
                 return othersession
             }
         }
-        
+
         return <LoginSession>null;
     }
-    
+
     static async loadAsync(id: string): Promise<LoginSession> {
         let session = await LoginSession.loadCoreAsync(id);
         return session
     }
-    
-    public async setMigrationUserAsync(uid: string, multipleOK = false)
-    {
+
+    public async setMigrationUserAsync(uid: string, multipleOK = false) {
         let ok = await tdliteUsers.setProfileIdFromLegacyAsync(uid, this.profileId, multipleOK);
         if (!ok) return false;
         this.userid = uid
         this.askLegacy = false
         return true
     }
-    
-    public fixupRedirectUrl(url:string)
-    {        
+
+    public fixupRedirectUrl(url: string) {
         if (this.oauthClientId == "webapp3") {
             // if the webapp supports this, use %23 instead of a second hash
             // otherwise sign-in on iOS/Chrome doesn't work
@@ -122,21 +117,20 @@ export class LoginSession
         }
         return url;
     }
-    
-    public async createUserIfNeededAsync(req: restify.Request): Promise<IUser>
-    {
+
+    public async createUserIfNeededAsync(req: restify.Request): Promise<IUser> {
         if (this.userCreated()) {
             let js = await tdliteUsers.getAsync(this.userid);
             if (this.termsOk)
                 js = await this.updateTermsVersionAsync(req, js)
             return js
         }
-        
+
         let profile = this.federatedUserInfo;
-    
+
         let username = core.fullTD ? profile.name : profile.name.replace(/\s.*/g, "");
-        let realname = /^0x/.test(profile.name) ? "" : profile.name 
-        
+        let realname = /^0x/.test(profile.name) ? "" : profile.name
+
         if (this.nickname) username = this.nickname;
         if (this.realname) realname = this.realname;
 
@@ -147,12 +141,12 @@ export class LoginSession
         let userjs = await tdliteUsers.createNewUserAsync(username, profile.email, this.profileId, perms, realname, false);
         this.userid = userjs["id"];
         await this.saveAsync();
-        
+
         userjs = await this.updateTermsVersionAsync(req, userjs)
-      
+
         return userjs
     }
-    
+
     public async updateTermsVersionAsync(req: restify.Request, userjs: IUser) {
         let ver = core.serviceSettings.termsversion || "default"
         if (userjs.termsversion != ver) {
@@ -168,20 +162,17 @@ export class LoginSession
         }
         return userjs;
     }
-    
-    public async saveAsync()
-    {
+
+    public async saveAsync() {
         await serverAuth.options().setData(this.state, JSON.stringify(this.toJson()));
     }
-    
-    public async saveAndRedirectAsync(req:restify.Request)
-    {
+
+    public async saveAndRedirectAsync(req: restify.Request) {
         await this.saveAsync();
         req.response.redirect(302, core.self + "oauth/dialog?td_session=" + this.state)
     }
-    
-    private async generateRedirectUrlAsync(): Promise<string>
-    {
+
+    private async generateRedirectUrlAsync(): Promise<string> {
         assert(this.userCreated())
         let clientId = this.oauthClientId;
         if (this.federatedUserInfo.redirectPrefix.startsWith("http://localhost:"))
@@ -193,9 +184,8 @@ export class LoginSession
         }
         return this.fixupRedirectUrl(redirectUrl);
     }
-    
-    public async accessTokenRedirectAsync(req:restify.Request)
-    {
+
+    public async accessTokenRedirectAsync(req: restify.Request) {
         let url = await this.generateRedirectUrlAsync();
         accessTokenRedirect(req.response, url);
     }
@@ -263,7 +253,7 @@ export async function initAsync(): Promise<void> {
 
     serverAuth.init({
         makeJwt: async(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) => {
-            let url2 = await loginFederatedAsync(profile, oauthReq);       
+            let url2 = await loginFederatedAsync(profile, oauthReq);
             return {
                 "http redirect": url2
             }
@@ -280,7 +270,7 @@ export async function initAsync(): Promise<void> {
         federationMaster: orEmpty(td.serverSetting("AUTH_FEDERATION_MASTER", true)),
         federationTargets: orEmpty(td.serverSetting("AUTH_FEDERATION_TARGETS", true)),
         self: core.self.replace(/\/$/g, ""),
-        isValidDomain: s => 
+        isValidDomain: s =>
             s + "/" == core.self ||
             core.serviceSettings.domains.hasOwnProperty(s.replace(/^https:\/\//i, "").toLowerCase()),
         requestEmail: true,
@@ -325,7 +315,7 @@ export async function initAsync(): Promise<void> {
         if (!session) {
             session = new LoginSession();
             session.state = cachedStore.freshShortId(16);
-        }    
+        }
         if (session.userid == "") {
             serverAuth.validateOauthParameters(req, res);
         }
@@ -344,7 +334,7 @@ export async function initAsync(): Promise<void> {
                     entry.totalcredit = 1000;
                     entry.permissions = ",admin,";
                 });
-                await session.accessTokenRedirectAsync(req);                
+                await session.accessTokenRedirectAsync(req);
             }
             else {
                 await loginHandleCodeAsync(accessCode, res, req, session);
@@ -359,7 +349,7 @@ export async function initAsync(): Promise<void> {
         let _new = "<p>Your access token is below. Only paste in applications you absolutely trust.</p>\n<pre id=\"token\">\nloading...\n</pre>\n<p>You could have added <code>?u=xyzw</code> to get access token for a different user (given the right permissions).\n</p>\n<script>\nsetTimeout(function() {\nvar h = document.location.href.replace(/oauth\\/gettoken.*access_token/, \"?access_token\").replace(/&.*/, \"\");\ndocument.getElementById(\"token\").textContent = h;\n}, 100)\n</script>";
         res4.html(td.replaceAll(td.replaceAll(template_html, "@JS@", ""), "@BODY@", _new));
     });
-    
+
     core.addRoute("POST", "*user", "logout", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
         await logoutEverywhereAsync(req.rootId);
@@ -378,21 +368,21 @@ export async function initAsync(): Promise<void> {
             req3.response = {};
             if (req3.userinfo.token.cookie)
                 req3.headers = {
-                    "Set-Cookie": wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971") 
+                    "Set-Cookie": wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971")
                 };
         }
         else {
             req3.status = httpCode._401Unauthorized;
         }
     });
-    
+
     core.addRoute("POST", "*user", "token", async(req7: core.ApiRequest) => {
         core.checkPermission(req7, "signin-" + req7.rootId);
         if (req7.status == 200) {
             let resp = {};
             let clientId = "webapp2";
             if (!req7.userinfo.token.cookie)
-                clientId = "no-cookie";    
+                clientId = "no-cookie";
             let tok = await generateTokenAsync(req7.rootId, "admin", clientId);
             if (tok.cookie) {
                 if (req7.headers == null) {
@@ -412,7 +402,7 @@ export async function initAsync(): Promise<void> {
     });
 }
 
-async function logoutEverywhereAsync(uid:string) {
+async function logoutEverywhereAsync(uid: string) {
     let entities = await tokensTable.createQuery().partitionKeyIs(uid).fetchAllAsync();
     await parallel.forAsync(entities.length, async(x: number) => {
         let json = entities[x];
@@ -423,8 +413,7 @@ async function logoutEverywhereAsync(uid:string) {
     });
 }
 
-async function generateTokenAsync(user: string, reason: string, client_id: string) : Promise<tdliteUsers.IRedirectAndCookie>
-{
+async function generateTokenAsync(user: string, reason: string, client_id: string): Promise<tdliteUsers.IRedirectAndCookie> {
     let token = new core.Token();
     token.PartitionKey = user;
     token.RowKey = td.createRandomId(32);
@@ -434,7 +423,7 @@ async function generateTokenAsync(user: string, reason: string, client_id: strin
     if (orEmpty(client_id) != "no-cookie") {
         token.cookie = td.createRandomId(32);
     }
-    await tdliteUsers.updateAsync(user, async (entry) => {
+    await tdliteUsers.updateAsync(user, async(entry) => {
         entry.lastlogin = await core.nowSecondsAsync();
     });
     await tokensTable.insertEntityAsync(token.toJson(), "or merge");
@@ -444,27 +433,24 @@ async function generateTokenAsync(user: string, reason: string, client_id: strin
     }
 }
 
-export function tokenString(token: core.Token) : string
-{
+export function tokenString(token: core.Token): string {
     let customToken: string;
     customToken = "0" + token.PartitionKey + "." + token.RowKey;
     return customToken;
 }
 
-function wrapAccessTokenCookie(cookie: string): string 
-{
+function wrapAccessTokenCookie(cookie: string): string {
     let value = "TD_ACCESS_TOKEN2=" + cookie + "; ";
     if (core.hasHttps)
         value += "Secure; "
     value += "HttpOnly; Path=/; "
     if (!/localhost:/.test(core.self))
         value += "Domain=" + core.self.replace(/\/$/g, "").replace(/.*\//g, "").replace(/:\d+$/, "") + "; "
-    value += "Expires=" + new Date(Date.now() + 365 * 24 * 3600 * 1000).toString();    
+    value += "Expires=" + new Date(Date.now() + 365 * 24 * 3600 * 1000).toString();
     return value;
 }
 
-async function getRedirectUrlAsync(user2: string, req: restify.Request, session: LoginSession) : Promise<string>
-{
+async function getRedirectUrlAsync(user2: string, req: restify.Request, session: LoginSession): Promise<string> {
     let url: string;
     let jsb = {};
     let tok = await generateTokenAsync(user2, "code", req.query()["client_id"]);
@@ -480,7 +466,7 @@ async function getRedirectUrlAsync(user2: string, req: restify.Request, session:
 }
 
 
-async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest): Promise<string> {    
+async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest): Promise<string> {
     await core.refreshSettingsAsync();
 
     let coll = (/([^:]*):(.*)/.exec(profile.id) || []);
@@ -543,13 +529,13 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     session.oauthClientId = clientOAuth.client_id;
     session.oauthU = clientOAuth.u;
     session.restartQuery = clientOAuth.toQueryString();
-    
+
     if (userjs == null) {
         if (core.jsonArrayIndexOf(core.serviceSettings.blockedAuth, provider) >= 0) {
             // New accounts blocked for now.
             return "/";
         }
-        userjs = <any> { id: "pending" }
+        userjs = <any>{ id: "pending" }
     }
     else {
         logger.tick("Login@federated");
@@ -568,7 +554,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
 
     session.state = cachedStore.freshShortId(16);
     session.userid = userjs["id"];
-    
+
     if (session.userCreated()) {
         let linkedSession = await session.getLinkedSessionAsync();
         if (linkedSession && linkedSession.profileId) {
@@ -588,10 +574,10 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
                 })
         }
     }
-    
+
     if (core.fullTD) {
         session.termsOk = true;
-        session.codeOk = true;        
+        session.codeOk = true;
         session.legacyCodes = null;
         if (!session.userCreated())
             session.askLegacy = true;
@@ -599,15 +585,14 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         session.termsOk = orEmpty(userjs["termsversion"]) == core.serviceSettings.termsversion;
         session.codeOk = orEmpty(userjs["permissions"]) != "";
         session.legacyCodes = {};
-        
+
     }
 
     await session.saveAsync();
     return "/oauth/dialog?td_session=" + encodeURIComponent(session.state);
 }
 
-async function createKidUserWhenUsernamePresentAsync(req: restify.Request, session: LoginSession, res: restify.Response) : Promise<void>
-{
+async function createKidUserWhenUsernamePresentAsync(req: restify.Request, session: LoginSession, res: restify.Response): Promise<void> {
     let tdUsername = req.query()["td_username"];
     if (!res.finished() && session.groupid != "" && orEmpty(tdUsername) != "") {
         let groupJson = await core.getPubAsync(session.groupid, "group");
@@ -637,7 +622,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
             await tdliteGroups.addUserToGroupAsync(user2, groupJson, (<core.ApiRequest>null));
         }
         let redirectUri = await getRedirectUrlAsync(user2, req, session);
-        await session.saveAsync();        
+        await session.saveAsync();
 
         let tok = stripCookie(redirectUri);
         if (tok.cookie != "") {
@@ -653,8 +638,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
     }
 }
 
-async function loginHandleCodeAsync(accessCode: string, res: restify.Response, req: restify.Request, session: LoginSession) : Promise<void>
-{
+async function loginHandleCodeAsync(accessCode: string, res: restify.Response, req: restify.Request, session: LoginSession): Promise<void> {
     let passId = core.normalizeAndHash(accessCode);
     let lang = await tdlitePointers.handleLanguageAsync(req);
     let msg = "";
@@ -698,7 +682,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 else {
                     let userjson = await session.createUserIfNeededAsync(req);
                     await tdliteUsers.applyCodeAsync(userjson, codeObj, passId, audit.buildAuditApiRequest(req));
-                    await session.accessTokenRedirectAsync(req);                    
+                    await session.accessTokenRedirectAsync(req);
                 }
             }
             else if (kind == "groupinvitation") {
@@ -728,11 +712,11 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
         }
     }
 
-    if ( ! res.finished()) {
+    if (!res.finished()) {
         await core.refreshSettingsAsync();
         let params = {
             LANG: lang,
-        };        
+        };
         let inner = "kidornot";
         if (accessCode == "kid") {
             inner = "kidcode";
@@ -755,9 +739,9 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 // this should never be true now
                 if (false && session.userCreated()) {
                     let delEntry = await tdliteUsers.getAsync(session.userid);
-                    if (delEntry != null && ! delEntry["termsversion"] && ! delEntry["permissions"]) {
+                    if (delEntry != null && !delEntry["termsversion"] && !delEntry["permissions"]) {
                         let delok = await core.deleteAsync(delEntry);
-                        await core.pubsContainer.updateAsync(session.userid, async (entry: JsonBuilder) => {
+                        await core.pubsContainer.updateAsync(session.userid, async(entry: JsonBuilder) => {
                             entry["settings"] = {};
                             entry["pub"] = {};
                             entry["login"] = "";
@@ -768,12 +752,12 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 res.redirect(302, "/");
                 return;
             }
-            if ( ! session.termsOk && termsversion == core.serviceSettings.termsversion) {
+            if (!session.termsOk && termsversion == core.serviceSettings.termsversion) {
                 session.termsOk = true;
                 await session.saveAsync();
             }
             let username = orEmpty(req.query()["td_username"]).slice(0, 25);
-            if (!session.nickname && username) {                
+            if (!session.nickname && username) {
                 let nick = username.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
                 if (new RegExp(core.serviceSettings.blockedNicknameRx).test(nick)) {
                     msg = core.translateMessage("This nickname is not allowed.", lang);
@@ -783,10 +767,10 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                     if (realname)
                         session.realname = realname
                     await session.saveAsync();
-                }    
+                }
             }
-            
-            
+
+
             if (!session.termsOk) {
                 inner = "agree";
             }
@@ -797,7 +781,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 if (!session.federatedUserInfo.name || /^0x/.test(session.federatedUserInfo.name))
                     params["REALNAMESTYLE"] = "display:block";
                 else
-                    params["REALNAMESTYLE"] = "display:none";                
+                    params["REALNAMESTYLE"] = "display:none";
                 let uentry = await tdliteUsers.getAsync(session.userid);
                 if (uentry) {
                     let nm = uentry["pub"].name
@@ -808,7 +792,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 inner = "activate";
             }
             else {
-                await tdliteLegacy.handleLegacyAsync(req, session, params);                
+                await tdliteLegacy.handleLegacyAsync(req, session, params);
                 if (session.askLegacy) {
                     inner = params["INNER"];
                 } else {
@@ -817,13 +801,13 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
             }
         }
-        
+
         if (!res.finished()) {
             if (kidsDisabled && inner == "kidornot") {
                 redirectToProviders(req);
                 return;
             }
-            
+
             let agreeurl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state) + "&td_agree=" + encodeURIComponent(core.serviceSettings.termsversion);
             let disagreeurl = "/oauth/dialog?td_session=" + encodeURIComponent(session.state) + "&td_agree=noway";
             params["MSG"] = msg;
@@ -836,8 +820,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
     }
 }
 
-async function getLoginHtmlAsync(inner: string, lang: string) : Promise<string>
-{
+async function getLoginHtmlAsync(inner: string, lang: string): Promise<string> {
     let text = await tdlitePointers.simplePointerCacheAsync("signin/" + inner, lang);
     if (text.length < 100) {
         text = loginHtml[inner];
@@ -850,8 +833,7 @@ async function getLoginHtmlAsync(inner: string, lang: string) : Promise<string>
 }
 
 
-function accessTokenRedirect(res: restify.Response, url2: string) : void
-{
+function accessTokenRedirect(res: restify.Response, url2: string): void {
     let tok = stripCookie(url2);
     if (tok.cookie != "") {
         res.setHeader("Set-Cookie", tok.cookie);
@@ -859,8 +841,7 @@ function accessTokenRedirect(res: restify.Response, url2: string) : void
     res.redirect(303, tok.url);
 }
 
-function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
-{
+function stripCookie(url2: string): tdliteUsers.IRedirectAndCookie {
     let cook: string;
     let coll = (/&td_cookie=([\w.]+)$/.exec(url2) || []);
     let cookie = coll[1];
@@ -875,7 +856,7 @@ function stripCookie(url2: string) : tdliteUsers.IRedirectAndCookie
     }
 }
 
-export async function lookupTokenAsync(token: string):Promise<core.Token> {
+export async function lookupTokenAsync(token: string): Promise<core.Token> {
     let tokenJs: {} = null;
     if (td.startsWith(token, "0") && token.length < 100) {
         let value = await core.redisClient.getAsync("tok:" + token);
@@ -892,7 +873,7 @@ export async function lookupTokenAsync(token: string):Promise<core.Token> {
             tokenJs = JSON.parse(value);
         }
     }
-    
+
     if (tokenJs) {
         return core.Token.createFromJson(tokenJs);
     } else {
@@ -904,8 +885,7 @@ export async function lookupTokenAsync(token: string):Promise<core.Token> {
 // If it's anonymous request it will suceeded, otherwise checkPermission() will set code to 401 anyways.
 var softTokenFailure = true;
 
-export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request) : Promise<void>
-{
+export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Request): Promise<void> {
     if (req.isCached) {
         return;
     }
@@ -916,9 +896,9 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
             req.status = 442;
             return;
         }
-        
+
         let token2 = await lookupTokenAsync(token);
-     
+
         if (token2 == null) {
             if (!softTokenFailure)
                 req.status = httpCode._401Unauthorized;
