@@ -60,6 +60,7 @@ export class LoginSession
     @td.json public storedMessage: string;
     @td.json public oauthClientId: string;
     @td.json public oauthU: string;
+    @td.json public oauthHost: string;
     @td.json public federatedUserInfo: serverAuth.IUserInfo;
     @td.json public linksecret: string;
     @td.json public restartQuery: string;
@@ -187,7 +188,7 @@ export class LoginSession
 
     public async accessTokenRedirectAsync(req: restify.Request) {
         let url = await this.generateRedirectUrlAsync();
-        accessTokenRedirect(req.response, url);
+        accessTokenRedirect(req, url);
     }
 }
 
@@ -320,6 +321,10 @@ export async function initAsync(): Promise<void> {
             serverAuth.validateOauthParameters(req, res);
         }
         core.handleBasicAuth(req, res);
+        if (session.oauthHost && req.header("host") && req.header("host").toLowerCase() != session.oauthHost) {
+            res.redirect(302, "https://" + session.oauthHost + req.url())
+            return
+        }         
         await createKidUserWhenUsernamePresentAsync(req, session, res);
         if (!res.finished()) {
             let accessCode = orEmpty(req.query()["td_state"]);
@@ -366,10 +371,13 @@ export async function initAsync(): Promise<void> {
                 await core.redisClient.setpxAsync("tok:" + tokenString(req3.userinfo.token), "", 500);
             }
             req3.response = {};
-            if (req3.userinfo.token.cookie)
+            if (req3.userinfo.token.cookie) {
+                let cookie = wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971")
+                cookie = patchUpAccessTokenCookie(req3.restifyReq, cookie)
                 req3.headers = {
-                    "Set-Cookie": wrapAccessTokenCookie("logout").replace(/Dec 9999/g, "Dec 1971")
+                    "Set-Cookie": cookie
                 };
+            }
         }
         else {
             req3.status = httpCode._401Unauthorized;
@@ -388,7 +396,7 @@ export async function initAsync(): Promise<void> {
                 if (req7.headers == null) {
                     req7.headers = {};
                 }
-                req7.headers["Set-Cookie"] = wrapAccessTokenCookie(tok.cookie);
+                req7.headers["Set-Cookie"] = patchUpAccessTokenCookie(req7.restifyReq, wrapAccessTokenCookie(tok.cookie));
             }
             else {
                 assert(clientId == "no-cookie", "no cookie in token");
@@ -525,7 +533,9 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     let session = new LoginSession();
     session.federatedUserInfo = <any>profile.toJson();
     session.profileId = profileId;
-    session.providerId = provider;
+    session.providerId = provider;    
+    let m = /^https:\/\/([^/]+)/.exec(clientOAuth.redirect_uri)
+    session.oauthHost = m ? m[1].toLowerCase() : core.myHost
     session.oauthClientId = clientOAuth.client_id;
     session.oauthU = clientOAuth.u;
     session.restartQuery = clientOAuth.toQueryString();
@@ -592,8 +602,22 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     return "/oauth/dialog?td_session=" + encodeURIComponent(session.state);
 }
 
+function patchUpAccessTokenCookie(req: restify.Request, cookie: string) {
+    let host = req.header("host")
+    if (host && host.toLowerCase() != core.myHost) {
+        cookie = cookie.replace("Domain=" + core.myHost, "Domain=" + host.toLowerCase())
+    }
+    return cookie
+}
+
+function setAccessTokenCookie(req: restify.Request, cookie: string) {
+    if (!cookie) return
+    req.response.setHeader("Set-Cookie", patchUpAccessTokenCookie(req, cookie));
+}
+
 async function createKidUserWhenUsernamePresentAsync(req: restify.Request, session: LoginSession, res: restify.Response): Promise<void> {
     let tdUsername = req.query()["td_username"];
+    // TODO multi-host cookie support
     if (!res.finished() && session.groupid != "" && orEmpty(tdUsername) != "") {
         let groupJson = await core.getPubAsync(session.groupid, "group");
         session.pass = session.passwords[core.orZero(req.query()["td_password"])];
@@ -625,9 +649,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
         await session.saveAsync();
 
         let tok = stripCookie(redirectUri);
-        if (tok.cookie != "") {
-            res.setHeader("Set-Cookie", tok.cookie);
-        }
+        setAccessTokenCookie(req, tok.cookie)
         let lang = await tdlitePointers.handleLanguageAsync(req);
         let html = td.replaceAll(await getLoginHtmlAsync("usercreated", lang), "@URL@", tok.url);
         html = td.replaceAll(html, "@USERID@", session.userid);
@@ -666,7 +688,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                 }
                 else {
                     logger.tick("Login@code");
-                    accessTokenRedirect(res, await getRedirectUrlAsync(userJson["id"], req, session));
+                    accessTokenRedirect(req, await getRedirectUrlAsync(userJson["id"], req, session));
                 }
             }
             else if (kind == "activationcode") {
@@ -833,11 +855,10 @@ async function getLoginHtmlAsync(inner: string, lang: string): Promise<string> {
 }
 
 
-function accessTokenRedirect(res: restify.Response, url2: string): void {
+function accessTokenRedirect(req: restify.Request, url2: string): void {
+    let res = req.response
     let tok = stripCookie(url2);
-    if (tok.cookie != "") {
-        res.setHeader("Set-Cookie", tok.cookie);
-    }
+    setAccessTokenCookie(req, tok.cookie)
     res.redirect(303, tok.url);
 }
 
