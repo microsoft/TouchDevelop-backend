@@ -15,6 +15,7 @@ import * as tdliteDocs from './tdlite-docs';
 
 var uploadCache: td.SMap<string> = {};
 var uploadPromises: td.SMap<Promise<string>> = {};
+var usedPromises: td.SMap<boolean> = {};
 var nunjucks = require("nunjucks");
 var clientConfig: any;
 var i18nPtrs = {}
@@ -67,6 +68,7 @@ function replContent(str: string, waitFor: Promise<string>[]) {
         if (!repl) {
             error("file not uploaded? " + x)
         }
+        usedPromises[x] = true;
         if (waitFor) waitFor.push(repl)
         else return (<any>repl).value();
         return "";
@@ -176,6 +178,7 @@ async function uploadRedirectAsync(fn: string) {
         if (!task) {
             throw new Error("redirection: " + fn + " -> " + url + ": art not found")
         }
+        usedPromises[url] = true
         let bloburl = await task
         let m = /\/pub\/([a-z]+)/.exec(bloburl)
         url = ""
@@ -269,6 +272,12 @@ async function uploadAsync() {
     console.log(`i18n: ${resp2.statusCode() } ${util.inspect(resp2.contentAsJson()) }`)
 
     fs.writeFileSync(cachepath, JSON.stringify(uploadCache, null, 2))
+    
+    for (let k of Object.keys(uploadPromises)) {
+        if (/^\/static\//.test(k) && !usedPromises[k]) {
+            console.log("unused:", k)
+        }
+    }
 }
 
 async function serveAsync() {
