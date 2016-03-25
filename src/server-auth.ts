@@ -269,6 +269,7 @@ export interface IInitOptions {
     requestEmail?: boolean;
     errorCallback?: ErrorCallback;
     redirectOnError?: string;
+    isValidDomain?: (domain: string) => boolean;
 }
 
 export interface IUserInfo {
@@ -321,6 +322,10 @@ export function init(options_: IInitOptions = {}): void {
     else {
         fedTargets = (<string[]>[]);
     }
+
+    if (!globalOptions.isValidDomain)
+        globalOptions.isValidDomain = d => d == globalOptions.self
+
     tokenSecret = td.serverSetting("TOKEN_SECRET", false);
     initRestify();
     logger.info("Started");
@@ -920,8 +925,10 @@ export function validateOauthParameters(req: restify.Request, res: restify.Respo
     }
     else {
         let url = orEmpty(clientOauth.redirect_uri);
-        if (!(td.startsWith(url, globalOptions.self) || td.startsWith(url, "http://localhost:"))) {
-            res.sendError(400, "invalid redirect_uri; expecting it to start with " + globalOptions.self + " or http://localhost");
+        let m = /^(https?:\/\/[^/]+)/.exec(url)
+        let domain = m ? m[1] : ""
+        if (!(globalOptions.isValidDomain(domain) || td.startsWith(domain, "http://localhost:"))) {
+            res.sendError(400, "invalid redirect_uri; expecting it to start with " + globalOptions.self + ", http://localhost:, or another valid virtual domain");
         }
         if (orEmpty(clientOauth.client_id) == "no-cookie" && url != globalOptions.self + "/oauth/gettokencallback") {
             res.sendError(400, "invalid no-cookie redirect_uri; expecting it to start with " + globalOptions.self);

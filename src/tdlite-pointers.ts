@@ -370,12 +370,12 @@ export async function initAsync(): Promise<void> {
                 "author_url": core.self + scr["pub"]["userid"],
                 "html": `<iframe width="${w}" height="${h}" src="${core.self}${scr["id"]}/embed" frameborder="0"></iframe>`
             }
-            
+
             if (fmt == "xml") {
                 let xml = `<?xml version="1.0" encoding="utf-8" standalone="yes"?><oembed>\n`
                 for (let k of Object.keys(req.response)) {
                     let v = req.response[k] + ""
-                    xml += `<${k}>${core.htmlQuote(v)}</${k}>\n` 
+                    xml += `<${k}>${core.htmlQuote(v) }</${k}>\n`
                 }
                 xml += "</oembed>\n"
                 req.response = xml
@@ -834,6 +834,32 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     let lang = await handleLanguageAsync(req);
     let urlFile = req.url().replace(/\?.*/g, "")
     let fn = urlFile.replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
+
+    let baseDir = fn.replace(/\/.*/, "")
+    let host = (req.header("host") || "").toLowerCase()
+    let isVhost = false
+    let hasVhosts = false
+
+    for (let domain of Object.keys(core.serviceSettings.domains)) {
+        hasVhosts = true
+        let path = core.serviceSettings.domains[domain]
+        if (baseDir == path) {
+            res.redirect(httpCode._301MovedPermanently, "https://" + domain + "/" + req.url().slice(baseDir.length + 2))
+            return
+        }
+        if (domain == host) {
+            fn = core.serviceSettings.domains[host] + "/" + fn
+            fn = fn.replace(/\/$/g, "")
+            isVhost = true
+            break
+        }
+    }
+
+    if (hasVhosts && !isVhost && host && host != core.myHost) {
+        res.redirect(httpCode._301MovedPermanently, core.self + req.url().slice(1))
+        return
+    }
+
     if (fn == "") {
         fn = "home";
     }

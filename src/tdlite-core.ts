@@ -53,7 +53,7 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 236;
+export var rewriteVersion: number = 237;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
@@ -109,6 +109,7 @@ export class ServiceSettings
     @td.json public langs: JsonObject;
     @td.json public envrewrite: JsonObject;
     @td.json public blockedAuth: string[];
+    @td.json public domains: td.SMap<string> = {};
     static createFromJson(o: JsonObject) { let r = new ServiceSettings(); r.fromJson(o); return r; }
 }
 
@@ -1598,6 +1599,7 @@ export async function refreshSettingsAsync(): Promise<void> {
         "envrewrite": {},
         "alarmingEmails": [],
         "blockedAuth": [],
+        "domains": {}
     };
     td.jsonCopyFrom(jsb, entry2);
     serviceSettings = ServiceSettings.createFromJson(td.clone(jsb));
