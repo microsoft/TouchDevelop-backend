@@ -195,6 +195,10 @@ export async function initAsync(): Promise<void> {
             req3.response = ({});
         }
     });
+    core.addRoute("POST", "pokecloud", "", async(req4: core.ApiRequest) => {
+        await pokeReleaseAsync("cloud", 0);
+        req4.response = {}
+    });
     core.addRoute("POST", "upload", "files", async(req4: core.ApiRequest) => {
         if (td.startsWith(orEmpty(req4.body["filename"]).toLowerCase(), "override")) {
             core.checkPermission(req4, "root");
@@ -432,6 +436,21 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
     let verPref = "var tdVersion = \"" + ver + "\";\n" + "var tdConfig = " + JSON.stringify(ccfg.toJson(), null, 2) + ";\n";
     text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
     return text;
+}
+
+export async function getJsonReleaseFileAsync(relid: string, fn: string): Promise<{}> {
+    let path = "jsoncache/" + relid + "/" + fn
+    let entry = await cacheRewritten.getAsync(path);
+    if (entry) return entry
+    let res = await appContainer.getBlobToTextAsync(relid + "/" + fn)
+    let txt = res.text()
+    if (txt) {
+        let ret = JSON.parse(txt)
+        await cacheRewritten.justInsertAsync(path, ret)
+        return ret
+    } else {
+        return null as any;
+    }
 }
 
 async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string, contentType: string, res: restify.Response, rewrite: StringTransformer): Promise<void> {

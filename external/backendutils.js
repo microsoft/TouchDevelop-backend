@@ -421,6 +421,7 @@ var ts;
                         case "ttf": return "font/ttf";
                         case "woff": return "application/font-woff";
                         case "woff2": return "application/font-woff2";
+                        case "md": return "text/markdown";
                         default: return "application/octet-stream";
                     }
                 else
@@ -567,6 +568,7 @@ var ts;
             }
             Util.lf = lf;
             function toDataUri(data, mimetype) {
+                // TODO does this only support trusted data?
                 // already a data uri?       
                 if (/^data:/i.test(data))
                     return data;
@@ -790,11 +792,13 @@ var ks;
             return s;
         }
         docs.htmlQuote = htmlQuote;
-        function renderMarkdown(template, src) {
-            var vars = {};
+        function renderMarkdown(template, src, theme) {
+            if (theme === void 0) { theme = {}; }
+            var params = {};
             var boxes = U.clone(stdboxes);
             var macros = U.clone(stdmacros);
             var settings = U.clone(stdsettings);
+            var menus = {};
             function parseHtmlAttrs(s) {
                 var attrs = {};
                 while (s.trim()) {
@@ -812,7 +816,7 @@ var ks;
                 return attrs;
             }
             var error = function (s) {
-                return ("<div class='ui negative message'>" + s + "</div>");
+                return ("<div class='ui negative message'>" + htmlQuote(s) + "</div>");
             };
             template = template.replace(/<aside\s+([^<>]+)>([^]*?)<\/aside>/g, function (full, attrsStr, body) {
                 var attrs = parseHtmlAttrs(attrsStr);
@@ -827,6 +831,9 @@ var ks;
                 }
                 else if (/setting/.test(attrs["class"])) {
                     settings[name] = body;
+                }
+                else if (/menu/.test(attrs["class"])) {
+                    menus[name] = body;
                 }
                 else {
                     macros[name] = body;
@@ -850,7 +857,7 @@ var ks;
                 if (tp == "@") {
                     var expansion = U.lookup(settings, cmd);
                     if (expansion != null) {
-                        vars[cmd] = args;
+                        params[cmd] = args;
                     }
                     else {
                         expansion = U.lookup(macros, cmd);
@@ -896,8 +903,33 @@ var ks;
                 var k = _a[_i];
                 html += injectBody(k + "-container", registers[k]);
             }
-            vars["body"] = html;
-            return injectHtml(template, vars, ["body"]);
+            var recMenu = function (m, lev) {
+                var templ = menus["item"];
+                var mparams = {
+                    NAME: m.name,
+                };
+                if (m.subitems) {
+                    if (lev == 0)
+                        templ = menus["top-dropdown"];
+                    else
+                        templ = menus["inner-dropdown"];
+                    mparams["ITEMS"] = m.subitems.map(function (e) { return recMenu(e, lev + 1); }).join("\n");
+                }
+                else {
+                    if (/^-+$/.test(m.name)) {
+                        templ = menus["divider"];
+                    }
+                    if (m.path && !/^(https?:|\/)/.test(m.path))
+                        return error("Invalid link: " + m.path);
+                    mparams["LINK"] = m.path;
+                }
+                return injectHtml(templ, mparams, ["ITEMS"]);
+            };
+            params["body"] = html;
+            params["menu"] = (theme.docMenu || []).map(function (e) { return recMenu(e, 0); }).join("\n");
+            params["targetname"] = theme.name || "KindScript";
+            params["targetlogo"] = theme.docsLogo ? "<img src=\"" + U.toDataUri(theme.logo) + "\" />" : "";
+            return injectHtml(template, params, ["body", "menu", "targetlogo"]);
         }
         docs.renderMarkdown = renderMarkdown;
         function injectHtml(template, vars, quoted) {

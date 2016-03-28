@@ -18,6 +18,7 @@ import * as search from "./tdlite-search"
 import * as notifications from "./tdlite-notifications"
 import * as tdliteIndex from "./tdlite-index"
 import * as tdliteSearch from "./tdlite-search"
+import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteData from "./tdlite-data"
 
 var orFalse = core.orFalse;
@@ -33,8 +34,7 @@ var aacContainer: azureBlobStorage.Container;
 var screenshots: indexedStore.Store;
 
 export class PubArt
-    extends core.Publication
-{
+    extends core.Publication {
     @td.json public name: string = "";
     @td.json public description: string = "";
     @td.json public flags: string[];
@@ -47,26 +47,23 @@ export class PubArt
     @td.json public bloburl: string = "";
     @td.json public arttype: string = "";
     @td.json public filehash: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubArt(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubArt(); r.fromJson(o); return r; }
 }
 
-export class ThumbContainer
-{
+export class ThumbContainer {
     public name: string = "";
     public container: azureBlobStorage.Container;
     public size: number = 0;
 }
 
 export class PubScreenshot
-    extends core.PubOnPub
-{
+    extends core.PubOnPub {
     @td.json public pictureurl: string = "";
     @td.json public thumburl: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubScreenshot(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubScreenshot(); r.fromJson(o); return r; }
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     if (core.hasSetting("KRAKEN_API_SECRET")) {
         kraken.init("", "");
     }
@@ -84,35 +81,35 @@ export async function initAsync() : Promise<void>
         importOne: importArtAsync,
         specialDeleteAsync: deleteArtAsync,
     })
-    await core.setResolveAsync(arts, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(arts, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await resolveArtAsync(fetchResult, apiRequest);
     }
-    , {
-        byUserid: true,
-        anonSearch: true
-    });
-    core.addRoute("POST", "art", "", async (req: core.ApiRequest) => {
+        , {
+            byUserid: true,
+            anonSearch: true
+        });
+    core.addRoute("POST", "art", "", async(req: core.ApiRequest) => {
         await postArtAsync(req);
     }
-    , {
-        sizeCheckExcludes: "content"
-    });
-    core.addRoute("GET", "*script", "art", async (req1: core.ApiRequest) => {
+        , {
+            sizeCheckExcludes: "content"
+        });
+    core.addRoute("GET", "*script", "art", async(req1: core.ApiRequest) => {
         // TODO implement /<scriptid>/art
         req1.response = ({ "items": [] });
     });
     await arts.createIndexAsync("filehash", entry => orEmpty(entry["pub"]["filehash"]));
-    core.addRoute("GET", "arthash", "*", async (req2: core.ApiRequest) => {
+    core.addRoute("GET", "arthash", "*", async(req2: core.ApiRequest) => {
         await core.anyListAsync(arts, req2, "filehash", req2.verb);
     });
-    
+
     core.addRoute("POST", "art", "rethumb", rethumbArtsAsync);
-    
-    core.addRoute("POST", "art", "reindex", async (req2: core.ApiRequest) => {
+
+    core.addRoute("POST", "art", "reindex", async(req2: core.ApiRequest) => {
         core.checkPermission(req2, "operator");
         if (req2.status == 200) {
             await tdliteIndex.clearArtIndexAsync();
-            /* async */ arts.getIndex("all").forAllBatchedAsync("all", 100, async (json: JsonObject[]) => {
+            /* async */ arts.getIndex("all").forAllBatchedAsync("all", 100, async(json: JsonObject[]) => {
                 let batch = tdliteIndex.createArtUpdate();
                 for (let js of await core.addUsernameEtcCoreAsync(json)) {
                     let pub = PubArt.createFromJson(td.clone(js["pub"]));
@@ -129,16 +126,14 @@ export async function initAsync() : Promise<void>
     await initScreenshotsAsync();
 }
 
-export async function getPubScreenshotsAsync(pubid: string, num:number)
-{
+export async function getPubScreenshotsAsync(pubid: string, num: number) {
     let req = core.buildApiRequest("/api")
     req.queryOptions = { count: num.toString() }
     let res = await core.fetchAndResolveAsync(screenshots, req, "publicationid", pubid)
     return res.items;
 }
 
-async function initScreenshotsAsync(): Promise<void>
-{
+async function initScreenshotsAsync(): Promise<void> {
     core.anyListAsync
     screenshots = await indexedStore.createStoreAsync(core.pubsContainer, "screenshot");
     core.registerPubKind({
@@ -147,28 +142,27 @@ async function initScreenshotsAsync(): Promise<void>
         importOne: importScreenshotAsync,
         specialDeleteAsync: deleteArtAsync,
     })
-    await core.setResolveAsync(screenshots, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(screenshots, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await resolveScreenshotAsync(fetchResult, apiRequest);
     }
-    , {
-        byUserid: true,
-        byPublicationid: true
-    });
-    core.addRoute("POST", "*pub", "screenshots", async (req: core.ApiRequest) => {
+        , {
+            byUserid: true,
+            byPublicationid: true
+        });
+    core.addRoute("POST", "*pub", "screenshots", async(req: core.ApiRequest) => {
         await core.canPostAsync(req, "screenshot");
         if (req.status == 200) {
             await postScreenshotAsync(req);
         }
     }
-    , {
-        sizeCheckExcludes: "content"
-    });
+        , {
+            sizeCheckExcludes: "content"
+        });
 }
 
 
 
-async function resolveArtAsync(entities: indexedStore.FetchResult, req: core.ApiRequest) : Promise<void>
-{
+async function resolveArtAsync(entities: indexedStore.FetchResult, req: core.ApiRequest): Promise<void> {
     await core.addUsernameEtcAsync(entities);
     let coll = (<PubArt[]>[]);
 
@@ -190,7 +184,7 @@ async function resolveArtAsync(entities: indexedStore.FetchResult, req: core.Api
             pubArt.bloburl = core.cdnUrl(pubArt.pictureurl);
             pubArt.arttype = "picture";
         }
-        else if (! pubArt.arttype || pubArt.arttype == "sound") {
+        else if (!pubArt.arttype || pubArt.arttype == "sound") {
             pubArt.wavurl = core.cdnUrl(artContainer.url() + id);
             if (orFalse(jsb["hasAac"])) {
                 pubArt.aacurl = core.cdnUrl(aacContainer.url() + id + ".m4a");
@@ -209,8 +203,7 @@ async function resolveArtAsync(entities: indexedStore.FetchResult, req: core.Api
     entities.items = td.arrayToJson(coll);
 }
 
-async function postArtAsync(req: core.ApiRequest) : Promise<void>
-{
+async function postArtAsync(req: core.ApiRequest): Promise<void> {
     let ext = getArtExtension(req.body["contentType"]);
     await core.canPostAsync(req, "art");
     core.checkPermission(req, "post-art-" + ext);
@@ -243,15 +236,13 @@ async function postArtAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
-function getArtExtension(contentType: string) : string
-{
+function getArtExtension(contentType: string): string {
     let ext: string;
     ext = orEmpty(tdliteData.artContentTypes[orEmpty(contentType)]);
     return ext;
 }
 
-async function addThumbContainerAsync(size: number, name: string) : Promise<void>
-{
+async function addThumbContainerAsync(size: number, name: string): Promise<void> {
     let thumbContainer2 = new ThumbContainer();
     thumbContainer2.size = size;
     thumbContainer2.name = name;
@@ -259,8 +250,7 @@ async function addThumbContainerAsync(size: number, name: string) : Promise<void
     thumbContainers.push(thumbContainer2);
 }
 
-async function resolveScreenshotAsync(entities: indexedStore.FetchResult, req: core.ApiRequest) : Promise<void>
-{
+async function resolveScreenshotAsync(entities: indexedStore.FetchResult, req: core.ApiRequest): Promise<void> {
     await core.addUsernameEtcAsync(entities);
     let coll = (<PubScreenshot[]>[]);
     for (let js of entities.items) {
@@ -277,16 +267,14 @@ async function resolveScreenshotAsync(entities: indexedStore.FetchResult, req: c
     entities.items = td.arrayToJson(coll);
 }
 
-async function updateScreenshotCountersAsync(screenshot: PubScreenshot) : Promise<void>
-{
-    await core.pubsContainer.updateAsync(screenshot.publicationid, async (entry: JsonBuilder) => {
+async function updateScreenshotCountersAsync(screenshot: PubScreenshot): Promise<void> {
+    await core.pubsContainer.updateAsync(screenshot.publicationid, async(entry: JsonBuilder) => {
         core.increment(entry, "screenshots", 1);
     });
 }
 
 
-async function redownloadArtAsync(jsb: JsonObject) : Promise<void>
-{
+async function redownloadArtAsync(jsb: JsonObject): Promise<void> {
     let urlbase = "https://touchdevelop.blob.core.windows.net/";
     urlbase = "http://cdn.touchdevelop.com/";
     let id = jsb["id"];
@@ -309,10 +297,9 @@ async function redownloadArtAsync(jsb: JsonObject) : Promise<void>
     }
 }
 
-async function postScreenshotAsync(req: core.ApiRequest) : Promise<void>
-{
+async function postScreenshotAsync(req: core.ApiRequest): Promise<void> {
     let baseKind = req.rootPub["kind"];
-    if ( ! /^(script)$/.test(baseKind)) {
+    if (! /^(script)$/.test(baseKind)) {
         req.status = httpCode._412PreconditionFailed;
     }
     else {
@@ -336,13 +323,12 @@ async function postScreenshotAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
-async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promise<void>
-{
+async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder): Promise<void> {
     let contentType = orEmpty(req.body["contentType"]);
     fixArtProps(contentType, jsb);
     let ext = jsb["ext"];
     let enc = withDefault(req.body["contentEncoding"], "base64");
-    if ( ! (enc == "base64" || enc == "utf8")) {
+    if (!(enc == "base64" || enc == "utf8")) {
         req.status = httpCode._412PreconditionFailed;
     }
     else if (ext == "") {
@@ -367,7 +353,7 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
         else {
             let sha = td.sha256(buf).substr(0, 32);
             jsb["pub"]["filehash"] = sha;
-            if (orEmpty(jsb["kind"]) == "art" && ! orFalse(req.body["forcenew"])) {
+            if (orEmpty(jsb["kind"]) == "art" && !orFalse(req.body["forcenew"])) {
                 let fetchResult = await arts.getIndex("filehash").fetchAsync(sha, ({}));
                 let existing = fetchResult.items[0];
                 if (existing != null) {
@@ -391,7 +377,7 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
                 cacheControl: "public, max-age=900",
                 smartGzip: true
             });
-            if ( ! result.succeded()) {
+            if (!result.succeded()) {
                 req.status = httpCode._424FailedDependency;
             }
             else if (ext == "mp3") {
@@ -399,7 +385,7 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder) : Promis
                 result = await aacContainer.createBlockBlobFromBufferAsync(filename + ".m4a", buf, {
                     contentType: contentType,
                     cacheControl: "public, max-age=900",
-                });                
+                });
             }
             else if (jsb["isImage"]) {
                 await rethumbOneAsync(req, filename, contentType);
@@ -436,11 +422,10 @@ async function rethumbOneAsync(req: core.ApiRequest, filename: string, contentTy
     });
 }
 
-async function rethumbArtsAsync(req: core.ApiRequest)
-{
+async function rethumbArtsAsync(req: core.ApiRequest) {
     if (!core.checkPermission(req, "operator"))
-        return;    
-    let fr = await arts.fetchFromIdListAsync(req.argument.split(/,/).filter(e => !!e), {});    
+        return;
+    let fr = await arts.fetchFromIdListAsync(req.argument.split(/,/).filter(e => !!e), {});
     await resolveArtAsync(fr, req);
     let msgs = []
     await parallel.forJsonAsync(fr.items, async(pub) => {
@@ -455,16 +440,14 @@ async function rethumbArtsAsync(req: core.ApiRequest)
     }
 }
 
-async function redownloadScreenshotAsync(js: JsonObject) : Promise<void>
-{
+async function redownloadScreenshotAsync(js: JsonObject): Promise<void> {
     await redownloadArtAsync(js);
-    await core.pubsContainer.updateAsync(js["id"], async (entry: JsonBuilder) => {
+    await core.pubsContainer.updateAsync(js["id"], async(entry: JsonBuilder) => {
         fixArtProps("image/jpeg", entry);
     });
 }
 
-async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<void>
-{
+async function importArtAsync(req: core.ApiRequest, body: JsonObject): Promise<void> {
     let pubArt = new PubArt();
     pubArt.fromJson(core.removeDerivedProperties(body));
     let contentType = "";
@@ -502,7 +485,7 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
             logger.error("cannot download art blob: " + JSON.stringify(pubArt.toJson()));
             req.status = 500;
         }
-        else if ( ! result3.succeded()) {
+        else if (!result3.succeded()) {
             logger.error("cannot create art blob: " + JSON.stringify(pubArt.toJson()));
             req.status = 500;
         }
@@ -512,8 +495,8 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
             if (result5 == null || result4 == null) {
                 logger.error("cannot download art blob thumb: " + JSON.stringify(pubArt.toJson()));
                 req.status = httpCode._206PartialContent;
-            }   
-            else if ( ! result4.succeded() || ! result5.succeded()) {
+            }
+            else if (!result4.succeded() || !result5.succeded()) {
                 logger.error("cannot create art blob thumb: " + JSON.stringify(pubArt.toJson()));
                 req.status = 500;
             }
@@ -522,7 +505,7 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
         else if (orEmpty(pubArt.aacurl) != "") {
             let result41 = await core.copyUrlToBlobAsync(aacContainer, pubArt.id + ".m4a", pubArt.aacurl);
             logger.debug("copy audio url OK for " + pubArt.id);
-            if (result41 == null || ! result41.succeded()) {
+            if (result41 == null || !result41.succeded()) {
                 logger.error("cannot create art blob aac: " + JSON.stringify(pubArt.toJson()));
                 req.status = 500;
             }
@@ -539,8 +522,7 @@ async function importArtAsync(req: core.ApiRequest, body: JsonObject) : Promise<
     }
 }
 
-function fixArtProps(contentType: string, jsb: JsonBuilder) : void
-{
+function fixArtProps(contentType: string, jsb: JsonBuilder): void {
     let ext = getArtExtension(contentType);
     jsb["ext"] = ext;
     jsb["contentType"] = contentType;
@@ -565,8 +547,7 @@ function fixArtProps(contentType: string, jsb: JsonBuilder) : void
     jsb["pub"]["arttype"] = arttype;
 }
 
-async function importScreenshotAsync(req: core.ApiRequest, body: JsonObject) : Promise<void>
-{
+async function importScreenshotAsync(req: core.ApiRequest, body: JsonObject): Promise<void> {
     let screenshot = new PubScreenshot();
     screenshot.fromJson(core.removeDerivedProperties(body));
     let r = orEmpty(screenshot.pictureurl);
@@ -577,7 +558,7 @@ async function importScreenshotAsync(req: core.ApiRequest, body: JsonObject) : P
     // 
     let fn = screenshot.id;
     let result3 = await core.copyUrlToBlobAsync(artContainer, fn, r);
-    if (result3 == null || ! result3.succeded()) {
+    if (result3 == null || !result3.succeded()) {
         logger.error("cannot create ss blob: " + JSON.stringify(screenshot.toJson()));
         req.status = 500;
     }
@@ -588,7 +569,7 @@ async function importScreenshotAsync(req: core.ApiRequest, body: JsonObject) : P
             logger.error("cannot download ssblob thumb: " + JSON.stringify(screenshot.toJson()));
             req.status = 404;
         }
-        else if ( ! result4.succeded()) {
+        else if (!result4.succeded()) {
             logger.error("cannot create ssblob thumb: " + JSON.stringify(screenshot.toJson()));
             req.status = 500;
         }
@@ -601,24 +582,21 @@ async function importScreenshotAsync(req: core.ApiRequest, body: JsonObject) : P
     }
 }
 
-async function deleteArtAsync(entryid:string, entry:JsonObject)
-{
+async function deleteArtAsync(entryid: string, entry: JsonObject) {
     await artContainer.deleteBlobAsync(entryid);
     for (let thumbContainer of thumbContainers) {
         await thumbContainer.container.deleteBlobAsync(entryid);
     }
 }
 
-export function hasThumbContainer(name:string)
-{
+export function hasThumbContainer(name: string) {
     return thumbContainers.some(e => e.name == name);
 }
 
-function searchIndexArt(pub: PubArt) : tdliteIndex.ArtEntry
-{
+function searchIndexArt(pub: PubArt): tdliteIndex.ArtEntry {
     let entry: tdliteIndex.ArtEntry;
     let tp = "picture";
-    if (! pub.pictureurl) {
+    if (!pub.pictureurl) {
         tp = "sound";
     }
     let spr = false;
@@ -636,8 +614,7 @@ function searchIndexArt(pub: PubArt) : tdliteIndex.ArtEntry
     return entry;
 }
 
-export async function upsertArtAsync(obj: JsonBuilder) : Promise<void>
-{
+export async function upsertArtAsync(obj: JsonBuilder): Promise<void> {
     if (tdliteSearch.disableSearch) {
         return;
     }
@@ -652,16 +629,14 @@ export async function upsertArtAsync(obj: JsonBuilder) : Promise<void>
     });
 }
 
-function queueUpgradeTask(req: core.ApiRequest, task:Promise<void>) : void
-{
+function queueUpgradeTask(req: core.ApiRequest, task: Promise<void>): void {
     if (req.upgradeTasks == null) {
         req.upgradeTasks = [];
     }
     req.upgradeTasks.push(task);
 }
 
-async function awaitUpgradeTasksAsync(req: core.ApiRequest) : Promise<void>
-{
+async function awaitUpgradeTasksAsync(req: core.ApiRequest): Promise<void> {
     if (req.upgradeTasks != null) {
         for (let task2 of req.upgradeTasks) {
             await task2;
@@ -669,7 +644,28 @@ async function awaitUpgradeTasksAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
-export function getBlobUrl(artjs: {})
-{
+export function getBlobUrl(artjs: {}) {
     return artContainer.url() + "/" + artjs["filename"];
 }
+
+export async function getJsonArtFileAsync(artid: string): Promise<{}> {
+    let path = "jsonartcache/" + artid
+    let entry = await tdliteReleases.cacheRewritten.getAsync(path);
+    if (entry) return entry
+
+    let pub = await core.getPubAsync(artid, "art")
+    let ret = null
+    if (pub) {
+        let url = getBlobUrl(pub)
+        let resp = await td.createRequest(url).sendAsync()
+        ret = resp.contentAsJson()
+    }
+
+    if (ret) {
+        await tdliteReleases.cacheRewritten.justInsertAsync(path, ret)
+        return ret
+    } else {
+        return null as any;
+    }
+}
+

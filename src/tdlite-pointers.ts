@@ -499,13 +499,13 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     }
 }
 
-async function renderMarkdownAsync(artobj: {}, lang: string) {
+async function renderMarkdownAsync(artobj: {}, lang: string, theme: {}) {
     let url = tdliteArt.getBlobUrl(artobj)
     let resp = await td.createRequest(url).sendAsync();
     let textObj = resp.content();
     if (!textObj) textObj = "Art object not found."
     let templ = await getTemplateTextAsync("templates/docs", lang)
-    return tdliteDocs.renderMarkdown(templ, textObj)
+    return tdliteDocs.renderMarkdown(templ, textObj, theme)
 }
 
 async function getHtmlArtAsync(templid: string, lang: string) {
@@ -836,7 +836,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
     let baseDir = fn.replace(/\/.*/, "")
     let host = (req.header("host") || "").toLowerCase()
-    let isVhost = false
+    let vhostDirName = ""
     let hasVhosts = false
 
     for (let domain of Object.keys(core.serviceSettings.domains)) {
@@ -847,14 +847,14 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             return
         }
         if (domain == host) {
-            fn = core.serviceSettings.domains[host] + "/" + fn
+            vhostDirName = core.serviceSettings.domains[host].replace(/^\//, "")
+            fn = vhostDirName + "/" + fn
             fn = fn.replace(/\/$/g, "")
-            isVhost = true
             break
         }
     }
 
-    if (hasVhosts && !isVhost && host && host != core.myHost) {
+    if (hasVhosts && !vhostDirName && host && host != core.myHost) {
         res.redirect(httpCode._301MovedPermanently, core.self + req.url().slice(1))
         return
     }
@@ -962,7 +962,13 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     await errorAsync("No such art: /" + ptr.artid)
                 } else {
                     if (artobj["contentType"] == "text/markdown") {
-                        v.text = await renderMarkdownAsync(artobj, lang)
+                        let theme = null
+                        if (vhostDirName) {
+                            let ptrx = await core.getPubAsync("ptr-" + vhostDirName + "-theme-json", "pointer")                            
+                            if (ptrx && ptrx["pub"]["artid"])
+                                theme = await tdliteArt.getJsonArtFileAsync(ptrx["pub"]["artid"])
+                        }
+                        v.text = await renderMarkdownAsync(artobj, lang, theme || {})
                     } else {
                         v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                     }

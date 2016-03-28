@@ -104,6 +104,7 @@ export var artContentTypes: td.SMap<string> =
       "audio/mpeg": "mp3",
       "text/css": "css",
       "application/javascript": "js",
+      "application/json": "json",
       "text/plain": "txt",
       "application/pdf": "pdf",
       "video/mp4": "mp4",
