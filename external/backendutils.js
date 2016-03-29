@@ -792,6 +792,23 @@ var ks;
             return s;
         }
         docs.htmlQuote = htmlQuote;
+        // the input already should be HTML-quoted but we want to make sure, and also quote quotes
+        function html2Quote(s) {
+            return htmlQuote(s.replace(/\&([#a-z0-9A-Z]+);/g, function (f, ent) {
+                switch (ent) {
+                    case "amp": return "&";
+                    case "lt": return "<";
+                    case "gt": return ">";
+                    case "quot": return "\"";
+                    default:
+                        if (ent[0] == "#")
+                            return String.fromCharCode(parseInt(ent.slice(1)));
+                        else
+                            return f;
+                }
+            }));
+        }
+        docs.html2Quote = html2Quote;
         function renderMarkdown(template, src, theme) {
             if (theme === void 0) { theme = {}; }
             var params = {};
@@ -852,8 +869,8 @@ var ks;
                 var cmd = m ? m[1] : body;
                 var args = m ? m[2] : "";
                 var rawArgs = args;
-                args = htmlQuote(args);
-                cmd = htmlQuote(cmd);
+                args = html2Quote(args);
+                cmd = html2Quote(cmd);
                 if (tp == "@") {
                     var expansion = U.lookup(settings, cmd);
                     if (expansion != null) {
@@ -887,6 +904,16 @@ var ks;
                     }
                 }
             });
+            if (!params["title"]) {
+                var titleM = /<h1[^<>]*>([^<>]+)<\/h1>/.exec(html);
+                if (titleM)
+                    params["title"] = html2Quote(titleM[1]);
+            }
+            if (!params["description"]) {
+                var descM = /<p>(.+?)<\/p>/.exec(html);
+                if (descM)
+                    params["description"] = html2Quote(descM[1]);
+            }
             var registers = {};
             registers["main"] = ""; // first
             html = html.replace(/<!-- BEGIN-ASIDE (\S+) -->([^]*?)<!-- END-ASIDE -->/g, function (f, nam, cont) {
@@ -929,6 +956,7 @@ var ks;
             params["menu"] = (theme.docMenu || []).map(function (e) { return recMenu(e, 0); }).join("\n");
             params["targetname"] = theme.name || "KindScript";
             params["targetlogo"] = theme.docsLogo ? "<img src=\"" + U.toDataUri(theme.logo) + "\" />" : "";
+            params["name"] = params["title"] + " - " + params["targetname"];
             return injectHtml(template, params, ["body", "menu", "targetlogo"]);
         }
         docs.renderMarkdown = renderMarkdown;
@@ -937,7 +965,7 @@ var ks;
             return template.replace(/@(\w+)@/g, function (f, key) {
                 var res = U.lookup(vars, key) || "";
                 if (quoted.indexOf(key) < 0) {
-                    res = htmlQuote(res);
+                    res = html2Quote(res);
                 }
                 return res;
             });
