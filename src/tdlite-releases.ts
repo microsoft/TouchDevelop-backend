@@ -40,10 +40,12 @@ export class PubRelease
     @td.json public labels: IReleaseLabel[];
     @td.json public commit: string = "";
     @td.json public branch: string = "";
+    @td.json public pkgversion: string = "";
     @td.json public buildnumber: number = 0;
     @td.json public version: string = "";
     @td.json public name: string = "";
     @td.json public cdnUrl: string = "";
+    @td.json public baserelease: string = "";
     static createFromJson(o: JsonObject) { let r = new PubRelease(); r.fromJson(o); return r; }
 }
 
@@ -97,22 +99,44 @@ export async function initAsync(): Promise<void> {
         fetchResult.items = td.arrayToJson(coll);
     }, { byUserid: true });
 
-    core.addRoute("POST", "releases", "", async(req1: core.ApiRequest) => {
-        core.checkPermission(req1, "upload");
-        if (req1.status == 200) {
-            let rel1 = new PubRelease();
-            rel1.userid = req1.userid;
-            rel1.time = await core.nowSecondsAsync();
-            rel1.releaseid = td.toString(req1.body["releaseid"]);
-            rel1.commit = orEmpty(req1.body["commit"]);
-            rel1.branch = orEmpty(req1.body["branch"]);
-            rel1.buildnumber = core.orZero(req1.body["buildnumber"]);
+    core.addRoute("POST", "releases", "", async(req: core.ApiRequest) => {
+        let baseid = orEmpty(req.body["baserelease"])
+
+        if (baseid)
+            core.checkPermission(req, "upload-target");
+        else
+            core.checkPermission(req, "upload");
+
+        if (req.status == 200) {
+            let baseRel = null
+            if (baseid) {
+                baseRel = await core.getPubAsync(baseid, "release")
+                if (!baseRel) {
+                    req.status = httpCode._404NotFound
+                    return
+                }
+                // no uploading of targets against other targets
+                if (baseRel["pub"]["baserelease"]) {
+                    req.status = httpCode._400BadRequest
+                    return
+                }
+            }
+
+            let rel = new PubRelease();
+            rel.userid = req.userid;
+            rel.time = await core.nowSecondsAsync();
+            rel.releaseid = td.toString(req.body["releaseid"]);
+            rel.commit = orEmpty(req.body["commit"]);
+            rel.branch = orEmpty(req.body["branch"]);
+            rel.pkgversion = orEmpty(req.body["pkgversion"]);
+            rel.buildnumber = core.orZero(req.body["buildnumber"]);
+            rel.baserelease = baseid
 
             if (core.kindScript) {
-                rel1.releaseid = ""
+                rel.releaseid = ""
             } else {
-                if (!looksLikeReleaseId(rel1.releaseid)) {
-                    req1.status = httpCode._412PreconditionFailed;
+                if (!looksLikeReleaseId(rel.releaseid)) {
+                    req.status = httpCode._412PreconditionFailed;
                     return
                 }
             }
@@ -120,43 +144,69 @@ export async function initAsync(): Promise<void> {
             await core.updateSettingsAsync("releaseversion", async(entry: JsonBuilder) => {
                 let x = core.orZero(entry[core.releaseVersionPrefix]) + 1;
                 entry[core.releaseVersionPrefix] = x;
-                rel1.version = core.releaseVersionPrefix + "." + x + "." + rel1.buildnumber;
+                rel.version = core.releaseVersionPrefix + "." + x + "." + rel.buildnumber;
             });
             let jsb = {};
             await core.generateIdAsync(jsb, 5);
-            if (!rel1.releaseid) rel1.releaseid = jsb["id"];
-            jsb["pub"] = rel1.toJson();
-            let key = "rel-" + rel1.releaseid;
+            if (!rel.releaseid) rel.releaseid = jsb["id"];
+            jsb["pub"] = rel.toJson();
+            let key = "rel-" + rel.releaseid;
+
+            if (rel.baserelease) {
+                let files = ["index.html", "worker.js", "embed.js", "run.html"]
+                let cdnUrl = core.currClientConfig.primaryCdnUrl + "/app/" + rel.baserelease + "/c/"
+                for (let fn of files) {
+                    let res = await appContainer.getBlobToTextAsync(rel.baserelease + "/" + fn)
+                    let idx = res.text()
+                    idx = idx.replace('"./embed.js"', `"/app/embed.js?r=${rel.releaseid}"`)
+                    idx = idx.replace(/"\.\//g, "\"" + cdnUrl)
+                    idx = idx.replace(/"sim\//, "\"./")
+                    let contentType = /html/.test(fn) ? "text/html; charset=utf8" : "application/javascript; charset=utf8"
+                    await saveFileToCdnAsync(rel.releaseid, fn, contentType, new Buffer(idx, "utf8"))
+                }
+            }
+
             let ok = await core.tryInsertPubPointerAsync(key, jsb["id"]);
             if (ok) {
                 await releases.insertAsync(jsb);
-                await core.returnOnePubAsync(releases, td.clone(jsb), req1);
+                await core.returnOnePubAsync(releases, td.clone(jsb), req);
             }
             else {
                 let entry1 = await core.getPointedPubAsync(key, "release");
-                await core.returnOnePubAsync(releases, entry1, req1);
+                await core.returnOnePubAsync(releases, entry1, req);
             }
         }
     });
+
+    async function saveFileToCdnAsync(relid: string, fn: string, contentType: string, buf: Buffer) {
+        let result = await appContainer.createBlockBlobFromBufferAsync(relid + "/" + fn, buf, {
+            contentType: contentType
+        });
+        result = await appContainer.createGzippedBlockBlobFromBufferAsync(relid + "/c/" + fn, buf, {
+            contentType: contentType,
+            cacheControl: "public, max-age=31556925",
+            smartGzip: true
+        });
+    }
+
     core.addRoute("POST", "*release", "files", async(req2: core.ApiRequest) => {
-        core.checkPermission(req2, "upload");
+        let rel = PubRelease.createFromJson(req2.rootPub["pub"]);
+        let isTrg = !!rel.baserelease
+        core.checkPermission(req2, isTrg ? "upload-target" : "upload");
         if (req2.status == 200) {
-            let rel2 = PubRelease.createFromJson(req2.rootPub["pub"]);
             let body = req2.body;
             let buf = new Buffer(orEmpty(body["content"]), orEmpty(body["encoding"]));
-            let request = td.createRequest(filesContainer.url() + "/overrideupload/" + td.toString(body["filename"]));
+            let fn = td.toString(body["filename"])
+            if (isTrg && !/\.json$/.test(fn) && !/^sim/.test(fn)) {
+                req2.status = httpCode._415UnsupportedMediaType
+                return
+            }
+            let request = td.createRequest(filesContainer.url() + "/overrideupload/" + fn);
             let response = await request.sendAsync();
             if (response.statusCode() == 200) {
                 buf = response.contentAsBuffer();
             }
-            let result = await appContainer.createBlockBlobFromBufferAsync(rel2.releaseid + "/" + td.toString(body["filename"]), buf, {
-                contentType: td.toString(body["contentType"])
-            });
-            result = await appContainer.createGzippedBlockBlobFromBufferAsync(rel2.releaseid + "/c/" + td.toString(body["filename"]), buf, {
-                contentType: td.toString(body["contentType"]),
-                cacheControl: "public, max-age=31556925",
-                smartGzip: true
-            });
+            await saveFileToCdnAsync(rel.releaseid, fn, td.toString(body["contentType"]), buf)
             req2.response = ({ "status": "ok" });
         }
     }, { sizeCheckExcludes: "content" });
@@ -421,6 +471,10 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
 
     if (!info.text()) return srcFile + " missing"
 
+    let baseRel = null
+    if (prel.baserelease)
+        baseRel = await core.getPubAsync(prel.baserelease, "release")
+
     let ccfg = clientConfigForRelease(prel);
     ccfg.releaseLabel = rellbl;
     let ver = orEmpty(relpub["pub"]["version"]);
@@ -433,7 +487,13 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
     text = td.replaceAll(text, '"embed.js"', '"/app/embed.js' + suff + '"');
     //logger.debug(`after repl: ${text}`)
     text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/");
-    let verPref = "var tdVersion = \"" + ver + "\";\n" + "var tdConfig = " + JSON.stringify(ccfg.toJson(), null, 2) + ";\n";
+    let cfg = ccfg.toJson()
+    cfg["targetVersion"] = prel.pkgversion
+    cfg["ksVersion"] = (baseRel ? baseRel["pub"]["pkgversion"] : null)
+    let verPref = `
+        var tdVersion = "${ver}";
+        var tdConfig = ${JSON.stringify(cfg, null, 2) };
+    `;
     text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
     return text;
 }
