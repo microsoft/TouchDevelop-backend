@@ -779,6 +779,7 @@ var ks;
         var stdsettings = {
             "parent": stdSetting,
             "short": stdSetting,
+            "description": "<!-- desc -->"
         };
         function replaceAll(replIn, x, y) {
             return replIn.split(x).join(y);
