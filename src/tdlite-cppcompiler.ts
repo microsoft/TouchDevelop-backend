@@ -349,6 +349,8 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
         req.status = httpCode._413RequestEntityTooLarge;
         return;
     }
+    
+    let buildTimeout = 120
 
     let hexurl = compileContainer.url() + "/" + sha + ".hex";
     req.response = { ready: false, hex: hexurl }
@@ -361,7 +363,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             req.response = { ready: true, hex: hexurl }
             return;
         }
-        if (now - currStatus.starttime < 2 * 60) {
+        if (now - currStatus.starttime < buildTimeout) {
             return;
         }
     }
@@ -370,7 +372,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
 
     await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
         let starttime = entry.starttime
-        if (now - starttime < 2 * 60) {
+        if (now - starttime < buildTimeout) {
             logger.info("race on compile start for " + sha)
             shouldStart = false;
         } else {
@@ -423,48 +425,50 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             return;
         }
 
-        if (compileReq.dependencies && Object.keys(compileReq.dependencies).length > 0) {
-            let modulejson = JSON.parse(await githubFetchAsync(ccfg, tag + "/module.json"));
-            td.jsonCopyFrom(modulejson["dependencies"], compileReq.dependencies);
-            compileReq.replaceFiles["/module.json"] = JSON.stringify(modulejson, null, 2) + "\n"
+        let modulejson = {
+            "name": ccfg.target_binary.replace(/-combined/, "").replace(/\.hex$/, ""),
+            "version": "0.0.0",
+            "description": "Auto-generated. Do not edit.",
+            "license": "n/a",
+            "dependencies": compileReq.dependencies || {},
+            "targetDependencies": {},
+            "bin": "./source"
         }
+
+        let repoSlug = ccfg.repourl.replace(/^https?:\/\/[^\/]+\//, "").replace(/\.git#/, "#")
+        let pkgName = repoSlug.replace(/#.*/, "").replace(/^.*\//, "")
+        modulejson.dependencies[pkgName] = repoSlug
+        compileReq.replaceFiles["/module.json"] = JSON.stringify(modulejson, null, 2) + "\n"
 
         let result2 = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "-metainfo.json", new Buffer(metainfo, "utf8"), {
             contentType: "application/json; charset=utf-8"
         });
 
-        logger.debug("compile at " + ccfg.repourl);
+        logger.debug("compile at " + ccfg.repourl + " module.json: " + compileReq.replaceFiles["/module.json"]);
 
-        if (ccfg.internalUrl) {
-            let jsb = {
-                op: "buildex",
-                files: Object.keys(compileReq.replaceFiles).map(k => { return { name: k.replace(/^\/+/, ""), text: compileReq.replaceFiles[k] } }),
-                gittag: ccfg.repourl.replace(/.*#/, ""),
-            };
-            /* async */ mbedintDownloadAsync(sha, jsb, ccfg, true);
-            req.response = {
-                ready: false,
-                started: true,
-                hex: hexurl
-            }
-
-        } else {
-            let compile = mbedworkshopCompiler.createCompilation(ccfg.platform, ccfg.repourl, ccfg.target_binary);
-            compile.replaceFiles = compileReq.replaceFiles;
-            let started = await compile.startAsync();
-            if (!started) {
-                logger.tick("MbedWsCompileStartFailed");
-                req.status = httpCode._424FailedDependency;
-            }
-            else {
-                /* async */ mbedwsDownloadAsync(sha, compile, ccfg, true);
-                req.response = {
-                    ready: false,
-                    started: true,
-                    hex: hexurl
+        let mappedFiles =
+            Object.keys(compileReq.replaceFiles).map(k => {
+                return {
+                    name: k.replace(/^\/+/, ""),
+                    text: compileReq.replaceFiles[k]
                 }
-            }
+            })
+
+        let jsb = {
+            op: "buildex",
+            files: mappedFiles,
+            gittag: ccfg.repourl.replace(/.*#/, ""),
+            empty: true,
+        };
+        
+        /* async */ mbedintDownloadAsync(sha, jsb, ccfg, true);
+
+        req.response = {
+            ready: false,
+            started: true,
+            hex: hexurl
         }
+
     }
 }
 
@@ -537,7 +541,7 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
     logger.measure("MbedIntCompileTime", logger.contextDuration());
     // Just in case...
     if (response.statusCode() != 200 || respJson == null) {
-        setMbedresponse(st, "Code: " + response.statusCode() + " / " + (response.content() || "???").slice(0,300));
+        setMbedresponse(st, "Code: " + response.statusCode() + " / " + (response.content() || "???").slice(0, 300));
     }
     else {
         let hexfile = respJson["hexfile"];
@@ -547,7 +551,7 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
         }
         else {
             st.success = true;
-            let hexname = ccfg.hexfilename ? sha + "/" + ccfg.hexfilename : sha + ".hex" 
+            let hexname = ccfg.hexfilename ? sha + "/" + ccfg.hexfilename : sha + ".hex"
             st.hexurl = compileContainer.url() + "/" + hexname;
             let result = await compileContainer.createGzippedBlockBlobFromBufferAsync(hexname, new Buffer(hexfile, "utf8"), {
                 contentType: ccfg.hexcontenttype
@@ -556,7 +560,7 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
         }
     }
     let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
-    
+
     if (saveSt)
         await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
             entry.finished = true;
