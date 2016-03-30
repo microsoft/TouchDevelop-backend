@@ -31,9 +31,9 @@ function handle(req) {
     }
     let cmd = `git pull --tags && git checkout ${req.gittag} && yotta update`
     if (req.empty)
-       cmd = `yotta target ${req.target} && yotta update`
+        cmd = `yotta target ${req.target} && yotta update`
     let res = child_process.spawnSync("bash", ["-c", cmd], { encoding: "utf8" })
-    let resp = { 
+    let resp = {
         stdout: res.stdout || "",
         stderr: res.stderr || "",
         status: res.status,
@@ -57,10 +57,10 @@ function handle(req) {
             if (fs.existsSync(hex))
                 resp.hexfile = fs.readFileSync(hex, "utf8")
         }
-   }
+    }
 
-   process.stdout.write(JSON.stringify(resp, null, 1))
-   process.stdout.write("\n")
+    process.stdout.write(JSON.stringify(resp, null, 1))
+    process.stdout.write("\n")
 }
 
 handle(global.buildReq)

@@ -10,55 +10,58 @@ var azure = require("azure-storage");
 
 var cfg = JSON.parse(fs.readFileSync("config.json", "utf8"))
 
-function err(res,code,msg)
-{
+function err(res, code, msg) {
     console.log("err: " + code + ": " + msg)
-        res.writeHead(code); res.end(msg);
+    res.writeHead(code); res.end(msg);
 }
 
-var key = new Buffer(cfg.key,"hex")
+var key = new Buffer(cfg.key, "hex")
 
-process.on('uncaughtException', function (err) {
+process.on('uncaughtException', function(err) {
     console.log(err);
 })
 
-var builderJs = fs.readFileSync("builder.js","utf8")
+var builderJs = fs.readFileSync("builder.js", "utf8")
 
-var buildq = async.queue(function(f,cb){f(cb)}, 8)
+var buildq = async.queue(function(f, cb) { f(cb) }, 8)
 function build(js, outp) {
-   buildq.push(function(cb) {
-       console.log("Build")
-      var ch = child_process.spawn("docker", ["run", "--rm", "-i", "-w", "/home/build", "-u", "build", js.image || "1647", "sh", "-c", "node go.js 2>&1"],
-      { })
-      js.builderJs = builderJs
-      ch.stdin.write(JSON.stringify(js))
-      ch.stdin.end()
-      ch.stdout.pipe(outp)
-      
-      ch.stderr.setEncoding("utf8")
-      var nuke = ""
-      ch.stderr.on("data", function(d) {
-           var m = /Cannot destroy container ([0-9a-f]{20,})/.exec(d)
-           if (m) {
+    buildq.push(function(cb) {
+        console.log("Build")
+        var ch = child_process.spawn("docker", [
+            "run", "--rm", "-i",
+            "-w", "/home/build", "-u", "build",
+            js.image || "1647",
+            "sh", "-c", "node go.js 2>&1"],
+            {})
+        js.builderJs = builderJs
+        ch.stdin.write(JSON.stringify(js))
+        ch.stdin.end()
+        ch.stdout.pipe(outp)
+
+        ch.stderr.setEncoding("utf8")
+        var nuke = ""
+        ch.stderr.on("data", function(d) {
+            var m = /Cannot destroy container ([0-9a-f]{20,})/.exec(d)
+            if (m) {
                 nuke = m[1]
-           }else {
-               console.log(d)
-           }
-      })
-      ch.on("exit", function() { 
-          cb(null) 
-          if (nuke)
-              setTimeout(function() {
-               console.log("nuke container " + nuke)
-                  var ch = child_process.spawn("docker", ["rm", nuke])
-                  ch.stderr.pipe(process.stderr)
-              }, 1000)
-      })
-   })
+            } else {
+                console.log(d)
+            }
+        })
+        ch.on("exit", function() {
+            cb(null)
+            if (nuke)
+                setTimeout(function() {
+                    console.log("nuke container " + nuke)
+                    var ch = child_process.spawn("docker", ["rm", nuke])
+                    ch.stderr.pipe(process.stderr)
+                }, 1000)
+        })
+    })
 }
 
 function handleReq(req, res) {
-      console.log(req.url)
+    console.log(req.url)
     var iv = req.headers["x-iv"]
     if (!iv) {
         err(res, 403, "No iv")
@@ -66,7 +69,7 @@ function handleReq(req, res) {
     }
     iv = new Buffer(iv.replace(/\s+/g, ""), "hex")
     if (!iv || iv.length != 16) {
-        err(res,403,"bad iv")
+        err(res, 403, "bad iv")
         return
     }
 
@@ -76,13 +79,13 @@ function handleReq(req, res) {
     ciph.on("data", function(d) { dd += d })
     ciph.on("end", function() {
         if (dd.length < 128) {
-            err(res,403, "too short")
+            err(res, 403, "too short")
             return
         }
         try {
             var js = JSON.parse(dd)
         } catch (e) {
-            err(res,403, "bad key")
+            err(res, 403, "bad key")
             return
         }
         var oiv = crypto.randomBytes(16)
@@ -94,7 +97,7 @@ function handleReq(req, res) {
         if (js.op == "buildex")
             build(js, enciph)
         else
-            enciph.end(JSON.stringify({err:"Wrong OP"}))
+            enciph.end(JSON.stringify({ err: "Wrong OP" }))
     })
     req.pipe(ciph)
 }
@@ -103,22 +106,20 @@ if (process.argv[2]) {
     let f = fs.readFileSync(process.argv[2], "utf8");
     build(JSON.parse(f), process.stdout)
 } else {
+    http.createServer(function(req, res) {
+        var d = domain.create();
+        d.on('error', function(er) {
+            console.error('error', er.stack);
+            try {
+                res.statusCode = 500;
+                res.setHeader('content-type', 'text/plain');
+                res.end();
+            } catch (e) {
+            }
+        })
+        d.add(req);
+        d.add(res);
+        d.run(function() { handleReq(req, res) })
 
-http.createServer(function (req, res) {
-    var d = domain.create();
-    d.on('error', function(er) {
-       console.error('error', er.stack);
-       try {
-         res.statusCode = 500;
-         res.setHeader('content-type', 'text/plain');
-         res.end();
-       } catch (e) {
-        }
-    })
-    d.add(req);
-    d.add(res);
-    d.run(function() { handleReq(req, res) })
-      
-}).listen(2424);
-
+    }).listen(2424);
 }
