@@ -27,13 +27,14 @@ var builderJs = fs.readFileSync("builder.js","utf8")
 var buildq = async.queue(function(f,cb){f(cb)}, 8)
 function build(js, outp) {
    buildq.push(function(cb) {
-      var ch = child_process.spawn("docker", ["run", "--rm", "-i", "-w", "/home/build", "-u", "build", js.image || "1647", "node", "go.js"],
+       console.log("Build")
+      var ch = child_process.spawn("docker", ["run", "--rm", "-i", "-w", "/home/build", "-u", "build", js.image || "1647", "sh", "-c", "node go.js 2>&1"],
       { })
       js.builderJs = builderJs
       ch.stdin.write(JSON.stringify(js))
       ch.stdin.end()
       ch.stdout.pipe(outp)
-
+      
       ch.stderr.setEncoding("utf8")
       var nuke = ""
       ch.stderr.on("data", function(d) {
@@ -97,19 +98,6 @@ function handleReq(req, res) {
     })
     req.pipe(ciph)
 }
-
-function createService(acct, key) {
-  var blob_service = azure.createBlobService(acct, key)
-
-  var retryOperations = new azure.LinearRetryPolicyFilter(10, 1000);
-  blob_service = blob_service.withFilter(retryOperations);
-
-  var svc = blob_service;
-  return svc
-}
-
-//var svc = createService(cfg.blobAccount, cfg.blobKey);
-//svc.createContainerIfNotExists(cfg.blobContainer, { publicAccessLevel: "blob" }, function() {})
 
 if (process.argv[2]) {
     let f = fs.readFileSync(process.argv[2], "utf8");

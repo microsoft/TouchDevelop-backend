@@ -14,7 +14,8 @@ sh)
 if [ "X$1" = X ] ; then
   exit 1
 fi
-  docker run -w /build -u build -it $1 bash -l
+  #docker run -w /build -u build -it $1 bash -l
+  docker run -w /home/build -u build -it $1 bash -l
   ;;
 save)
   id=`docker ps -l | tail -1 | awk '{print $1}'`
