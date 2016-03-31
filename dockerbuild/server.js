@@ -39,21 +39,21 @@ function build(js, outp) {
         ch.stdout.pipe(outp)
 
         ch.stderr.setEncoding("utf8")
-        var nuke = ""
+        var remove = ""
         ch.stderr.on("data", function(d) {
             var m = /Cannot destroy container ([0-9a-f]{20,})/.exec(d)
             if (m) {
-                nuke = m[1]
+                remove = m[1]
             } else {
                 console.log(d)
             }
         })
         ch.on("exit", function() {
             cb(null)
-            if (nuke)
+            if (remove)
                 setTimeout(function() {
-                    console.log("nuke container " + nuke)
-                    var ch = child_process.spawn("docker", ["rm", nuke])
+                    console.log("remove container " + remove)
+                    var ch = child_process.spawn("docker", ["rm", remove])
                     ch.stderr.pipe(process.stderr)
                 }, 1000)
         })
