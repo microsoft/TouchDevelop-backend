@@ -405,6 +405,16 @@ export async function initAsync(): Promise<void> {
         }
     });
     core.addRoute("POST", "scripts", "", async(req: core.ApiRequest) => {
+        if (!req.userid) {
+            let anonId = core.serviceSettings.accounts["anonscript"]
+            if (anonId) {
+                await core.throttleAsync(req, "pub", 60); // additional throttle - anonscript user is unlimited
+                await core.setReqUserIdAsync(req, anonId)
+                req.body["ishidden"] = true
+                //req.body["baseid"] = ""
+            }
+        }
+
         await core.canPostAsync(req, "direct-script");
         if (req.status == 200 && orEmpty(req.body["text"]).length > 200000) {
             req.status = httpCode._413RequestEntityTooLarge;
@@ -420,7 +430,7 @@ export async function initAsync(): Promise<void> {
         }
 
         if (!/^[a-z\-]*$/.test(orEmpty(req.body["target"]))) {
-            req.status == httpCode._400BadRequest
+            req.status = httpCode._400BadRequest
             return
         }
 
