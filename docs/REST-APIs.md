@@ -589,6 +589,7 @@ To update:
 * `/<userid>/abuses` - abuse reports about publications of a given user
 * `/<userid>/abusereports` - abuses reported by a given user
 * `/<publicationid>/abusereports` - abuse reports about a given publication
+* `/abusereports` - all abuse reports
 
     GET /<publicationid>/candelete =>
     {
