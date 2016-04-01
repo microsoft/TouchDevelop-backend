@@ -160,7 +160,9 @@ async function initEmbedThumbnailsAsync() : Promise<void>
     });
     restify.server().get("/thumbnail/:size/:provider/:id", async (req: restify.Request, res: restify.Response) => {
         let referer = orEmpty(req.header("referer")).toLowerCase();
-        if (referer == "" || td.startsWith(referer, core.self) || td.startsWith(referer, "http://localhost:")) {
+        let refDomain = referer.replace(/^https?:\/\//, "").replace(/\/.*/, "")
+        if (referer == "" || td.startsWith(referer, core.self) || td.startsWith(referer, "http://localhost:")
+            || core.serviceSettings.domains.hasOwnProperty(refDomain)) {
             // ok, referer checked
         }
         else {

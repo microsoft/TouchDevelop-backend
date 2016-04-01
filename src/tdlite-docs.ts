@@ -14,7 +14,7 @@ var expandInfo: td.Action1<JsonBuilder>;
 
 require("./backendutils")
 declare var ks:any;
-export var renderMarkdown : (template:string, src: string, theme: {}) => string = ks.docs.renderMarkdown;  
+export var renderMarkdown : (template:string, src: string, theme: {}, pubinfo?: {}) => string = ks.docs.renderMarkdown;  
 
 export async function formatAsync(templ: string, pubdata: JsonBuilder): Promise<string> {
     if (pubdata["time"] != null) {

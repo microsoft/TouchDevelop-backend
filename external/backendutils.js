@@ -294,6 +294,10 @@ var ts;
                 });
             }
             Util.requestAsync = requestAsync;
+            function httpGetTextAsync(url) {
+                return requestAsync({ url: url }).then(function (resp) { return resp.text; });
+            }
+            Util.httpGetTextAsync = httpGetTextAsync;
             function httpGetJsonAsync(url) {
                 return requestAsync({ url: url }).then(function (resp) { return resp.json; });
             }
@@ -810,9 +814,24 @@ var ks;
             }));
         }
         docs.html2Quote = html2Quote;
-        function renderMarkdown(template, src, theme) {
+        var links = [
+            {
+                rx: /^vimeo\.com\/(\d+)/,
+                cmd: "### @vimeo $1"
+            },
+            {
+                rx: /^youtu\.be\/(\w+)/,
+                cmd: "### @youtube $1"
+            },
+            {
+                rx: /^www\.youtube\.com\/watch\?v=(\w+)/,
+                cmd: "### @youtube $1"
+            },
+        ];
+        function renderMarkdown(template, src, theme, pubinfo) {
             if (theme === void 0) { theme = {}; }
-            var params = {};
+            if (pubinfo === void 0) { pubinfo = null; }
+            var params = pubinfo || {};
             var boxes = U.clone(stdboxes);
             var macros = U.clone(stdmacros);
             var settings = U.clone(stdsettings);
@@ -860,6 +879,22 @@ var ks;
             });
             if (!marked)
                 marked = require("marked");
+            src = src.replace(/^\s*https?:\/\/(\S+)\s*$/mg, function (f, lnk) {
+                var _loop_1 = function(ent) {
+                    var m = ent.rx.exec(lnk);
+                    if (m) {
+                        return { value: ent.cmd.replace(/\$(\d+)/g, function (f, k) {
+                            return m[parseInt(k)] || "";
+                        }) + "\n" };
+                    }
+                };
+                for (var _i = 0, links_1 = links; _i < links_1.length; _i++) {
+                    var ent = links_1[_i];
+                    var state_1 = _loop_1(ent);
+                    if (typeof state_1 === "object") return state_1.value;
+                }
+                return f;
+            });
             var html = marked(src, {
                 sanitize: true,
                 smartypants: true,
@@ -905,15 +940,20 @@ var ks;
                     }
                 }
             });
-            if (!params["title"]) {
-                var titleM = /<h1[^<>]*>([^<>]+)<\/h1>/.exec(html);
-                if (titleM)
-                    params["title"] = html2Quote(titleM[1]);
+            if (pubinfo) {
+                params["title"] = pubinfo["name"];
             }
-            if (!params["description"]) {
-                var descM = /<p>(.+?)<\/p>/.exec(html);
-                if (descM)
-                    params["description"] = html2Quote(descM[1]);
+            else {
+                if (!params["title"]) {
+                    var titleM = /<h1[^<>]*>([^<>]+)<\/h1>/.exec(html);
+                    if (titleM)
+                        params["title"] = html2Quote(titleM[1]);
+                }
+                if (!params["description"]) {
+                    var descM = /<p>(.+?)<\/p>/.exec(html);
+                    if (descM)
+                        params["description"] = html2Quote(descM[1]);
+                }
             }
             var registers = {};
             registers["main"] = ""; // first
@@ -965,6 +1005,7 @@ var ks;
             if (quoted === void 0) { quoted = []; }
             return template.replace(/@(\w+)@/g, function (f, key) {
                 var res = U.lookup(vars, key) || "";
+                res += ""; // make sure it's a string
                 if (quoted.indexOf(key) < 0) {
                     res = html2Quote(res);
                 }

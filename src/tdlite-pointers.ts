@@ -499,7 +499,18 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     }
 }
 
-async function renderMarkdownAsync(artobj: {}, lang: string, theme: {}) {
+async function getTargetThemeAsync(targetName: string) {
+    let theme = null
+    if (targetName) {
+        let ptrx = await core.getPubAsync("ptr-" + targetName + "-theme-json", "pointer")
+        if (ptrx && ptrx["pub"]["artid"])
+            theme = await tdliteArt.getJsonArtFileAsync(ptrx["pub"]["artid"])
+    }
+    return theme || {}
+}
+
+async function renderMarkdownAsync(artobj: {}, lang: string, targetName: string) {
+    let theme = await getTargetThemeAsync(targetName)
     let url = tdliteArt.getBlobUrl(artobj)
     let resp = await td.createRequest(url).sendAsync();
     let textObj = resp.content();
@@ -788,13 +799,33 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
     req.rootId = scriptjson["id"];    // this is to make sure we show hidden scripts
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, req);
     let templ = "templates/script"
-    if (/#stepByStep/i.test(pub["description"]))
-        templ = "templates/tutorial";
-    else if (/#docs/i.test(pub["description"]))
-        templ = "templates/docscript";
-    pub["templatename"] = templ;
-    pub["screenshoturl"] = await lookupScreenshotIdAsync(pub);
-    await renderFinalAsync(pub, v, lang);
+
+    if (core.kindScript) {
+        let targetName: string = pub["target"]
+        let theme = await getTargetThemeAsync(targetName)
+        let readmeMd = ""
+        let textObj = await tdliteScripts.getScriptTextAsync(scriptjson["id"])
+        if (textObj) {
+            try {
+                let files = JSON.parse(textObj["text"])
+                readmeMd = files["README.md"]
+            } catch (e) {
+            }
+        }
+
+        pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
+        let templTxt = await getTemplateTextAsync(templ, lang)
+        v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
+    } else {
+        if (/#stepByStep/i.test(pub["description"]))
+            templ = "templates/tutorial";
+        else if (/#docs/i.test(pub["description"]))
+            templ = "templates/docscript";
+            
+        pub["templatename"] = templ;
+        pub["screenshoturl"] = await lookupScreenshotIdAsync(pub);
+        await renderFinalAsync(pub, v, lang);
+    }
 }
 
 interface CachedPage {
@@ -829,12 +860,27 @@ var subFiles = {
     run: "run.html"
 }
 
+function domainOfTarget(trg: string) {
+    for (let domain of Object.keys(core.serviceSettings.domains)) {
+        let path = core.serviceSettings.domains[domain]
+        if (trg == path) return domain;
+    }
+    return null
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let lang = await handleLanguageAsync(req);
     let urlFile = req.url().replace(/\?.*/g, "")
     let fn = urlFile.replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
+    let bareFn = fn
 
-    let baseDir = fn.replace(/\/.*/, "")
+    let baseDir = fn.replace(/[\/-].*/, "")
+    let redirDomain = domainOfTarget(baseDir)
+    if (redirDomain) {
+        res.redirect(httpCode._301MovedPermanently, "https://" + redirDomain + "/" + req.url().slice(baseDir.length + 2))
+        return
+    }
+
     let host = (req.header("host") || "").toLowerCase()
     let vhostDirName = ""
     let hasVhosts = false
@@ -842,10 +888,6 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     for (let domain of Object.keys(core.serviceSettings.domains)) {
         hasVhosts = true
         let path = core.serviceSettings.domains[domain]
-        if (baseDir == path) {
-            res.redirect(httpCode._301MovedPermanently, "https://" + domain + "/" + req.url().slice(baseDir.length + 2))
-            return
-        }
         if (domain == host) {
             vhostDirName = core.serviceSettings.domains[host].replace(/^\//, "")
             fn = vhostDirName + "/" + fn
@@ -935,13 +977,20 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
                 await renderFinalAsync(pubdata, v, lang);
             }
-            else if (/^[a-z]+$/.test(fn)) {
-                let entry = await core.pubsContainer.getAsync(fn);
+            else if (/^[a-z]+$/.test(bareFn)) {
+                let entry = await core.pubsContainer.getAsync(bareFn);
                 if (entry == null || withDefault(entry["kind"], "reserved") == "reserved") {
                     await errorAsync("No such publication");
                 }
                 else {
-                    if (core.fullTD && entry["kind"] == "script") {
+                    if (core.kindScript && entry["kind"] == "script") {
+                        let domain = domainOfTarget(entry["pub"]["target"])
+                        if (domain && domain != host) {
+                            v.redirect = "https://" + domain + "/" + bareFn
+                        } else {
+                            await renderScriptPageAsync(entry, v, lang)
+                        }
+                    } else if (core.fullTD && entry["kind"] == "script") {
                         await renderScriptPageAsync(entry, v, lang)
                     } else {
                         v.redirect = "/app/#pub:" + entry["id"];
@@ -962,13 +1011,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     await errorAsync("No such art: /" + ptr.artid)
                 } else {
                     if (artobj["contentType"] == "text/markdown") {
-                        let theme = null
-                        if (vhostDirName) {
-                            let ptrx = await core.getPubAsync("ptr-" + vhostDirName + "-theme-json", "pointer")                            
-                            if (ptrx && ptrx["pub"]["artid"])
-                                theme = await tdliteArt.getJsonArtFileAsync(ptrx["pub"]["artid"])
-                        }
-                        v.text = await renderMarkdownAsync(artobj, lang, theme || {})
+                        v.text = await renderMarkdownAsync(artobj, lang, vhostDirName)
                     } else {
                         v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                     }
