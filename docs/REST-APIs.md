@@ -591,13 +591,14 @@ To update:
 * `/<publicationid>/abusereports` - abuse reports about a given publication
 * `/abusereports` - all abuse reports
 
-    GET /<publicationid>/candelete =>
-    {
-      candelete: true/false, // current user can delete or not
-      hasabusereports: true/false,
-      canmanage: true/false, // the current user has mangement permissions over the publication author
-    }
-
+```
+GET /<publicationid>/candelete =>
+{
+  candelete: true/false, // current user can delete or not
+  hasabusereports: true/false,
+  canmanage: true/false, // the current user has mangement permissions over the publication author
+}
+```
 
 #### channel
 
