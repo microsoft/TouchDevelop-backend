@@ -362,7 +362,7 @@ export async function initAsync(): Promise<void> {
                 "version": "1.0",
                 "type": "rich",
                 "provider_name": "KindScript/" + target,
-                "provider_url": "https://kindscript.com/",
+                "provider_url": core.self,
                 "width": w,
                 "height": h,
                 "title": scr["pub"]["name"],
@@ -643,6 +643,11 @@ async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonB
         pubdata["msg"] = "Pointed script not found";
         return
     }
+    
+    if (scriptjs["pub"]["target"]) {
+        v.redirect = "/" + scriptid
+        return
+    }
 
     let editor = orEmpty(scriptjs["pub"]["editor"]);
     let raw = orEmpty(scriptjs["pub"]["raw"]);
@@ -808,12 +813,14 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         if (textObj) {
             try {
                 let files = JSON.parse(textObj["text"])
-                readmeMd = files["README.md"]
+                readmeMd = files["README.md"] || ""
             } catch (e) {
             }
         }
 
         pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
+        pub["oembedurl"] = `${core.self}api/oembed?url=${encodeURIComponent(core.self + req.rootId)}`
+        
         let templTxt = await getTemplateTextAsync(templ, lang)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
