@@ -44,12 +44,12 @@ async function fillUpPointerBodyAsync(res: JsonBuilder): Promise<void> {
     if (link[0] != '/') return;
     let ptr = await core.getPubAsync(tdlitePointers.pathToPtr(link), "pointer")
     if (!ptr) return;
-    let scr = await core.getPubAsync(ptr["pub"]["scriptid"], "script");    
+    let scr = await core.getPubAsync(ptr["pub"]["scriptid"], "script");
     if (!scr) return;
     let pscr = scr["pub"];
     let txt = await tdliteScripts.getScriptTextAsync(scr["id"])
     if (!txt || !txt["text"]) return;
-    
+
     res["description"] = pscr["name"] + "\n" + res["description"];
     res["body"] = pscr["description"] + "\n" + txt["text"];
 }
@@ -65,17 +65,17 @@ async function secondarySearchEntryAsync(obj: JsonBuilder, body: string): Promis
         let promotags: string[] = promo["tags"] || []
         if (promotags.length == 0)
             return <JsonBuilder>null;
-        
+
         if (promotags.indexOf("hidden") >= 0 || promotags.indexOf("preview") >= 0)
             return <{}>null;
-        
+
         res["kind"] = "promo";
         res["id"] = "promo-" + res["id"];
         res["name"] = promo["name"];
         res["description"] = promo["description"];
-        
+
         await fillUpPointerBodyAsync(res);
-    
+
         return res;
     } else {
         return <JsonBuilder>null;
@@ -121,7 +121,7 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
     }
     // ## scan
     if (!options_.skipScan) {
-        let text = body;        
+        let text = body;
         for (let fldname of ["about", "grade", "school"]) {
             text = text + " " + orEmpty(pub[fldname]);
         }
@@ -129,10 +129,10 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
         //logger.debug("scanning desc: " + desc)
         
         // TODO this was alrady fetched in "resolve" above...
-        let userjson = await tdliteUsers.getAsync(pub["userid"]);        
+        let userjson = await tdliteUsers.getAsync(pub["userid"]);
         await tdliteAbuse.scanAndPostAsync(pub["id"], text, desc, userjson);
 
-        if (acsCallbackUrl) { 
+        if (acsCallbackUrl) {
             text = desc + " " + text;
             /* async */ acs.validateTextAsync(pub["id"], text, acsCallbackUrl);
             let picurl = orEmpty(pub["pictureurl"]);
@@ -146,11 +146,10 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
 /**
  * {action:ignoreReturn}
  */
-export async function updateAndUpsertAsync(container: cachedStore.Container, req: core.ApiRequest, update:td.Action1<JsonBuilder>) : Promise<JsonBuilder>
-{
+export async function updateAndUpsertAsync(container: cachedStore.Container, req: core.ApiRequest, update: td.Action1<JsonBuilder>): Promise<JsonBuilder> {
     let bld: JsonBuilder;
     let last = {}
-    await container.updateAsync(req.rootId, async (entry: JsonBuilder) => {
+    await container.updateAsync(req.rootId, async(entry: JsonBuilder) => {
         await update(entry);
         last = entry;
     });
@@ -158,47 +157,46 @@ export async function updateAndUpsertAsync(container: cachedStore.Container, req
     return last;
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     disableSearch = orEmpty(td.serverSetting("DISABLE_SEARCH", true)) == "true";
     core.executeSearchAsync = executeSearchAsync;
-    
+
     await initAcsAsync();
 
     azureSearch.init({
         allow_409: true
     });
-    
+
     await tdliteIndex.initAsync();
 
-    core.addRoute("GET", "websearch", "", async (req: core.ApiRequest) => {
+    core.addRoute("GET", "websearch", "", async(req: core.ApiRequest) => {
         if (req.status == 200) {
             await executeSearchAsync("web", orEmpty(req.queryOptions["q"]), req);
         }
     });
-    core.addRoute("GET", "search", "", async (req: core.ApiRequest) => {        
-        core.checkRelexedGlobalList(req);        
+    core.addRoute("GET", "search", "", async(req: core.ApiRequest) => {
+        core.checkRelexedGlobalList(req);
         if (req.status == 200) {
             await executeSearchAsync("", orEmpty(req.queryOptions["q"]), req);
         }
     });
-    core.addRoute("POST", "search", "reindexdocs", async (req1: core.ApiRequest) => {
+    core.addRoute("POST", "search", "reindexdocs", async(req1: core.ApiRequest) => {
         core.checkPermission(req1, "operator");
         if (req1.status == 200) {
             // /* async */ tdliteIndex.indexDocsAsync();
             req1.response = ({});
         }
     });
-    
-    core.addRoute("DELETE", "admin", "searchindex", async (req: core.ApiRequest) => {
+
+    core.addRoute("DELETE", "admin", "searchindex", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");
         if (req.status == 200) {
             await tdliteIndex.clearPubIndexAsync();
-            req.response = { msg: "Gone." }            
+            req.response = { msg: "Gone." }
         }
     });
-    
-    core.addRoute("POST", "admin", "reindex", async (req: core.ApiRequest) => {
+
+    core.addRoute("POST", "admin", "reindex", async(req: core.ApiRequest) => {
         core.checkPermission(req, "operator");
         if (req.status != 200) return;
         let store = indexedStore.storeByKind(req.argument);
@@ -207,21 +205,21 @@ export async function initAsync() : Promise<void>
                 await reindexPromosAsync(req);
             } else {
                 req.status = httpCode._404NotFound;
-            }    
+            }
             return;
         }
-        
+
         let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
         req.response = {
             continuation: lst.continuation,
             itemCount: lst.items.length,
             itemsReindexed: 0
-        }           
+        }
         await reindexEntriesAsync(store, lst.items, req);
     });
-    
-        
-    core.addRoute("GET", "admin", "countpubs", async(req) => {        
+
+
+    core.addRoute("GET", "admin", "countpubs", async(req) => {
         if (!core.checkPermission(req, "root")) return;
         let store = indexedStore.storeByKind(req.argument);
         let lst = await store.getIndex("all").fetchAsync("all", req.queryOptions);
@@ -256,7 +254,7 @@ export async function initAsync() : Promise<void>
             }
             else if (e["arttype"] == "picture") {
                 counters.picture++;
-                let sh =e["shieldinfo"] 
+                let sh = e["shieldinfo"]
                 if (!sh) {
                     counters.noShield++;
                 } else {
@@ -278,9 +276,9 @@ export async function initAsync() : Promise<void>
     })
 
     core.addRoute("POST", "*pub", "rescan", async(req: core.ApiRequest) => {
-        core.checkPermission(req, "operator");        
+        core.checkPermission(req, "operator");
         if (req.status != 200) return;
-        await scanAndSearchAsync(req.rootPub, {  })
+        await scanAndSearchAsync(req.rootPub, {})
         req.response = {}
     });
 
@@ -290,8 +288,8 @@ async function reindexEntriesAsync(store: indexedStore.Store, json: JsonObject[]
     let batch = tdliteIndex.createPubsUpdate();
     let fetchResult = store.singleFetchResult(json);
     fetchResult.items = json;
-     
-    await core.resolveAsync(store, fetchResult, core.adminRequest);        
+
+    await core.resolveAsync(store, fetchResult, core.adminRequest);
     let fieldname = "id";
     let isPtr = store.kind == "pointer";
     if (isPtr) {
@@ -306,9 +304,9 @@ async function reindexEntriesAsync(store: indexedStore.Store, json: JsonObject[]
             if (pub["ishidden"]) {
                 return false; // always skip hidden scripts
             }
-            
-            return true;            
-        })        
+
+            return true;
+        })
         let coll = fetchResult.items.map<string>(elt => orEmpty(elt[fieldname])).filter(elt1 => elt1 != "");
         let bodies = {};
         let entries = await tdliteScripts.getScriptTextsAsync(coll);
@@ -317,9 +315,9 @@ async function reindexEntriesAsync(store: indexedStore.Store, json: JsonObject[]
                 bodies[js2["id"]] = js2["text"];
             }
         }
-                
+
         for (let pub of fetchResult.items) {
-            let body = orEmpty(bodies[orEmpty(pub[fieldname])]);            
+            let body = orEmpty(bodies[orEmpty(pub[fieldname])]);
             let entry = tdliteIndex.toPubEntry(pub, body, pubFeatures(pub), 0);
             req.response["itemsReindexed"]++;
             entry.upsertPub(batch);
@@ -338,33 +336,33 @@ async function reindexEntriesAsync(store: indexedStore.Store, json: JsonObject[]
     }
 }
 
-function pubFeatures(pub: JsonObject) : string[]
-{    
-    let features:string[] = [ "@" + pub["kind"] ];
+function pubFeatures(pub: JsonObject): string[] {
+    let features: string[] = ["@" + pub["kind"]];
     if (pub["kind"] == "script") {
         if (pub["islibrary"]) {
             features.push("library");
         }
     }
-    
+
     if (pub["kind"] == "pointer") {
         let bareid = (<string>pub["id"]).replace(/^ptr-/, "")
         let ns = "ptr-" + bareid.replace(/-.*/, "")
         features.push("@" + ns)
         if (ns != "ptr-usercontent")
-            features.push("@official");        
+            features.push("@official");
+        if (pub["searchfeatures"])
+            td.pushRange(features, pub["searchfeatures"])
     }
-    
+
     if (pub["kind"] == "promo") {
-        features.push("@official");        
+        features.push("@official");
         pub["promo"]["tags"].forEach(t => features.push("@" + t))
     }
     return features;
 }
- 
 
-export async function executeSearchAsync(kind: string, q: string, req: core.ApiRequest) : Promise<void>
-{
+
+export async function executeSearchAsync(kind: string, q: string, req: core.ApiRequest): Promise<void> {
     let query = tdliteIndex.toPubQuery("pubs1", kind, q);
     query.scoringProfile = "pubs";
     let qurl = query.toUrl();
@@ -375,9 +373,9 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
     if (searchResults == null) {
         logger.debug("js: " + qurl + " -> " + JSON.stringify(js, null, 2));
     }
-    let ids0:string[] = searchResults.map(e => e["id"]);    
+    let ids0: string[] = searchResults.map(e => e["id"]);
     let idsF = ids0.map(s => s.replace(/^promo-/, ""))
-    let fetchResult2 = await tdliteScripts.scripts.fetchFromIdListAsync(idsF, req.queryOptions);    
+    let fetchResult2 = await tdliteScripts.scripts.fetchFromIdListAsync(idsF, req.queryOptions);
     let jsons = fetchResult2.items;
     for (let i = 0; i < jsons.length; ++i) {
         let res = searchResults[i];
@@ -386,7 +384,7 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
         }
     }
     //logger.debug("jsrch: " + qurl + " -> " + JSON.stringify(js, null, 2) + " - " + JSON.stringify(jsons,null,2));
-    if ( ! core.callerHasPermission(req, "global-list")) {
+    if (!core.callerHasPermission(req, "global-list")) {
         jsons = jsons.filter(elt => core.isAbuseSafe(elt));
     }
     let bykind = {};
@@ -413,7 +411,7 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
             fld = "promoid";
             for (let s of fetchResult2.items) {
                 s["kind"] = "promo";
-                s[fld] = "promo-" + s["id"]; 
+                s[fld] = "promo-" + s["id"];
             }
         } else {
             let store = indexedStore.storeByKind(knd);
@@ -431,42 +429,41 @@ export async function executeSearchAsync(kind: string, q: string, req: core.ApiR
             r["searchfeatures"] = e["features"];
             fetchResult2.items.push(r);
         }
-    })     
+    })
     core.buildListResponse(fetchResult2, req);
 }
 
-async function initAcsAsync() : Promise<void>
-{    
+async function initAcsAsync(): Promise<void> {
     if (core.fullTD && core.hasSetting("ACS_PASSWORD")) {
         acsCallbackToken = core.sha256(core.tokenSecret + ":acs");
-        let selfx = td.serverSetting("ACS_SELF", true) || core.self;        
+        let selfx = td.serverSetting("ACS_SELF", true) || core.self;
         acsCallbackUrl = selfx + "api/acscallback?token=" + acsCallbackToken + "&anon_token=" + encodeURIComponent(core.basicCreds);
         await acs.initAsync();
     }
-    core.addRoute("POST", "acscallback", "", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "acscallback", "", async(req: core.ApiRequest) => {
         if (core.withDefault(req.queryOptions["token"], "none") == acsCallbackToken) {
             let jobid = orEmpty(req.body["JobId"]);
             let results = req.body["Results"];
             for (let stat of results) {
                 if (stat["Status"] == "3000") {
                     let pubid = stat["Id"];
-                        await core.pubsContainer.updateAsync(pubid, async(entry: JsonBuilder) => {
-                            let curr = entry["acsJobId"]
-                            if (curr) curr += "," + jobid;
-                            else curr = jobid;
-                            entry["acsJobId"] = curr;
-                            if (!stat["Safe"]) {
-                                entry["acsFlag"] = stat;    
-                            }
+                    await core.pubsContainer.updateAsync(pubid, async(entry: JsonBuilder) => {
+                        let curr = entry["acsJobId"]
+                        if (curr) curr += "," + jobid;
+                        else curr = jobid;
+                        entry["acsJobId"] = curr;
+                        if (!stat["Safe"]) {
+                            entry["acsFlag"] = stat;
+                        }
                     });
-                    
+
                     if (stat["Safe"]) {
                         logger.debug("acsok: " + JSON.stringify(stat, null, 2));
                     }
                     else {
                         logger.info("acsflag: " + JSON.stringify(stat, null, 2));
-                        let msg = "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"]); 
-                        await tdliteAbuse.postAcsReport(pubid, msg, jobid, req);                          
+                        let msg = "ACS flagged, policy codes " + JSON.stringify(stat["PolicyCodes"]);
+                        await tdliteAbuse.postAcsReport(pubid, msg, jobid, req);
                     }
                 }
                 else {
@@ -482,38 +479,36 @@ async function initAcsAsync() : Promise<void>
     });
 }
 
-function acsValidatePub(jsb: JsonBuilder) : void
-{
+function acsValidatePub(jsb: JsonBuilder): void {
     if (acsCallbackUrl == "") {
         return;
     }
 }
 
 
-async function reindexPromosAsync(req: core.ApiRequest)
-{
+async function reindexPromosAsync(req: core.ApiRequest) {
     let store = tdliteScripts.scripts;
     let lst = await store.getIndex("promo").fetchAsync("all", req.queryOptions);
-    
+
     req.response = {
         continuation: lst.continuation,
         itemCount: lst.items.length,
         itemsReindexed: 0
     }
-    
+
     await core.resolveAsync(store, lst, core.emptyRequest);
-    
+
     let batch = tdliteIndex.createPubsUpdate();
-    
-    await parallel.forJsonAsync(lst.items, async (e) => {    
+
+    await parallel.forJsonAsync(lst.items, async(e) => {
         let jtxt = await tdliteScripts.getScriptTextAsync(e["id"]) || {}
         let secondary = await secondarySearchEntryAsync(e, jtxt["text"] || "");
         if (secondary) {
             let entry2 = tdliteIndex.toPubEntry(secondary, secondary["body"], pubFeatures(secondary), 0);
             entry2.upsertPub(batch);
             req.response["itemsReindexed"]++;
-        }        
+        }
     })
-    
+
     await batch.sendAsync();
 }

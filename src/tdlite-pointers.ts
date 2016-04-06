@@ -53,6 +53,7 @@ export class PubPointer
     @td.json public scriptdescription: string = "";
     @td.json public breadcrumbtitle: string = "";
     @td.json public customtick: string = "";
+    @td.json public searchfeatures: string[] = [];
     static createFromJson(o: JsonObject) { let r = new PubPointer(); r.fromJson(o); return r; }
 }
 
@@ -407,11 +408,18 @@ async function setPointerPropsAsync(req: core.ApiRequest, ptr: JsonBuilder, body
     pub["parentpath"] = "";
     pub["scriptname"] = "";
     pub["scriptdescription"] = "";
+    pub["searchfeatures"] = []
     let sid = await core.getPubAsync(pub["scriptid"], "script");
     if (sid == null) {
         pub["scriptid"] = "";
     }
     else {
+        for (let fn of ["target", "editor"]) {
+            if (sid["pub"][fn])
+                pub["searchfeatures"].push("@" + fn + "-" + sid["pub"][fn])
+        }
+        if (sid["pub"]["islibrary"])
+            pub["searchfeatures"].push("@library")
         pub["scriptname"] = sid["pub"]["name"];
         pub["scriptdescription"] = sid["pub"]["description"];
         await core.pubsContainer.updateAsync(sid["id"], async(entry: JsonBuilder) => {
@@ -643,7 +651,7 @@ async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonB
         pubdata["msg"] = "Pointed script not found";
         return
     }
-    
+
     if (scriptjs["pub"]["target"]) {
         v.redirect = "/" + scriptid
         return
@@ -819,8 +827,8 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         }
 
         pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
-        pub["oembedurl"] = `${core.self}api/oembed?url=${encodeURIComponent(core.self + req.rootId)}`
-        
+        pub["oembedurl"] = `${core.self}api/oembed?url=${encodeURIComponent(core.self + req.rootId) }`
+
         let templTxt = await getTemplateTextAsync(templ, lang)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
@@ -828,7 +836,7 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
             templ = "templates/tutorial";
         else if (/#docs/i.test(pub["description"]))
             templ = "templates/docscript";
-            
+
         pub["templatename"] = templ;
         pub["screenshoturl"] = await lookupScreenshotIdAsync(pub);
         await renderFinalAsync(pub, v, lang);
