@@ -1049,7 +1049,11 @@ export function addGitHub(options_: IProviderOptions = {}): void {
         let url: string;
         p.client_id = clientId;
         p.response_type = "code";
-        p.scope = "user:email";
+        if (globalOptions.requestEmail) {
+            p.scope = "user:email";
+        } else {
+            p.scope = "";
+        }
         url = "https://github.com/login/oauth/authorize?" + toQueryString(p.toJson());
         return url;
     }
@@ -1072,7 +1076,7 @@ export function addGitHub(options_: IProviderOptions = {}): void {
             inf.id = "github:" + profile1["id"];
             inf.name = profile1["login"];
             inf.email = profile1["email"];
-            inf.realname = profile1["name"];
+            inf.realname = profile1["name"] || profile1["login"];
             return inf;
         });
 }
