@@ -46,6 +46,7 @@ export class PubRelease
     @td.json public name: string = "";
     @td.json public cdnUrl: string = "";
     @td.json public baserelease: string = "";
+    @td.json public target: string = "";
     static createFromJson(o: JsonObject) { let r = new PubRelease(); r.fromJson(o); return r; }
 }
 
@@ -98,6 +99,11 @@ export async function initAsync(): Promise<void> {
         }
         fetchResult.items = td.arrayToJson(coll);
     }, { byUserid: true });
+    
+    await releases.createIndexAsync("target", entry => entry["pub"]["target"] || "none");
+    core.addRoute("GET", "releases", "bytarget", async(req: core.ApiRequest) => {
+        await core.anyListAsync(releases, req, "target", req.argument);
+    });
 
     core.addRoute("POST", "releases", "", async(req: core.ApiRequest) => {
         let baseid = orEmpty(req.body["baserelease"])
