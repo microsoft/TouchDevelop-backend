@@ -110,6 +110,7 @@ export class ServiceSettings
     @td.json public envrewrite: JsonObject;
     @td.json public blockedAuth: string[];
     @td.json public domains: td.SMap<string> = {};
+    @td.json public targetsDomain: string;
     static createFromJson(o: JsonObject) { let r = new ServiceSettings(); r.fromJson(o); return r; }
 }
 

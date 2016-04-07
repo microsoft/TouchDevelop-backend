@@ -398,6 +398,13 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
     }
     rel = withDefault(req.query()["releaseid"], withDefault(req.query()["r"], rel));
 
+    let targetFromHost = ""
+    let host = (req.header("host") || "").toLowerCase()
+    if (core.serviceSettings.targetsDomain && host.startsWith("trg-") && host.endsWith("." + core.serviceSettings.targetsDomain)) {
+        targetFromHost = host.slice(4, host.length - 1 - core.serviceSettings.targetsDomain.length)
+    }
+    let targetIsMatching = false
+
     let relid = "";
     if (looksLikeReleaseId(rel)) {
         relid = rel;
@@ -409,8 +416,11 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             let entry3 = await core.getPubAsync(rel, "release");
             if (entry3 == null) {
                 res.sendError(404, "no such release: " + rel);
+                return
             }
             else {
+                if (targetFromHost && entry3["pub"]["target"] === targetFromHost)
+                    targetIsMatching = true
                 relid = entry3["pub"]["releaseid"];
             }
         }
@@ -418,6 +428,22 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             relid = js["releaseid"];
         }
     }
+
+    if (fn == "simulator.html") {
+        if (!targetIsMatching) {
+            res.sendError(404, "simulator.html only available on trg-..., not on " + targetFromHost);
+            return
+        }
+    } else {
+        targetIsMatching = false
+    }
+
+    if (!targetIsMatching && targetFromHost) {
+        // do not serve anything except for simulator.html from "trg-XYZ.mydomain.net"
+        res.redirect(301, core.self + req.url().slice(1));
+        return;
+    }
+
     if (relid != "") {
         if (fn == "" && relid == "2519967637668242448-920d9e58.a88e.4fa8.bcd1.9be5ba29da9f-workerjs") {
             let s = await tdlitePointers.simplePointerCacheAsync("/worker.js", "") || "";
@@ -446,13 +472,17 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         else if (/\.error$/.test(fn)) {
             res.redirect(httpCode._301MovedPermanently, "/app/error.html");
         }
-        else if (fn == "error.html" || fn == "browsers.html") {
+        else if (fn == "error.html" || fn == "browsers.html" || fn == "simulator.html") {
             await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async(text2: string) => {
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
         else if (fn == "worker.js" || fn == "embed.js") {
             await rewriteAndCacheAsync(rel, relid, fn, "application/javascript", res, async(text2: string) => {
+                if (core.kindScript) {
+                    let xrel = await core.getPubAsync(relid, "release")
+                    text2 = patchSimHtml(text2, xrel)
+                }
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
@@ -460,6 +490,14 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             res.sendError(404, "get file from CDN");
         }
     }
+}
+
+function patchSimHtml(idx: string, rel: JsonObject) {
+    if (!rel) return idx
+    let pub = rel["pub"]
+    let dom = core.serviceSettings.targetsDomain
+    idx = idx.replace(/\/sim\/simulator\.html/, `https://trg-${pub["target"]}.${dom}/app/simulator.html?r=${rel["id"]}`);
+    return idx
 }
 
 function isKnownReleaseName(fn: string): boolean {
@@ -495,6 +533,8 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
     text = td.replaceAll(text, '"embed.js"', '"/app/embed.js' + suff + '"');
     //logger.debug(`after repl: ${text}`)
     text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/");
+    text = patchSimHtml(text, relpub)
+
     let cfg = ccfg.toJson()
     cfg["targetVersion"] = prel.pkgversion
     cfg["ksVersion"] = (baseRel ? baseRel["pub"]["pkgversion"] : null)
