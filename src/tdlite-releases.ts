@@ -99,7 +99,7 @@ export async function initAsync(): Promise<void> {
         }
         fetchResult.items = td.arrayToJson(coll);
     }, { byUserid: true });
-    
+
     await releases.createIndexAsync("target", entry => entry["pub"]["target"] || "none");
     core.addRoute("GET", "releases", "bytarget", async(req: core.ApiRequest) => {
         await core.anyListAsync(releases, req, "target", req.argument);
@@ -137,6 +137,8 @@ export async function initAsync(): Promise<void> {
             rel.pkgversion = orEmpty(req.body["pkgversion"]);
             rel.buildnumber = core.orZero(req.body["buildnumber"]);
             rel.baserelease = baseid
+            rel.target = orEmpty(req.body["target"])
+            if (!core.isValidTargetName(rel.target)) rel.target = ""
 
             if (core.kindScript) {
                 rel.releaseid = ""

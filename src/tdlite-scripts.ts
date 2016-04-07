@@ -429,7 +429,7 @@ export async function initAsync(): Promise<void> {
             core.checkPermission(req, "pub-mgmt");
         }
 
-        if (!/^[a-z\-]*$/.test(orEmpty(req.body["target"]))) {
+        if (!core.isValidTargetName(req.body["target"])) {
             req.status = httpCode._400BadRequest
             return
         }

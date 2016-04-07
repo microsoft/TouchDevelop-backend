@@ -34,13 +34,12 @@ var workspaceContainer: cachedStore.Container[] = [];
 var historyTable: azureTable.Table;
 
 export class PubVersion
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public instanceId: string = "";
     @td.json public baseSnapshot: string = "";
     @td.json public time: number = 0;
     @td.json public version: number = 0;
-    static createFromJson(o:JsonObject) { let r = new PubVersion(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubVersion(); r.fromJson(o); return r; }
 }
 
 export interface IPubVersion {
@@ -51,8 +50,7 @@ export interface IPubVersion {
 }
 
 export class PubHeader
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public guid: string = "";
     @td.json public name: string = "";
     @td.json public scriptId: string = "";
@@ -67,7 +65,7 @@ export class PubHeader
     @td.json public editor: string = "";
     @td.json public target: string = "";
     @td.json public meta: JsonObject;
-    static createFromJson(o:JsonObject) { let r = new PubHeader(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubHeader(); r.fromJson(o); return r; }
 }
 
 export interface IPubHeader {
@@ -108,8 +106,7 @@ export interface IPubHeaders {
 }
 
 export class PubBody
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public guid: string = "";
     @td.json public name: string = "";
     @td.json public scriptId: string = "";
@@ -122,7 +119,7 @@ export class PubBody
     @td.json public editor: string = "";
     @td.json public target: string = "";
     @td.json public meta: JsonObject;
-    static createFromJson(o:JsonObject) { let r = new PubBody(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubBody(); r.fromJson(o); return r; }
 }
 
 export interface IPubBody {
@@ -141,12 +138,11 @@ export interface IPubBody {
 }
 
 export class InstalledResult
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public delay: number = 0;
     @td.json public numErrors: number = 0;
     @td.json public headers: JsonObject[];
-    static createFromJson(o:JsonObject) { let r = new InstalledResult(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new InstalledResult(); r.fromJson(o); return r; }
 }
 
 export interface IInstalledResult {
@@ -156,8 +152,7 @@ export interface IInstalledResult {
 }
 
 export class PubInstalledHistory
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public kind: string = "";
     @td.json public time: number = 0;
     @td.json public historyid: string = "";
@@ -168,7 +163,7 @@ export class PubInstalledHistory
     @td.json public isactive: boolean = false;
     @td.json public meta: string = "";
     @td.json public scriptsize: number = 0;
-    static createFromJson(o:JsonObject) { let r = new PubInstalledHistory(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubInstalledHistory(); r.fromJson(o); return r; }
 }
 
 export interface IPubInstalledHistory {
@@ -185,8 +180,7 @@ export interface IPubInstalledHistory {
 }
 
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     let tableClientWs = await core.specTableClientAsync("WORKSPACE");
     let tableClientHist = await core.specTableClientAsync("WORKSPACE_HIST");
     installSlotsTable = await tableClientWs.createTableIfNotExistsAsync("installslots");
@@ -205,19 +199,19 @@ export async function initAsync() : Promise<void>
         workspaceContainer.push(container);
     }
 
-    core.addRoute("GET", "*user", "installed", async (req: core.ApiRequest) => {
+    core.addRoute("GET", "*user", "installed", async(req: core.ApiRequest) => {
         core.meOnly(req);
         if (req.status == 200) {
             await getInstalledAsync(req, false);
         }
     });
-    core.addRoute("GET", "*user", "installedlong", async (req1: core.ApiRequest) => {
+    core.addRoute("GET", "*user", "installedlong", async(req1: core.ApiRequest) => {
         core.meOnly(req1);
         if (req1.status == 200) {
             await getInstalledAsync(req1, true);
         }
     });
-    core.addRoute("POST", "*user", "installed", async (req2: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "installed", async(req2: core.ApiRequest) => {
         core.meOnly(req2);
         if (req2.status == 200) {
             await postInstalledAsync(req2);
@@ -225,8 +219,8 @@ export async function initAsync() : Promise<void>
     }, {
             noSizeCheck: true
         });
-    
-    
+
+
     core.addRoute("DELETE", "*user", "workspace", async(req: core.ApiRequest) => {
         // this isn't really safe - has interactions with client syncing
         if (!core.checkPermission(req, "root")) return;
@@ -238,8 +232,8 @@ export async function initAsync() : Promise<void>
         //await core.pokeSubChannelAsync("installed:" + req.rootId);
         req.response = {}
     });
- 
-    core.addRoute("DELETE", "*user", "installed", async (req3: core.ApiRequest) => {
+
+    core.addRoute("DELETE", "*user", "installed", async(req3: core.ApiRequest) => {
         core.meOnly(req3);
         if (req3.status == 200) {
             let result = await installSlotsTable.getEntityAsync(req3.rootId, req3.argument);
@@ -255,31 +249,29 @@ export async function initAsync() : Promise<void>
     });
 }
 
-export async function getInstalledHeadersAsync(uid: string): Promise<IPubHeader[]>
-{
-    let jsons = await installSlotsTable.createQuery().partitionKeyIs(uid).fetchAllAsync(); 
+export async function getInstalledHeadersAsync(uid: string): Promise<IPubHeader[]> {
+    let jsons = await installSlotsTable.createQuery().partitionKeyIs(uid).fetchAllAsync();
     return jsons.map(headerFromSlot)
 }
 
-async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<void>
-{
+async function getInstalledAsync(req: core.ApiRequest, long: boolean): Promise<void> {
     let uid = req.rootId
     if (req.argument == "") {
         // this normally doesn't do anything, but it will fetch more
         // scripts while import is enabled
         await tdliteLegacy.importWorkspaceAsync(req.rootUser());
-        
+
         let v = await core.longPollAsync("installed:" + uid, long, req);
         if (req.status == 200) {
             if (long) {
                 // re-get for new notifiacation count if any
                 req.rootPub = await tdliteUsers.getAsync(uid);
-            }             
-            let res:IPubHeaders = <any>{};
+            }
+            let res: IPubHeaders = <any>{};
             res.headers = await getInstalledHeadersAsync(uid);
             res.blobcontainer = workspaceForUser(uid).blobContainer().url() + "/";
             res.time = await core.nowSecondsAsync();
-            res.random = crypto.randomBytes(16).toString("base64");            
+            res.random = crypto.randomBytes(16).toString("base64");
             res.newNotifications = core.orZero(req.rootPub["notifications"]);
             res.notifications = res.newNotifications > 0;
             res.v = v;
@@ -303,8 +295,7 @@ async function getInstalledAsync(req: core.ApiRequest, long: boolean) : Promise<
     }
 }
 
-async function postInstalledAsync(req: core.ApiRequest) : Promise<void>
-{
+async function postInstalledAsync(req: core.ApiRequest): Promise<void> {
     let installedResult = new InstalledResult();
     installedResult.delay = 10;
     installedResult.headers = (<JsonObject[]>[]);
@@ -328,7 +319,7 @@ async function postInstalledAsync(req: core.ApiRequest) : Promise<void>
                 let entity = azureTable.createEntity(req.rootId, orEmpty(use["guid"]));
                 entity["recentUse"] = use["recentUse"];
                 let ok = await installSlotsTable.tryUpdateEntityAsync(td.clone(entity), "merge");
-                if ( ! ok) {
+                if (!ok) {
                     installedResult.numErrors += 1;
                 }
                 req.verb = "installedrecent";
@@ -372,16 +363,14 @@ async function postInstalledAsync(req: core.ApiRequest) : Promise<void>
 
 }
 
-export async function deleteAllHistoryAsync(userid:string, req:core.ApiRequest)
-{
+export async function deleteAllHistoryAsync(userid: string, req: core.ApiRequest) {
     let resQuery = installSlotsTable.createQuery().partitionKeyIs(userid);
-    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async (json1: JsonObject) => {
+    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async(json1: JsonObject) => {
         await deleteHistoryAsync(req, json1["RowKey"]);
     });
 }
 
-async function deleteHistoryAsync(req: core.ApiRequest, guid: string) : Promise<void>
-{
+async function deleteHistoryAsync(req: core.ApiRequest, guid: string): Promise<void> {
     let result = await installSlotsTable.getEntityAsync(req.rootId, guid);
     if (result == null) {
         return;
@@ -394,21 +383,19 @@ async function deleteHistoryAsync(req: core.ApiRequest, guid: string) : Promise<
     let wsContainer = workspaceForUser(req.rootId);
     let scriptGuid = req.rootId + "." + guid;
     let resQuery = historyTable.createQuery().partitionKeyIs(scriptGuid);
-    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async (json: JsonObject) => {
-        await historyTable.deleteEntityAsync(json);         
+    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async(json: JsonObject) => {
+        await historyTable.deleteEntityAsync(json);
         await wsContainer.blobContainer().deleteBlobAsync(json["historyid"]);
     });
 }
 
-function workspaceForUser(userid: string) : cachedStore.Container
-{
+function workspaceForUser(userid: string): cachedStore.Container {
     let container: cachedStore.Container;
     container = workspaceContainer[userid[userid.length - 1].charCodeAt(0) % workspaceContainer.length];
     return container;
 }
 
-function headerFromSlot(js: JsonObject) : IPubHeader
-{
+function headerFromSlot(js: JsonObject): IPubHeader {
     let pubHeader: PubHeader;
     pubHeader = new PubHeader();
     let isDeleted = js["status"] == "deleted";
@@ -432,16 +419,14 @@ function headerFromSlot(js: JsonObject) : IPubHeader
     return <any>pubHeader.toJson();
 }
 
-async function getInstalledHistoryAsync(req: core.ApiRequest) : Promise<void>
-{
+async function getInstalledHistoryAsync(req: core.ApiRequest): Promise<void> {
     let scriptGuid = req.rootId + "." + req.argument;
     let resQuery = historyTable.createQuery().partitionKeyIs(scriptGuid);
     let entities2 = await indexedStore.executeTableQueryAsync(resQuery, req.queryOptions);
     req.response = entities2.toJson();
 }
 
-export async function saveScriptAsync(userid: string, body: PubBody, importTime = 0) : Promise<JsonObject>
-{
+export async function saveScriptAsync(userid: string, body: PubBody, importTime = 0): Promise<JsonObject> {
     let newSlot: JsonObject;
     core.progress("save 0");
     let bodyBuilder = td.clone(body.toJson());
@@ -452,11 +437,11 @@ export async function saveScriptAsync(userid: string, body: PubBody, importTime 
     let slotJson = await installSlotsTable.getEntityAsync(userid, body.guid);
     let updatedSlot = azureTable.createEntity(userid, body.guid);
     let isImport = importTime != 0;
-    
+
     if (isImport && slotJson) {
         return { error: "imported slot already exists" }
     }
-        
+
     core.progress("save 1");
     let time = importTime;
     if (!time && body.scriptVersion.time)
@@ -482,7 +467,7 @@ export async function saveScriptAsync(userid: string, body: PubBody, importTime 
     }
     if (!isImport)
         logger.tick("SaveScript");
-        
+
     bodyBuilder["slotUserId"] = userid;
     for (let s of Object.keys(bodyJson)) {
         if (s != "scriptVersion") {
@@ -508,7 +493,7 @@ export async function saveScriptAsync(userid: string, body: PubBody, importTime 
         else {
             versionOK = await installSlotsTable.tryUpdateEntityAsync(updatedJson, "merge");
         }
-        if ( ! versionOK) {
+        if (!versionOK) {
             let result = await installSlotsTable.getEntityAsync(userid, body.guid);
             if (result != null && orEmpty(result["currentBlob"]) == id2) {
                 logger.debug("fixing up wrong result from azure table insert, " + userid + " " + body.guid + " " + id2);
@@ -536,14 +521,13 @@ export async function saveScriptAsync(userid: string, body: PubBody, importTime 
         newSlot = headerFromSlot(updatedJson)
     }
     else {
-        newSlot = ({"error":"out of date"});
+        newSlot = ({ "error": "out of date" });
         logger.debug("collision on " + userid + "/" + body.guid + " " + prevBlob + " vs " + body.scriptVersion.baseSnapshot);
     }
     return newSlot;
 }
 
-async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
-{
+async function publishScriptAsync(req: core.ApiRequest): Promise<void> {
     core.progress("start publish, ");
     let slotJson = await installSlotsTable.getEntityAsync(req.userid, req.argument);
     let pubVersion = new PubVersion();
@@ -562,7 +546,7 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
         let pubScript = new tdliteScripts.PubScript();
         pubScript.userid = req.userid;
         pubScript.ishidden = orFalse(req.queryOptions["hidden"]);
-        pubScript.unmoderated = ! core.callerHasPermission(req, "adult");
+        pubScript.unmoderated = !core.callerHasPermission(req, "adult");
         let mergeids = req.queryOptions["mergeids"];
         if (mergeids != null) {
             pubScript.mergeids = mergeids.split(",");
@@ -596,6 +580,8 @@ async function publishScriptAsync(req: core.ApiRequest) : Promise<void>
         pubScript.flows = (<string[]>[]);
         pubScript.editor = orEmpty(slotJson["editor"]);
         pubScript.target = orEmpty(slotJson["target"]);
+        if (!core.isValidTargetName(pubScript.target))
+            pubScript.target = ""
         pubScript.iconArtId = td.toString(req.body["iconArtId"]);
         pubScript.splashArtId = td.toString(req.body["splashArtId"]);
         pubScript.meta = req.body["meta"];

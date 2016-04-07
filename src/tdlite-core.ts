@@ -375,6 +375,10 @@ export function nonEmpty(id: string): boolean {
     return b;
 }
 
+export function isValidTargetName(name: string) {
+    return /^[a-z]*$/.test(orEmpty(name))
+}
+
 export function buildApiRequest(url: string): ApiRequest {
     let apiReq: ApiRequest;
     apiReq = new ApiRequest();
