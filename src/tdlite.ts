@@ -165,7 +165,7 @@ async function _initAsync() : Promise<void>
         }
         else {
             core.handleBasicAuth(req, res);
-            if ( ! res.finished() && req.method() != "GET") {
+            if ( ! res.finished() && req.method() != "GET" && req.method() != "HEAD") {
                 res.sendError(httpCode._405MethodNotAllowed, "");
             }
             if (!res.finished()) {
