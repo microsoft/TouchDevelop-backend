@@ -760,7 +760,10 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response, rel
         if (relaxed) return
         if (fullTD && req.url().startsWith("/templates")) return
         if (kindScript && req.url().startsWith("/app/")) return
+        if (kindScript && req.url().startsWith("/sim/")) return
         if (kindScript && req.url().endsWith("--manifest")) return
+        if (kindScript && req.url().endsWith("--worker")) return
+        
         if (orEmpty(req.query()["anon_token"]) == basicCreds) {
             // OK
         }
@@ -1103,13 +1106,15 @@ export function hasPermission(userjs: IUser, perm: string): boolean {
 
 export function setHtmlHeaders(req: restify.Request): void {
     let res = req.response
-    if (!req.url().startsWith("/app/"))
+    if (!kindScript && !req.url().startsWith("/app/"))
         res.setHeader("Cache-Control", "no-cache, no-store");
     if (!kindScript)
         res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    
+    res.setHeader("Access-Control-Allow-Origin", "*");
 }
 
 export function encrypt(val: string, keyid: string): string {

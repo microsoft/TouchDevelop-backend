@@ -47,6 +47,7 @@ export class PubRelease
     @td.json public cdnUrl: string = "";
     @td.json public baserelease: string = "";
     @td.json public target: string = "";
+    @td.json public type: string = "";
     static createFromJson(o: JsonObject) { let r = new PubRelease(); r.fromJson(o); return r; }
 }
 
@@ -105,6 +106,12 @@ export async function initAsync(): Promise<void> {
         await core.anyListAsync(releases, req, "target", req.argument);
     });
 
+    core.addRoute("GET", "releasecfg", "*", async(req: core.ApiRequest) => {
+        req.response = {
+            
+        }        
+    });
+
     core.addRoute("POST", "releases", "", async(req: core.ApiRequest) => {
         let baseid = orEmpty(req.body["baserelease"])
 
@@ -139,6 +146,7 @@ export async function initAsync(): Promise<void> {
             rel.baserelease = baseid
             rel.target = orEmpty(req.body["target"])
             if (!core.isValidTargetName(rel.target)) rel.target = ""
+            rel.type = orEmpty(req.body["type"]) && baseRel ? "target" : ""
 
             if (core.kindScript) {
                 rel.releaseid = ""
@@ -160,7 +168,7 @@ export async function initAsync(): Promise<void> {
             jsb["pub"] = rel.toJson();
             let key = "rel-" + rel.releaseid;
 
-            if (rel.baserelease) {
+            if (rel.baserelease && !rel.type) {
                 let files = ["index.html", "worker.js", "embed.js", "run.html", "release.manifest"]
                 let cdnUrl = core.currClientConfig.primaryCdnUrl + "/app/" + rel.baserelease + "/c/"
                 for (let fn of files) {
@@ -457,9 +465,9 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return await rewriteIndexAsync(rel, relid, text)
             });
         }
-        else if (fn == "simulator.html" || fn == "sim.manifest") {            
+        else if (fn == "simulator.html" || fn == "sim.manifest") {
             await rewriteAndCacheAsync(rel, relid, fn, /html/.test(fn) ? "text/html" : "text/cache-manifest", res, async(text2: string) => {
-                return await getRewrittenIndexAsync("/app/sim.manifest?r=" + relid, relid, fn)
+                return await getLegacyRewrittenIndexAsync("/app/sim.manifest?r=" + relid, relid, fn)
             });
         }
         else if (/\.manifest$/.test(fn)) {
@@ -512,7 +520,7 @@ function isKnownReleaseName(fn: string): boolean {
     return b;
 }
 
-export async function getRewrittenIndexAsync(manifest: string, id: string, srcFile = "index.html") {
+export async function getLegacyRewrittenIndexAsync(manifest: string, id: string, srcFile: string) {
     let relpub = await core.getPubAsync(id, "release");
     if (!relpub) return "Release deleted."
 
@@ -559,6 +567,74 @@ export async function getRewrittenIndexAsync(manifest: string, id: string, srcFi
         var tdConfig = ${JSON.stringify(cfg, null, 2) };
     `;
     text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
+    return text;
+}
+
+function getSimUrl(trg: string, relid: string) {
+    let dom = core.serviceSettings.targetsDomain
+    return `https://trg-${trg}.${dom}/sim/${relid}`
+}
+
+export async function getRewrittenIndexAsync(relprefix: string, id: string, srcFile: string) {
+    let sanitize = (s: string) => s.replace(/[^\w \.\-\/]/g, "_")
+
+    relprefix = sanitize(relprefix)
+
+    let relpub = await core.getPubAsync(id, "release");
+    if (!relpub) return "Release deleted."
+
+    let prel = PubRelease.createFromJson(relpub["pub"]);
+
+    // no cache manifest on versioned releases - they just clog storage
+    let manifest = relprefix + "manifest"
+    if (/v\d+\./.test(relprefix)) manifest = ""
+
+    if (!prel.type)
+        return await getLegacyRewrittenIndexAsync(manifest, id, srcFile)
+
+    let baserelid = prel.releaseid
+
+    let baseRelJson = await core.getPubAsync(prel.baserelease, "release")
+    if (!baseRelJson)
+        return "Base release deleted: " + prel.baserelease
+    let baseRel = PubRelease.createFromJson(baseRelJson["pub"])
+    baserelid = baseRelJson["id"]
+
+    let srcRelId = /^sim/.test(srcFile) ? prel.releaseid : baserelid
+
+    let info = await appContainer.getBlobToTextAsync(srcRelId + "/" + srcFile);
+    let text = info.text()
+
+    if (!info.text()) return srcFile + " missing in " + srcRelId
+
+    let domain = core.serviceSettings.domains[prel.target] || core.myHost
+
+    let simCdn = core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/"
+    let trgCdn = + baserelid + "/c/"
+
+    let appCdn = core.currClientConfig.primaryCdnUrl + "/app/"
+    let ccfg = {
+        relprefix: relprefix,
+        workerjs: relprefix + "worker",
+        pxtVersion: sanitize(baseRel.pkgversion),
+        pxtRelId: baseRel.id,
+        pxtCdnUrl: appCdn + baseRel.id + "/c/",
+        targetVersion: sanitize(prel.pkgversion),
+        targetRelId: prel.id,
+        targetCdnUrl: appCdn + prel.id + "/c/",
+        targetId: prel.target,
+        simUrl: getSimUrl(prel.target, prel.id)
+    }
+
+    let cfgStr = JSON.stringify(ccfg, null, 4)
+    ccfg["cfg"] = cfgStr
+    ccfg["manifest"] = manifest ? `manifest="${manifest}"` : ""
+
+    text = text.replace(/@(\w+)@/g, (f, id) => {
+        if (ccfg.hasOwnProperty(id)) return ccfg[id]
+        else return f
+    })
+
     return text;
 }
 

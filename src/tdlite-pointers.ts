@@ -874,6 +874,7 @@ var subFiles = {
     embed: "embed.js",
     run: "run.html",
     manifest: "release.manifest",
+    worker: "worker.js",
 }
 
 function domainOfTarget(trg: string) {
@@ -900,22 +901,43 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     let host = (req.header("host") || "").toLowerCase()
     let vhostDirName = ""
     let hasVhosts = false
+    let simulatorDomain = ""
+    let isSimulator = fn.startsWith("sim/")
 
-    for (let domain of Object.keys(core.serviceSettings.domains)) {
-        hasVhosts = true
-        let path = core.serviceSettings.domains[domain]
-        if (domain == host) {
-            vhostDirName = core.serviceSettings.domains[host].replace(/^\//, "")
-            fn = vhostDirName + "/" + fn
-            fn = fn.replace(/\/$/g, "")
-            break
+    if (core.serviceSettings.targetsDomain && host.startsWith("trg-") && host.endsWith("." + core.serviceSettings.targetsDomain)) {
+        let trg = host.slice(4, host.length - 1 - core.serviceSettings.targetsDomain.length)
+        if (domainOfTarget(trg)) {
+            if (!isSimulator) {
+                res.sendError(httpCode._404NotFound, "Only /sim/* URLs allowed in trg-* domains.")
+                return
+            }
+            simulatorDomain = trg
         }
     }
 
-    if (hasVhosts && !vhostDirName && host && host != core.myHost) {
-        res.redirect(httpCode._301MovedPermanently, core.self + req.url().slice(1))
-        return
+    if (!simulatorDomain) {
+        if (isSimulator) {
+            res.sendError(httpCode._404NotFound, "/sim/* URLs only allowed in trg-* domains.")
+            return
+        }
+
+        for (let domain of Object.keys(core.serviceSettings.domains)) {
+            hasVhosts = true
+            let path = core.serviceSettings.domains[domain]
+            if (domain == host) {
+                vhostDirName = core.serviceSettings.domains[host].replace(/^\//, "")
+                fn = vhostDirName + "/" + fn
+                break
+            }
+        }
+
+        if (hasVhosts && !vhostDirName && host && host != core.myHost) {
+            res.redirect(httpCode._301MovedPermanently, core.self + req.url().slice(1))
+            return
+        }
     }
+
+    fn = fn.replace(/\/$/g, "")
 
     if (fn == "") {
         fn = "home";
@@ -958,6 +980,16 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         pubdata["ptrid"] = id;
 
         let subfile = ""
+
+        if (isSimulator) {
+            let rel = await core.getPubAsync(fn.slice(4), "release")
+            if (!rel) {
+                v.text = "No such release."
+            } else {
+                v.text = await tdliteReleases.getRewrittenIndexAsync("/--", rel["id"], "simulator.html")
+            }
+            return
+        }
 
         let existing = await core.getPubAsync(id, "pointer");
         if (existing == null && /@[a-z][a-z]$/.test(id)) {
@@ -1038,12 +1070,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     v.contentType = "text/plain; charset=utf-8"
                 }
             } else if (ptr.releaseid) {
-                let manifest = ptr.path.replace(/^\/*[^-\/]+/, "").replace(/^[-\/]/, "")
-                if (!manifest) manifest = "/--manifest"
-                else manifest = "/" + manifest + "---manifest"                 
-                // no cache manifest on versioned releases - they just clog storage
-                if (/v\d+\./.test(manifest)) manifest = ""
-                v.text = await tdliteReleases.getRewrittenIndexAsync(manifest, ptr.releaseid, subfile || "index.html")
+                let relname = ptr.path.replace(/^\/*[^-\/]+/, "").replace(/^[-\/]/, "")
+                let relpref = relname ? "/" + relname + "---" : "/--"
+                v.text = await tdliteReleases.getRewrittenIndexAsync(relpref, ptr.releaseid, subfile || "index.html")
                 if (subfile.endsWith(".js"))
                     v.contentType = "application/javascript; charset=utf-8"
                 else if (subfile.endsWith(".manifest"))
