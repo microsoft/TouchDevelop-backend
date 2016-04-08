@@ -108,8 +108,8 @@ export async function initAsync(): Promise<void> {
 
     core.addRoute("GET", "releasecfg", "*", async(req: core.ApiRequest) => {
         req.response = {
-            
-        }        
+
+        }
     });
 
     core.addRoute("POST", "releases", "", async(req: core.ApiRequest) => {
@@ -629,6 +629,12 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     let cfgStr = JSON.stringify(ccfg, null, 4)
     ccfg["cfg"] = cfgStr
     ccfg["manifest"] = manifest ? `manifest="${manifest}"` : ""
+
+    let mfiles = "@manifestfiles@"
+    if (text.indexOf(mfiles) >= 0) {
+        let info2 = await appContainer.getBlobToTextAsync(prel.releaseid + "/sim.manifestfiles");
+        text = td.replaceAll(text, mfiles, info2.text() || "")        
+    }
 
     text = text.replace(/@(\w+)@/g, (f, id) => {
         if (ccfg.hasOwnProperty(id)) return ccfg[id]
