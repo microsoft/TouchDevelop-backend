@@ -161,10 +161,11 @@ export async function initAsync(): Promise<void> {
             let key = "rel-" + rel.releaseid;
 
             if (rel.baserelease) {
-                let files = ["index.html", "worker.js", "embed.js", "run.html"]
+                let files = ["index.html", "worker.js", "embed.js", "run.html", "release.manifest"]
                 let cdnUrl = core.currClientConfig.primaryCdnUrl + "/app/" + rel.baserelease + "/c/"
                 for (let fn of files) {
                     let res = await appContainer.getBlobToTextAsync(rel.baserelease + "/" + fn)
+                    if (!res.succeded()) continue
                     let idx = res.text()
                     idx = idx.replace('"./embed.js"', `"/app/embed.js?r=${rel.releaseid}"`)
                     idx = idx.replace(/"\.\//g, "\"" + cdnUrl)
@@ -429,7 +430,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         }
     }
 
-    if (fn == "simulator.html") {
+    if (fn == "simulator.html" || fn == "sim.manifest") {
         if (!targetIsMatching) {
             res.sendError(404, "simulator.html only available on trg-..., not on " + targetFromHost);
             return
@@ -456,6 +457,11 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return await rewriteIndexAsync(rel, relid, text)
             });
         }
+        else if (fn == "simulator.html" || fn == "sim.manifest") {            
+            await rewriteAndCacheAsync(rel, relid, fn, /html/.test(fn) ? "text/html" : "text/cache-manifest", res, async(text2: string) => {
+                return await getRewrittenIndexAsync("/app/sim.manifest?r=" + relid, relid, fn)
+            });
+        }
         else if (/\.manifest$/.test(fn)) {
             await rewriteAndCacheAsync(rel, relid, "app.manifest", "text/cache-manifest", res, async(text: string) => {
                 let result1: string;
@@ -472,7 +478,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         else if (/\.error$/.test(fn)) {
             res.redirect(httpCode._301MovedPermanently, "/app/error.html");
         }
-        else if (fn == "error.html" || fn == "browsers.html" || fn == "simulator.html") {
+        else if (fn == "error.html" || fn == "browsers.html") {
             await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async(text2: string) => {
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
@@ -506,11 +512,13 @@ function isKnownReleaseName(fn: string): boolean {
     return b;
 }
 
-export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile = "index.html") {
+export async function getRewrittenIndexAsync(manifest: string, id: string, srcFile = "index.html") {
     let relpub = await core.getPubAsync(id, "release");
     if (!relpub) return "Release deleted."
 
     let prel = PubRelease.createFromJson(relpub["pub"]);
+
+    let baserelid = prel.releaseid
 
     let info = await appContainer.getBlobToTextAsync(prel.releaseid + "/" + srcFile);
     let text = info.text()
@@ -518,22 +526,30 @@ export async function getRewrittenIndexAsync(rellbl: string, id: string, srcFile
     if (!info.text()) return srcFile + " missing"
 
     let baseRel = null
-    if (prel.baserelease)
+    if (prel.baserelease) {
         baseRel = await core.getPubAsync(prel.baserelease, "release")
+        if (baseRel) baserelid = baseRel["id"]
+    }
 
     let ccfg = clientConfigForRelease(prel);
-    ccfg.releaseLabel = rellbl;
+    ccfg.releaseLabel = manifest;
     let ver = orEmpty(relpub["pub"]["version"]);
-    if (core.basicCreds == "") {
-        text = td.replaceAll(text, "data-manifest=\"\"", "manifest=\"/app/app.manifest?r=" + encodeURIComponent(id) + "\"");
+    if (manifest /*&& core.basicCreds == ""*/) {
+        text = td.replaceAll(text, "data-manifest=\"\"", `manifest="${manifest}"`);
     }
     let suff = "?r=" + encodeURIComponent(id);
     //text = td.replaceAll(text, "\"browsers.html\"", "\"/app/browsers.html" + suff);
     //text = td.replaceAll(text, "\"error.html\"", "\"/app/error.html" + suff);    
     text = td.replaceAll(text, '"embed.js"', '"/app/embed.js' + suff + '"');
     //logger.debug(`after repl: ${text}`)
-    text = td.replaceAll(text, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/");
+    let simCdn = core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/"
+    let trgCdn = core.currClientConfig.primaryCdnUrl + "/app/" + baserelid + "/c/"
+    text = td.replaceAll(text, "\"./", "\"" + simCdn);
     text = patchSimHtml(text, relpub)
+    text = td.replaceAll(text, "/sim/", simCdn);
+    text = td.replaceAll(text, "/cdn/", trgCdn);
+    text = td.replaceAll(text, "@TRGREL@", prel.releaseid);
+    text = td.replaceAll(text, "@BASEREL@", baserelid);
 
     let cfg = ccfg.toJson()
     cfg["targetVersion"] = prel.pkgversion

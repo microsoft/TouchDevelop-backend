@@ -872,7 +872,8 @@ function legacyKindPrefix(name: string) {
 
 var subFiles = {
     embed: "embed.js",
-    run: "run.html"
+    run: "run.html",
+    manifest: "release.manifest",
 }
 
 function domainOfTarget(trg: string) {
@@ -1037,9 +1038,16 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     v.contentType = "text/plain; charset=utf-8"
                 }
             } else if (ptr.releaseid) {
-                v.text = await tdliteReleases.getRewrittenIndexAsync(ptr.path, ptr.releaseid, subfile || "index.html")
+                let manifest = ptr.path.replace(/^\/*[^-\/]+/, "").replace(/^[-\/]/, "")
+                if (!manifest) manifest = "/--manifest"
+                else manifest = "/" + manifest + "---manifest"                 
+                // no cache manifest on versioned releases - they just clog storage
+                if (/v\d+\./.test(manifest)) manifest = ""
+                v.text = await tdliteReleases.getRewrittenIndexAsync(manifest, ptr.releaseid, subfile || "index.html")
                 if (subfile.endsWith(".js"))
                     v.contentType = "application/javascript; charset=utf-8"
+                else if (subfile.endsWith(".manifest"))
+                    v.contentType = "text/cache-manifest"
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
