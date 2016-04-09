@@ -875,6 +875,8 @@ var subFiles = {
     run: "run.html",
     manifest: "release.manifest",
     worker: "worker.js",
+    simulator: "simulator.html",
+    simmanifest: "sim.manifest",
 }
 
 function domainOfTarget(trg: string) {
@@ -902,22 +904,24 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     let vhostDirName = ""
     let hasVhosts = false
     let simulatorDomain = ""
-    let isSimulator = fn.startsWith("sim/")
+    let isSimulator = /--sim[a-z]*$/.test(fn)
 
     if (core.serviceSettings.targetsDomain && host.startsWith("trg-") && host.endsWith("." + core.serviceSettings.targetsDomain)) {
         let trg = host.slice(4, host.length - 1 - core.serviceSettings.targetsDomain.length)
         if (domainOfTarget(trg)) {
             if (!isSimulator) {
-                res.sendError(httpCode._404NotFound, "Only /sim/* URLs allowed in trg-* domains.")
+                res.sendError(httpCode._404NotFound, "Only *--sim* URLs allowed in trg-* domains.")
                 return
             }
             simulatorDomain = trg
+            vhostDirName = trg
+            fn = vhostDirName + "/" + fn
         }
     }
 
     if (!simulatorDomain) {
         if (isSimulator) {
-            res.sendError(httpCode._404NotFound, "/sim/* URLs only allowed in trg-* domains.")
+            res.sendError(httpCode._404NotFound, "*--sim* URLs only allowed in trg-* domains.")
             return
         }
 
@@ -981,16 +985,6 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
         let subfile = ""
 
-        if (isSimulator) {
-            let rel = await core.getPubAsync(fn.slice(4), "release")
-            if (!rel) {
-                v.text = "No such release."
-            } else {
-                v.text = await tdliteReleases.getRewrittenIndexAsync("/--", rel["id"], "simulator.html")
-            }
-            return
-        }
-
         let existing = await core.getPubAsync(id, "pointer");
         if (existing == null && /@[a-z][a-z]$/.test(id)) {
             existing = await core.getPubAsync(id.replace(/@..$/g, ""), "pointer");
@@ -1009,6 +1003,12 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
         if (existing)
             v.customtick = existing["pub"]["customtick"]
+        
+        if (isSimulator && (!subfile || !existing)) {
+            v.text = "Invalid trg-* reference: " + id
+            v.contentType = "text/plain"
+            return
+        }
 
         if (existing == null) {
             if (td.startsWith(fn, "u/")) {

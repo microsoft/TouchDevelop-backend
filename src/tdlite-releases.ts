@@ -584,9 +584,11 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     if (!relpub) return "Release deleted."
 
     let prel = PubRelease.createFromJson(relpub["pub"]);
+    
+    let isSim = /^sim/.test(srcFile)
 
     // no cache manifest on versioned releases - they just clog storage
-    let manifest = relprefix + "manifest"
+    let manifest = relprefix + (isSim ? "simmanifest" : "manifest")
     if (/v\d+\./.test(relprefix)) manifest = ""
 
     if (!prel.type)
@@ -612,6 +614,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     let simCdn = core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/"
     let trgCdn = + baserelid + "/c/"
 
+    let simdom = core.serviceSettings.targetsDomain
     let appCdn = core.currClientConfig.primaryCdnUrl + "/app/"
     let ccfg = {
         relprefix: relprefix,
@@ -623,7 +626,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
         targetRelId: prel.id,
         targetCdnUrl: appCdn + prel.id + "/c/",
         targetId: prel.target,
-        simUrl: getSimUrl(prel.target, prel.id)
+        simUrl: `https://trg-${prel.target}.${simdom}${relprefix}simulator`
     }
 
     let cfgStr = JSON.stringify(ccfg, null, 4)
@@ -631,10 +634,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     ccfg["manifest"] = manifest ? `manifest="${manifest}"` : ""
 
     let mfiles = "@manifestfiles@"
-    if (text.indexOf(mfiles) >= 0) {
-        let info2 = await appContainer.getBlobToTextAsync(prel.releaseid + "/sim.manifestfiles");
-        text = td.replaceAll(text, mfiles, info2.text() || "")        
-    }
+    text = td.replaceAll(text, mfiles, "")
 
     text = text.replace(/@(\w+)@/g, (f, id) => {
         if (ccfg.hasOwnProperty(id)) return ccfg[id]
