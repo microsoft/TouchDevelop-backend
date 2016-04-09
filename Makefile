@@ -22,6 +22,6 @@ docs: all
 upload:
 	node built/templater.js push
 
-ks:
-	make -C ../kindscript
-	cp ../kindscript/built/backendutils.js external/
+pxt:
+	make -C ../pxt
+	cp ../pxt/built/backendutils.js external/

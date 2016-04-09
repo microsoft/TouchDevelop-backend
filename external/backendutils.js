@@ -1,8 +1,8 @@
 /// <reference path="../../typings/bluebird/bluebird.d.ts"/>
 var ts;
 (function (ts) {
-    var ks;
-    (function (ks) {
+    var pxt;
+    (function (pxt) {
         var Util;
         (function (Util) {
             function assert(cond, msg) {
@@ -103,6 +103,21 @@ var ts;
                     return 1;
             }
             Util.strcmp = strcmp;
+            function stringMapEq(a, b) {
+                var ak = Object.keys(a);
+                var bk = Object.keys(b);
+                if (ak.length != bk.length)
+                    return false;
+                for (var _i = 0, ak_1 = ak; _i < ak_1.length; _i++) {
+                    var k = ak_1[_i];
+                    if (!b.hasOwnProperty(k))
+                        return false;
+                    if (a[k] !== b[k])
+                        return false;
+                }
+                return true;
+            }
+            Util.stringMapEq = stringMapEq;
             function endsWith(str, suffix) {
                 if (str.length < suffix.length)
                     return false;
@@ -419,6 +434,7 @@ var ts;
                         case "png": return "image/png";
                         case "ico": return "image/x-icon";
                         case "manifest": return "text/cache-manifest";
+                        case "webmanifest": return "application/manifest+json";
                         case "json": return "application/json";
                         case "svg": return "image/svg+xml";
                         case "eot": return "application/vnd.ms-fontobject";
@@ -588,18 +604,18 @@ var ts;
                     return "data:" + mimetype + ";base64," + btoa(toUTF8(data));
             }
             Util.toDataUri = toDataUri;
-        })(Util = ks.Util || (ks.Util = {}));
-    })(ks = ts.ks || (ts.ks = {}));
+        })(Util = pxt.Util || (pxt.Util = {}));
+    })(pxt = ts.pxt || (ts.pxt = {}));
 })(ts || (ts = {}));
 var ts;
 (function (ts) {
-    var ks;
-    (function (ks) {
+    var pxt;
+    (function (pxt) {
         var BrowserImpl;
         (function (BrowserImpl) {
-            ks.Util.httpRequestCoreAsync = httpRequestCoreAsync;
-            ks.Util.sha256 = sha256string;
-            ks.Util.getRandomBuf = function (buf) {
+            pxt.Util.httpRequestCoreAsync = httpRequestCoreAsync;
+            pxt.Util.sha256 = sha256string;
+            pxt.Util.getRandomBuf = function (buf) {
                 if (window.crypto)
                     window.crypto.getRandomValues(buf);
                 else {
@@ -611,7 +627,7 @@ var ts;
                 return new Promise(function (resolve, reject) {
                     var client;
                     var resolved = false;
-                    var headers = ks.Util.clone(options.headers) || {};
+                    var headers = pxt.Util.clone(options.headers) || {};
                     client = new XMLHttpRequest();
                     client.onreadystatechange = function () {
                         if (resolved)
@@ -649,7 +665,7 @@ var ts;
                         buf = data;
                     }
                     else {
-                        ks.Util.oops("bad data");
+                        pxt.Util.oops("bad data");
                     }
                     client.open(method, options.url);
                     Object.keys(headers).forEach(function (k) {
@@ -675,8 +691,8 @@ var ts;
                 return (v >>> b) | (v << (32 - b));
             }
             function sha256round(hs, w) {
-                ks.Util.assert(hs.length == 8);
-                ks.Util.assert(w.length == 64);
+                pxt.Util.assert(hs.length == 8);
+                pxt.Util.assert(w.length == 64);
                 for (var i = 16; i < 64; ++i) {
                     var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
                     var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
@@ -763,20 +779,20 @@ var ts;
             }
             BrowserImpl.sha256buffer = sha256buffer;
             function sha256string(s) {
-                return sha256buffer(ks.Util.stringToUint8Array(ks.Util.toUTF8(s)));
+                return sha256buffer(pxt.Util.stringToUint8Array(pxt.Util.toUTF8(s)));
             }
             BrowserImpl.sha256string = sha256string;
-        })(BrowserImpl = ks.BrowserImpl || (ks.BrowserImpl = {}));
-    })(ks = ts.ks || (ts.ks = {}));
+        })(BrowserImpl = pxt.BrowserImpl || (pxt.BrowserImpl = {}));
+    })(pxt = ts.pxt || (ts.pxt = {}));
 })(ts || (ts = {}));
 /// <reference path='../typings/marked/marked.d.ts' />
 /// <reference path="emitter/util.ts"/>
-var ks;
-(function (ks) {
+var pxt;
+(function (pxt) {
     var docs;
     (function (docs) {
         var marked;
-        var U = ts.ks.Util;
+        var U = ts.pxt.Util;
         var stdboxes = {};
         var stdmacros = {};
         var stdSetting = "<!-- @CMD@ @ARGS@ -->";
@@ -995,8 +1011,8 @@ var ks;
             };
             params["body"] = html;
             params["menu"] = (theme.docMenu || []).map(function (e) { return recMenu(e, 0); }).join("\n");
-            params["targetname"] = theme.name || "KindScript";
-            params["targetlogo"] = theme.docsLogo ? "<img src=\"" + U.toDataUri(theme.logo) + "\" />" : "";
+            params["targetname"] = theme.name || "PXT";
+            params["targetlogo"] = theme.docsLogo ? "<img src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
             params["name"] = params["title"] + " - " + params["targetname"];
             return injectHtml(template, params, ["body", "menu", "targetlogo"]);
         }
@@ -1012,8 +1028,8 @@ var ks;
                 return res;
             });
         }
-    })(docs = ks.docs || (ks.docs = {}));
-})(ks || (ks = {}));
-/// <reference path="../kindlib/docsrender.ts"/>
-global.ks = ks;
+    })(docs = pxt.docs || (pxt.docs = {}));
+})(pxt || (pxt = {}));
+/// <reference path="../pxtlib/docsrender.ts"/>
+global.pxt = pxt;
 //# sourceMappingURL=backendutils.js.map

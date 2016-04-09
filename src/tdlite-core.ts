@@ -36,7 +36,7 @@ export var blobService: azureBlobStorage.BlobService;
 export var cachedApiContainer: cachedStore.Container;
 export var emptyRequest: ApiRequest;
 export var fullTD: boolean = false;
-export var kindScript: boolean = false;
+export var pxt: boolean = false;
 export var hasHttps: boolean = false;
 export var httpCode = restify.http();
 export var myChannel: string = "";
@@ -53,7 +53,7 @@ export var serviceSettings: ServiceSettings;
 var settingsContainer: cachedStore.Container;
 export var currClientConfig: ClientConfig;
 export var releaseVersionPrefix: string = "0.0";
-export var rewriteVersion: number = 241;
+export var rewriteVersion: number = 242;
 
 var settingsCache = {};
 var lastSettingsVersion = "";
@@ -759,8 +759,8 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response, rel
     if (!res.finished() && basicCreds != "") {
         if (relaxed) return
         if (fullTD && req.url().startsWith("/templates")) return
-        if (kindScript && req.url().startsWith("/app/")) return
-        if (kindScript && /--([a-z]+)$/.test(req.url())) return
+        if (pxt && req.url().startsWith("/app/")) return
+        if (pxt && /--([a-z]+)$/.test(req.url())) return
         
         if (orEmpty(req.query()["anon_token"]) == basicCreds) {
             // OK
@@ -1104,9 +1104,9 @@ export function hasPermission(userjs: IUser, perm: string): boolean {
 
 export function setHtmlHeaders(req: restify.Request): void {
     let res = req.response
-    if (!kindScript && !req.url().startsWith("/app/"))
+    if (!pxt && !req.url().startsWith("/app/"))
         res.setHeader("Cache-Control", "no-cache, no-store");
-    if (!kindScript)
+    if (!pxt)
         res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
@@ -1371,7 +1371,7 @@ export async function initAsync() {
     throttleDisabled = orEmpty(td.serverSetting("DISABLE_THROTTLE", true)) == "true";
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
-    kindScript = td.serverSetting("KIND_SCRIPT", true) == "true";
+    pxt = td.serverSetting("KIND_SCRIPT", true) == "true";
     hasHttps = td.startsWith(td.serverSetting("SELF", false), "https:");
     self = td.serverSetting("SELF", false).toLowerCase();
     myHost = (/^https?:\/\/([^\/]+)/.exec(self) || [])[1].toLowerCase();

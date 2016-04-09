@@ -148,7 +148,7 @@ export async function initAsync(): Promise<void> {
             if (!core.isValidTargetName(rel.target)) rel.target = ""
             rel.type = orEmpty(req.body["type"]) && baseRel ? "target" : ""
 
-            if (core.kindScript) {
+            if (core.pxt) {
                 rel.releaseid = ""
             } else {
                 if (!looksLikeReleaseId(rel.releaseid)) {
@@ -459,7 +459,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             res.sendText(s, "application/javascript");
         }
         else if (fn == "") {
-            if (core.kindScript && (rel == "current" || rel == "latest" || rel == "beta"))
+            if (core.pxt && (rel == "current" || rel == "latest" || rel == "beta"))
                 res.redirect(httpCode._302MovedTemporarily, "/microbit");
             await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async(text: string) => {
                 return await rewriteIndexAsync(rel, relid, text)
@@ -493,7 +493,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         }
         else if (fn == "worker.js" || fn == "embed.js") {
             await rewriteAndCacheAsync(rel, relid, fn, "application/javascript", res, async(text2: string) => {
-                if (core.kindScript) {
+                if (core.pxt) {
                     let xrel = await core.getPubAsync(relid, "release")
                     text2 = patchSimHtml(text2, xrel)
                 }

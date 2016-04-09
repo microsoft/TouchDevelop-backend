@@ -306,7 +306,7 @@ export async function initAsync(): Promise<void> {
         }
     })
 
-    if (core.kindScript) {
+    if (core.pxt) {
         restify.server().get("/:scriptid/embed", async(req, res) => {
             let lang = await handleLanguageAsync(req);
             let sid = req.param("scriptid")
@@ -362,7 +362,7 @@ export async function initAsync(): Promise<void> {
             req.response = {
                 "version": "1.0",
                 "type": "rich",
-                "provider_name": "KindScript/" + target,
+                "provider_name": "PXT/" + target,
                 "provider_url": core.self,
                 "width": w,
                 "height": h,
@@ -813,7 +813,7 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, req);
     let templ = "templates/script"
 
-    if (core.kindScript) {
+    if (core.pxt) {
         let targetName: string = pub["target"]
         let theme = await getTargetThemeAsync(targetName)
         let readmeMd = ""
@@ -1032,7 +1032,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     await errorAsync("No such publication");
                 }
                 else {
-                    if (core.kindScript && entry["kind"] == "script") {
+                    if (core.pxt && entry["kind"] == "script") {
                         let domain = domainOfTarget(entry["pub"]["target"])
                         if (domain && domain != host) {
                             v.redirect = "https://" + domain + "/" + bareFn

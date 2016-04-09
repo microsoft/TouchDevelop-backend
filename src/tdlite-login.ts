@@ -938,7 +938,7 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
                     return;
                 }
                 let r = orEmpty(rreq.header("referer"));
-                if (core.kindScript || td.startsWith(r, "http://localhost:") || td.startsWith(r, core.self + "app/") || td.startsWith(r, core.self + "userapp/")) {
+                if (core.pxt || td.startsWith(r, "http://localhost:") || td.startsWith(r, core.self + "app/") || td.startsWith(r, core.self + "userapp/")) {
                 }
                 else {
                     req.status = httpCode._401Unauthorized;
