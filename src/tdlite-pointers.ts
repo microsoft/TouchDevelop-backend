@@ -877,6 +877,7 @@ var subFiles = {
     worker: "worker.js",
     simulator: "simulator.html",
     simmanifest: "sim.manifest",
+    webmanifest: "sim.webmanifest",
 }
 
 function domainOfTarget(trg: string) {
@@ -1074,9 +1075,11 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 let relpref = relname ? "/" + relname + "---" : "/--"
                 v.text = await tdliteReleases.getRewrittenIndexAsync(relpref, ptr.releaseid, subfile || "index.html")
                 if (subfile.endsWith(".js"))
-                    v.contentType = "application/javascript; charset=utf-8"
+                    v.contentType = "application/javascript"
                 else if (subfile.endsWith(".manifest"))
                     v.contentType = "text/cache-manifest"
+                else if (subfile.endsWith(".webmanifest"))
+                    v.contentType = "application/manifest+json"
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
