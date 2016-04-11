@@ -13,8 +13,8 @@ type JsonBuilder = td.JsonBuilder;
 var expandInfo: td.Action1<JsonBuilder>;
 
 require("./backendutils")
-declare var ks:any;
-export var renderMarkdown : (template:string, src: string, theme: {}, pubinfo?: {}) => string = ks.docs.renderMarkdown;  
+declare var pxt:any;
+export var renderMarkdown : (template:string, src: string, theme: {}, pubinfo?: {}) => string = pxt.docs.renderMarkdown;  
 
 export async function formatAsync(templ: string, pubdata: JsonBuilder): Promise<string> {
     if (pubdata["time"] != null) {

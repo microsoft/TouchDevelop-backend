@@ -590,6 +590,8 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     // no cache manifest on versioned releases - they just clog storage
     let manifest = relprefix + (isSim ? "simmanifest" : "manifest")
     if (/v\d+\./.test(relprefix)) manifest = ""
+    
+    if (core.basicCreds) manifest = ""
 
     if (!prel.type)
         return await getLegacyRewrittenIndexAsync(manifest, id, srcFile)
@@ -632,9 +634,6 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     let cfgStr = JSON.stringify(ccfg, null, 4)
     ccfg["cfg"] = cfgStr
     ccfg["manifest"] = manifest ? `manifest="${manifest}"` : ""
-
-    let mfiles = "@manifestfiles@"
-    text = td.replaceAll(text, mfiles, "")
 
     text = text.replace(/@(\w+)@/g, (f, id) => {
         if (ccfg.hasOwnProperty(id)) return ccfg[id]
