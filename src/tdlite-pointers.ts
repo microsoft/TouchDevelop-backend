@@ -875,6 +875,7 @@ var subFiles = {
     run: "run.html",
     manifest: "release.manifest",
     worker: "worker.js",
+    tdworker: "tdworker.js",
     simulator: "simulator.html",
     simmanifest: "sim.manifest",
     webmanifest: "sim.webmanifest",

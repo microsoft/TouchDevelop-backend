@@ -491,6 +491,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
+        /*
         else if (fn == "worker.js" || fn == "embed.js") {
             await rewriteAndCacheAsync(rel, relid, fn, "application/javascript", res, async(text2: string) => {
                 if (core.pxt) {
@@ -500,6 +501,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
+        */
         else {
             res.sendError(404, "get file from CDN");
         }
@@ -621,6 +623,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     let ccfg = {
         relprefix: relprefix,
         workerjs: relprefix + "worker",
+        tdworkerjs: relprefix + "tdworker",
         pxtVersion: sanitize(baseRel.pkgversion),
         pxtRelId: baseRel.id,
         pxtCdnUrl: appCdn + baseRel.id + "/c/",
