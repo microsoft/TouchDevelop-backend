@@ -128,9 +128,7 @@ async function updateReviewCountsAsync(review: PubReview, pubid: string, req: co
     jsb["pubid"] = pubid;
     let ok = await core.tryInsertPubPointerAsync(key, review.id);
     if (ok) {
-        if (false) {
-            logger.debug("review: " + JSON.stringify(jsb));
-        }
+        //    logger.debug("review: " + JSON.stringify(jsb));
         await reviews.insertAsync(jsb);
         // ### update heart count
         await core.pubsContainer.updateAsync(pubid, async (entry: JsonBuilder) => {

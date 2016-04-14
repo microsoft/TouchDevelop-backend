@@ -269,11 +269,9 @@ export async function initAsync() : Promise<void>
             }
             let numCode = "";
             for (let i = 0; i < 12; i++) {
-                if (false) {
-                    if (i > 0 && i % 4 == 0) {
-                        numCode = numCode + " ";
-                    }
-                }
+                    //if (i > 0 && i % 4 == 0) {
+                    //    numCode = numCode + " ";
+                    //}
                 numCode = numCode + td.randomRange(0, 9);
             }
             grCode = numCode;

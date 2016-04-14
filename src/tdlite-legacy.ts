@@ -148,7 +148,7 @@ export async function initAsync()
         let uid = json["id"]
         let userjson = await tdliteUsers.getAsync(uid);
         if (!userjson) {
-            userjson = <IUser>await tdliteImport.reimportPub(uid, "user");
+            userjson = <IUser>(await tdliteImport.reimportPub(uid, "user"));
             if (!userjson) {
                 req.status = httpCode._424FailedDependency;
                 return;
@@ -242,7 +242,7 @@ export async function initAsync()
 async function reimportUserAsync(uid: string) {
     let userjson = await tdliteUsers.getAsync(uid)
     if (!userjson)
-        userjson = <IUser>await tdliteImport.reimportPub(uid, "user");
+        userjson = <IUser>(await tdliteImport.reimportPub(uid, "user"));
     return userjson;
 }
 
@@ -405,7 +405,7 @@ export async function importWorkspaceAsync(userjson: IUser) {
     let userid = userjson.id;
     let query = workspaceTable.createQuery().partitionKeyIs(userid).and("RowKey", "<", "C")
     query.onlyFields = ["RowKey", "ScriptStatus"];
-    let entries = <WorkspaceEntry[]>await query.fetchAllAsync()
+    let entries = <WorkspaceEntry[]>(await query.fetchAllAsync())
     let current = await tdliteWorkspace.getInstalledHeadersAsync(userid);
     let currDict = td.toDictionary(current, c => c.guid);
     entries = entries.filter(e => e.ScriptStatus != "deleted")
@@ -416,7 +416,7 @@ export async function importWorkspaceAsync(userjson: IUser) {
 
     await parallel.forJsonAsync(slice, async(v: WorkspaceEntry) => {
         logger.debug(`import: ${v.RowKey}`)
-        v = <WorkspaceEntry>await workspaceTable.getEntityAsync(userid, v.RowKey);
+        v = <WorkspaceEntry>(await workspaceTable.getEntityAsync(userid, v.RowKey));
         logger.debug(`fetchdone: ${v.RowKey}`)
         await importHeaderAsync(v);
         logger.debug(`importdone: ${v.RowKey}`)

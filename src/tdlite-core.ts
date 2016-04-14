@@ -585,9 +585,7 @@ export async function copyUrlToBlobAsync(Container: azureBlobStorage.Container, 
                 if (!result3.succeded()) {
                     err = " ERROR: " + result3.error();
                 }
-                if (false) {
-                    logger.debug("copy url for " + Container.url() + "/" + id + err);
-                }
+                //logger.debug("copy url for " + Container.url() + "/" + id + err);
             }
             else if (response.statusCode() == 404) {
                 dlFailure = true;
@@ -780,7 +778,7 @@ export async function checkFacilitatorPermissionAsync(req: ApiRequest, subjectUs
         req.status = httpCode._401Unauthorized;
     }
     if (req.status == 200) {
-        let userjs = <IUser>await getPubAsync(subjectUserid, "user");
+        let userjs = <IUser>(await getPubAsync(subjectUserid, "user"))
         if (userjs == null) {
             checkPermission(req, "root");
             return;
@@ -808,14 +806,12 @@ export async function followPubIdsAsync(fetchResult: JsonObject[], field: string
     }
     else {
         pubs = pubs.map<JsonObject>((elt1: JsonObject) => {
-            let result: JsonObject;
             if (elt1 == null || elt1["kind"] == "reserved") {
                 return (<JsonObject>null);
             }
             else {
                 return elt1;
             }
-            return result;
         });
     }
     return pubs;
@@ -1058,9 +1054,7 @@ export function hasSetting(key: string): boolean {
 }
 
 export function progress(message: string): void {
-    if (false) {
-        logger.debug(message);
-    }
+        // logger.debug(message);
 }
 
 export function bareIncrement(entry: JsonBuilder, key: string): void {
@@ -1087,9 +1081,7 @@ export function hasPermission(userjs: IUser, perm: string): boolean {
     let lev = orEmpty(userjs["permissions"]);
     for (let s of lev.split(",")) {
         if (s != "") {
-            if (false) {
-                logger.debug("check " + s + " for " + perm + " against " + JSON.stringify(settingsPermissions, null, 2));
-            }
+            // logger.debug("check " + s + " for " + perm + " against " + JSON.stringify(settingsPermissions, null, 2));
             if (s == perm || s == "admin") {
                 return true;
             }
@@ -1200,14 +1192,12 @@ export async function resolveOnePubAsync(store: indexedStore.Store, obj: JsonObj
 }
 
 export function setBuilderIfMissing(entry: JsonBuilder, key: string): JsonBuilder {
-    let dictionary: JsonBuilder;
     let dict = entry[key];
     if (dict == null) {
         dict = {};
         entry[key] = dict;
     }
     return dict;
-    return dictionary;
 }
 
 export function callerIsFacilitatorOf(req: ApiRequest, subjectJson: IUser): boolean {
@@ -1234,7 +1224,6 @@ export function callerIsFacilitatorOf(req: ApiRequest, subjectJson: IUser): bool
 }
 
 export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject): boolean {
-    let isFacilitator: boolean;
     if (req === adminRequest) {
         return true;
     }
@@ -1252,7 +1241,6 @@ export function callerSharesGroupWith(req: ApiRequest, subjectJson: JsonObject):
         }
     }
     return false;
-    return isFacilitator;
 }
 
 export function isAbuseSafe(elt: JsonObject): boolean {
@@ -1651,7 +1639,7 @@ export async function deleteAsync(delEntry: JsonObject): Promise<boolean> {
 }
 
 export async function setReqUserIdAsync(req: ApiRequest, uid: string): Promise<void> {
-    let userjs = <IUser>await getPubAsync(uid, "user");
+    let userjs = <IUser>(await getPubAsync(uid, "user"));
     if (userjs == null) {
         req.status = httpCode._401Unauthorized;
         logger.info("accessing token for deleted user, " + uid);

@@ -119,9 +119,7 @@ export async function initAsync() : Promise<void>
             pubVideo.blobid = td.createRandomId(20).toLowerCase();
             pubVideo.provider = "vimeo";
             pubVideo.providerid = id;
-            if (false) {
-                pubVideo.time = vimeoPayload["modified_time"];
-            }
+            //pubVideo.time = vimeoPayload["modified_time"];
             let thumburl = vimeoPayload["pictures"]["sizes"][0]["link"];
             let sdDesc = asArray(vimeoPayload["download"]).filter(elt => elt["quality"] == "sd")[0];
             if (sdDesc["size"] > 4 * 1024 * 1024) {

@@ -85,8 +85,8 @@ export class Container
         if (ok) {
             await this.saveCacheAsync(name, text, 1);
         }
-        else if (false) {
-            logger.warning("failed to insert: " + result.error());
+        else {
+            //logger.warning("failed to insert: " + result.error());
         }
         return ok;
     }
@@ -480,9 +480,7 @@ export async function initAsync() : Promise<void>
     if (blobService == null) {
         azureBlobStorage.init();
         blobService = azureBlobStorage.createBlobService();
-        if (false) {
-            blobService.setLogLevel("debug");
-        }
+        //    blobService.setLogLevel("debug");
         redisClient = await redis.createClientAsync("", 0, "");
         logger = td.createLogger("cache");
         blobTimeout = 2000;

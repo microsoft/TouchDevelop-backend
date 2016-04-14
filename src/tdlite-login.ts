@@ -485,7 +485,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     let modernId = profileId;
     let upointer = await tdliteUsers.passcodesContainer.getAsync(profileId);
     // ## Legacy profiles
-    if (false) {
+    if (1>1) {
         if (upointer == null) {
             let legacyId = "id/" + provider + "/" + core.sha256(providerUserId);
             let entry = await tdliteUsers.passcodesContainer.getAsync(legacyId);

@@ -74,14 +74,6 @@ export async function initAsync() : Promise<void>
                 d[td.toString(jsb3)] = "1";
             }
             d["all"] = "1";
-            if (false) {
-                let pubScript = tdliteScripts.PubScript.createFromJson(req3.rootPub["pub"]);
-                coll.push(pubScript.editor);
-                d[core.withDefault(pubScript.editor, "touchdevelop")] = "1";
-                if (td.stringContains(pubScript.description, "#docs")) {
-                    d["docs"] = "1";
-                }
-            }
             jsb2["tags"] = td.arrayToJson(Object.keys(d));
         }
         promo = td.clone(jsb2);

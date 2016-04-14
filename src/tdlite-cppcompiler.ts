@@ -355,7 +355,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
     let hexurl = compileContainer.url() + "/" + sha + ".hex";
     req.response = { ready: false, hex: hexurl }
     let now = await core.nowSecondsAsync();
-    let currStatus = <IntCompileStatus>await cppCache.getAsync(sha + "-status");
+    let currStatus = <IntCompileStatus>(await cppCache.getAsync(sha + "-status"));
     if (currStatus) {
         // if not success, we let them retry after two minutes (below) 
         if (currStatus.finished && currStatus.success) {

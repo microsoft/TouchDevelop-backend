@@ -83,9 +83,7 @@ export class PubEntry
     {
         let doc = batch.upload(this.id);
         td.jsonCopyFrom(doc, this.toJson());
-        if (false) {
-            logger.debug("upsert pub: " + JSON.stringify(this.toJson(), null, 2));
-        }
+            //logger.debug("upsert pub: " + JSON.stringify(this.toJson(), null, 2));
     }
 
 }

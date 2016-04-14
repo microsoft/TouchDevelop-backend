@@ -167,9 +167,7 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
         }] 
     };
     let file = {};        
-    if (false) {
-        logger.debug("cloud JS: " + JSON.stringify(deployData, null, 2));
-    }
+    //    logger.debug("cloud JS: " + JSON.stringify(deployData, null, 2));
     
     let endpoint = td.serverSetting("TDC_ENDPOINT")
 
@@ -183,12 +181,12 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
 
     // ### give it time to come up and reindex docs
     // TODO enable this back
-    if (false) {
+    /*
         await td.sleepAsync(60);
         await importDoctopicsAsync(req);
         // await tdliteIndex.indexDocsAsync();
         logger.info("docs reindexed");
-    }
+    */
 }
 
 export async function cacheCloudCompilerDataAsync(ver: string) : Promise<void>

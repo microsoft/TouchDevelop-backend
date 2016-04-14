@@ -118,7 +118,7 @@ async function storeOneInfoAsync()
         return true;
     let elt = members[td.randomInt(members.length)]
     let scriptId = elt.replace(/.*:/, "");
-    let entries = <string[]>await core.redisClient.evalAsync(extractLua, [idxKey, elt], [])
+    let entries = <string[]>(await core.redisClient.evalAsync(extractLua, [idxKey, elt], []))
     logger.debug(`save progress entries: ${entries.length}`)
     if (entries.length == 0)
         return false;

@@ -353,7 +353,6 @@ export class Client
      */
     public async delAsync(key: string) : Promise<boolean>
     {
-        let removed: boolean;
         let result = td.toNumber(await this.sendCommand1Async("del", key));
         if (result == 1) {
             return true;
@@ -361,7 +360,6 @@ export class Client
         else {
             return false;
         }
-        return removed;
     }
 
     /**

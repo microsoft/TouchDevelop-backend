@@ -114,15 +114,14 @@ export async function initAsync() : Promise<void>
         await importFromPubloggerAsync(req);
     });
     
-    if (false)
+    
+    /*
         cron.registerJob(new cron.Job("importsync", 2, async() => {
             let req = core.buildApiRequest("/api/importsync");
             await importFromPubloggerAsync(req)
             logger.info(`importsync: ${req.status}; ` + (req.response ? JSON.stringify(req.response,null,2) : ""))
         }));
 
-    
-    /*
     core.addRoute("POST", "recimport", "*", async (req3: core.ApiRequest) => {
         core.checkPermission(req3, "root");
         let id = req3.verb;

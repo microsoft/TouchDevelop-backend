@@ -105,7 +105,7 @@ export async function initAsync() : Promise<void>
     
     abuseReports = await indexedStore.createStoreAsync(core.pubsContainer, "abusereport");
     await core.setResolveAsync(abuseReports, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
-        let users = <core.IUser[]>await core.followPubIdsAsync(fetchResult.items, "publicationuserid", "");
+        let users = <core.IUser[]>(await core.followPubIdsAsync(fetchResult.items, "publicationuserid", ""));
         let pubs = await core.followPubIdsAsync(fetchResult.items, "publicationid", "");
         let withUsers = await core.addUsernameEtcCoreAsync(fetchResult.items);
         let coll = (<PubAbusereport[]>[]);

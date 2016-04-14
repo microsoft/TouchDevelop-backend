@@ -746,14 +746,14 @@ export function normalizeUser(v: IUser) {
 }
 
 export async function updateAsync(id: string, f: (v: IUser) => Promise<void>) {
-    return <IUser>await core.pubsContainer.updateAsync(id, async(v: IUser) => {
+    return <IUser>(await core.pubsContainer.updateAsync(id, async(v: IUser) => {
         normalizeUser(v);
         await f(v);
-    })
+    }))
 }
 
 export async function getAsync(id: string) {
-    let r = <IUser>await core.getPubAsync(id, "user");
+    let r = <IUser>(await core.getPubAsync(id, "user"));
     normalizeUser(r)
     return r
 }

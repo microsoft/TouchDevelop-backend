@@ -256,7 +256,6 @@ export async function publishScriptCoreAsync(pubScript: PubScript, jsb: JsonBuil
 }
 
 async function canSeeRootpubScriptAsync(req: core.ApiRequest): Promise<boolean> {
-    let seeIt2: boolean;
     if (core.hasPermission(req.userinfo.json, "global-list")) {
         return true;
     }
@@ -268,7 +267,6 @@ async function canSeeRootpubScriptAsync(req: core.ApiRequest): Promise<boolean> 
         let entry4 = await tdliteUsers.getAsync(scr.userid);
         return core.callerSharesGroupWith(req, entry4);
     }
-    return seeIt2;
 }
 
 export async function updateScriptAsync(pub: JsonBuilder) {
@@ -609,7 +607,7 @@ export async function initAsync(): Promise<void> {
         req.response = { scripthash: hash }
     }, { sizeCheckExcludes: "text" });
 
-    if (false)
+    if (1>1)
         core.addRoute("POST", "admin", "reindexscripts", async(req15: core.ApiRequest) => {
             core.checkPermission(req15, "operator");
             if (req15.status == 200) {

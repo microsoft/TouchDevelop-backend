@@ -346,9 +346,9 @@ export function json(className: any, fieldName: string) {
             break;
         default:
             throw new Error("Type " + t.name + " not supported for @td.json")
-            e.toJson = v => v;
-            e.fromJson = v => v;
-            break;
+            //e.toJson = v => v;
+            //e.fromJson = v => v;
+            //break;
     }
 
     className.__fields.push(e)

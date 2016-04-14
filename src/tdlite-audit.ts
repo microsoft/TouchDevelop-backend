@@ -86,10 +86,8 @@ export async function logAsync(req: core.ApiRequest, type: string, options_0: IP
     }
     msg.type = type;
     msg.ip = core.fullTD ? "n/a" : core.encrypt(req.userinfo.ip, "AUDIT");
-    if (false) {
-        msg.oldvalue = core.encryptJson(msg.oldvalue, "AUDIT");
-        msg.newvalue = core.encryptJson(msg.newvalue, "AUDIT");
-    }
+    //    msg.oldvalue = core.encryptJson(msg.oldvalue, "AUDIT");
+    //    msg.newvalue = core.encryptJson(msg.newvalue, "AUDIT");
     let jsb = {};
     jsb["id"] = azureTable.createLogId();
     jsb["pub"] = msg.toJson();

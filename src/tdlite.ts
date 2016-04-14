@@ -106,9 +106,7 @@ async function _initAsync() : Promise<void>
 
     let timeDelta = await core.redisClient.cachedTimeAsync() - new Date().getTime();
     logger.info("time difference to redis instance: " + timeDelta + "ms");
-    if (false) {
-        logger.info(JSON.stringify(await core.redisClient.sendCommandAsync("info", [])));
-    }
+    //    logger.info(JSON.stringify(await core.redisClient.sendCommandAsync("info", [])));
 
     await cachedStore.initAsync();
     indexedStore.init(core.tableClient);

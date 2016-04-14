@@ -547,7 +547,6 @@ export function addLiveId(options_: IProviderOptions = {}): void {
             return profile;
         }
         , async(profile1: JsonObject) => {
-            let info: UserInfo;
             let inf = new UserInfo();
             if (!profile1["id"]) return <UserInfo>null;
             inf.id = "live:" + profile1["id"];
@@ -560,7 +559,6 @@ export function addLiveId(options_: IProviderOptions = {}): void {
                 }
             }
             return inf;
-            return info;
         });
     prov.shortname = "live";
 }
@@ -636,14 +634,12 @@ export function addFacebook(options_: IProviderOptions = {}): void {
             return profile;
         }
         , async(profile1: JsonObject) => {
-            let info: UserInfo;
             let inf = new UserInfo();
             if (!profile1["id"]) return <UserInfo>null;
             inf.id = "fb:" + profile1["id"];
             inf.name = profile1["name"];
             inf.email = profile1["email"];
             return inf;
-            return info;
         });
     prov.shortname = "fb";
 }

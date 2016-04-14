@@ -593,7 +593,6 @@ async function getHtmlArtAsync(templid: string, lang: string) {
 }
 
 export async function getTemplateTextAsync(templatename: string, lang: string): Promise<string> {
-    let r: string;
     let id = pathToPtr(templatename.replace(/:.*/g, ""));
     let entry3 = await core.getPubAsync(id + lang, "pointer");
     if (entry3 == null && lang != "") {
@@ -622,7 +621,7 @@ export async function getTemplateTextAsync(templatename: string, lang: string): 
         }
         else {
             return "Template has to be raw html";
-            if (false) {
+            /*
                 let resp3 = await tdliteTdCompiler.queryCloudCompilerAsync("q/" + scriptjs["id"] + "/string-art");
                 if (resp3 == null) {
                     return "Extracting strings from template failed";
@@ -640,10 +639,9 @@ export async function getTemplateTextAsync(templatename: string, lang: string): 
                         return arts1[0]["value"];
                     }
                 }
-            }
+            */
         }
     }
-    return r;
 }
 
 async function clearPtrCacheAsync(entry: {}): Promise<void> {
@@ -770,7 +768,7 @@ async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonB
 
 async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite: td.Action1<CachedPage>): Promise<void> {
     let path = "ptrcache/" + core.myChannel + "/" + id;
-    let cachedPage = <CachedPage>await tdliteReleases.cacheRewritten.getAsync(path);
+    let cachedPage = <CachedPage>(await tdliteReleases.cacheRewritten.getAsync(path));
     let ver = await core.getCloudRelidAsync(true);
 
     let event = "ServePtr";
@@ -1222,7 +1220,6 @@ function hasPtrPermission(req: core.ApiRequest, currptr: string): boolean {
 
 
 export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject): Promise<JsonBuilder> {
-    let jsb2: JsonBuilder;
     let js3 = await core.resolveOnePubAsync(tdliteScripts.scripts, pubJson, req);
     if (js3 == null) {
         return {};
@@ -1237,9 +1234,7 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
         jsb["vimeo"] = vimeo;
         jsb["fullpicture"] = js2["thumbnail_url"];
         jsb["thumbnail"] = js2["thumbnail_url"].replace(/_\d+\./g, "_512.");
-        if (false) {
-            let s2 = td.replaceAll("<iframe src=\"https://player.vimeo.com/video/{vimeo}\" width=\"500\" height=\"281\" frameborder=\"0\" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>", "{vimeo}", vimeo);
-        }
+         //  let s2 = td.replaceAll("<iframe src=\"https://player.vimeo.com/video/{vimeo}\" width=\"500\" height=\"281\" frameborder=\"0\" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>", "{vimeo}", vimeo);
     }
     let artid = orEmpty(scr.meta["art"]);
     if (artid != "") {
@@ -1264,7 +1259,6 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
     jsb["realid"] = scr.id;
     jsb["humantime"] = tdliteDocs.humanTime(new Date(jsb["timems"]))
     return jsb;
-    return jsb2;
 }
 
 
