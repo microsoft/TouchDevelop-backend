@@ -2,14 +2,13 @@
     "compilerOptions": {
         "target": "es6",
         "noImplicitAny": false,
-        "outDir": "built",
-        "rootDir": ".",
-        "experimentalAsyncFunctions": true,
+        "outDir": "built/ts",
+        "rootDir": "src",
         "newLine": "LF",
         "emitDecoratorMetadata": true,
         "experimentalDecorators":true,
         "module": "commonjs",
-        "sourceMap": true
+        "sourceMap": false
     },
     "exclude": [
         "typings",
