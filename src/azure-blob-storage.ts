@@ -435,14 +435,6 @@ export class BlobInfo
     }
 
     /**
-     * Get the MD5 checksum of the blob.
-     */
-    public contentMd5() : Buffer
-    {
-        return new Buffer(this.inf.contentMD5, "base64")
-    }
-
-    /**
      * Get the name of a blob.
      */
     public name() : string
