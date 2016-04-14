@@ -31,6 +31,11 @@ make
 
 `make docs` will start a server at http://localhost:4000
 
+## Updating dependencies
+
+azure-storage should stay at 0.6.0 unless great care is take to update 
+azure-blob-storage.ts (there are breaking changes and we're using `_putBlockBlob`)
+
 ## LICENSE
 
 The MIT License (MIT)
