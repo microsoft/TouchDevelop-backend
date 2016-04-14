@@ -395,6 +395,46 @@ export function pathToPtr(fn: string): string {
     return s;
 }
 
+async function extractMarkdownProps(artobj: {}, ptr: {}) {
+    let pub = ptr["pub"]
+    let url = tdliteArt.getBlobUrl(artobj)
+    let resp = await td.createRequest(url).sendAsync();
+    let textObj = resp.content();
+
+    if (!textObj) return
+
+    let m = /^\s*#\s*([^#].*)/m.exec(textObj)
+
+    pub["scriptname"] = m ? m[1] : "";
+    // pub["scriptdescription"] = ;
+
+    //coll = (/{bread[Cc]rumb[tT]itle:([^{}]+)}/.exec(orEmpty(entry1["text"])) || []);
+    //pub["breadcrumbtitle"] = withDefault(coll[1], pub["scriptname"]);
+
+    let parentTopic = null
+    let currid = pub["path"];
+    for (let i = 0; i < 5; i++) {
+        currid = currid.replace(/[^\/]*$/g, "").replace(/\/$/g, "");
+        if (currid == "") {
+            break;
+        }
+        parentTopic = await core.getPubAsync(pathToPtr(currid), "pointer");
+        if (parentTopic != null) {
+            break;
+        }
+    }
+
+    if (parentTopic != null) {
+        let parentRedir = orEmpty(parentTopic["pub"]["redirect"]);
+        if (parentRedir != "") {
+            parentTopic = await core.getPubAsync(pathToPtr(parentRedir), "pointer");
+        }
+    }
+    if (parentTopic != null) {
+        pub["parentpath"] = parentTopic["pub"]["path"];
+    }
+}
+
 async function setPointerPropsAsync(req: core.ApiRequest, ptr: JsonBuilder, body: JsonObject): Promise<void> {
     let pub = ptr["pub"];
     let empty = new PubPointer().toJson();
@@ -410,10 +450,16 @@ async function setPointerPropsAsync(req: core.ApiRequest, ptr: JsonBuilder, body
     pub["scriptdescription"] = "";
     pub["searchfeatures"] = []
     let sid = await core.getPubAsync(pub["scriptid"], "script");
-    if (sid == null) {
-        pub["scriptid"] = "";
+    let artobj = sid ? null : await core.getPubAsync(pub["artid"], "art")
+
+    if (artobj == null) pub["artid"] = "";
+    if (sid == null) pub["scriptid"] = "";
+
+    if (artobj && artobj["contentType"] == "text/markdown") {
+        await extractMarkdownProps(artobj, ptr)
     }
-    else {
+
+    if (sid) {
         for (let fn of ["target", "editor"]) {
             if (sid["pub"][fn])
                 pub["searchfeatures"].push("@" + fn + "-" + sid["pub"][fn])
@@ -1005,7 +1051,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
         if (existing)
             v.customtick = existing["pub"]["customtick"]
-        
+
         if (isSimulator && (!subfile || !existing)) {
             v.text = "Invalid trg-* reference: " + id
             v.contentType = "text/plain"
