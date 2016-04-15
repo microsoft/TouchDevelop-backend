@@ -217,6 +217,28 @@ var ts;
                 };
             }
             Util.memoize = memoize;
+            // Returns a function, that, as long as it continues to be invoked, will not
+            // be triggered. The function will be called after it stops being called for
+            // N milliseconds. If `immediate` is passed, trigger the function on the
+            // leading edge, instead of the trailing.
+            function debounce(func, wait, immediate) {
+                var timeout;
+                return function () {
+                    var context = this;
+                    var args = arguments;
+                    var later = function () {
+                        timeout = null;
+                        if (!immediate)
+                            func.apply(context, args);
+                    };
+                    var callNow = immediate && !timeout;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                    if (callNow)
+                        func.apply(context, args);
+                };
+            }
+            Util.debounce = debounce;
             function randomPermute(arr) {
                 for (var i = 0; i < arr.length; ++i) {
                     var j = randomUint32() % arr.length;
@@ -844,9 +866,10 @@ var pxt;
                 cmd: "### @youtube $1"
             },
         ];
-        function renderMarkdown(template, src, theme, pubinfo) {
+        function renderMarkdown(template, src, theme, pubinfo, breadcrumb) {
             if (theme === void 0) { theme = {}; }
             if (pubinfo === void 0) { pubinfo = null; }
+            if (breadcrumb === void 0) { breadcrumb = []; }
             var params = pubinfo || {};
             var boxes = U.clone(stdboxes);
             var macros = U.clone(stdmacros);
@@ -893,8 +916,29 @@ var pxt;
                 }
                 return "<!-- macro " + name + " -->";
             });
-            if (!marked)
+            if (!marked) {
                 marked = require("marked");
+                var renderer = new marked.Renderer();
+                renderer.image = function (href, title, text) {
+                    var out = '<img class="ui centered image" src="' + href + '" alt="' + text + '"';
+                    if (title) {
+                        out += ' title="' + title + '"';
+                    }
+                    out += this.options.xhtml ? '/>' : '>';
+                    return out;
+                };
+                marked.setOptions({
+                    renderer: renderer,
+                    gfm: true,
+                    tables: true,
+                    breaks: false,
+                    pedantic: false,
+                    sanitize: true,
+                    smartLists: true,
+                    smartypants: true
+                });
+            }
+            ;
             src = src.replace(/^\s*https?:\/\/(\S+)\s*$/mg, function (f, lnk) {
                 var _loop_1 = function(ent) {
                     var m = ent.rx.exec(lnk);
@@ -911,10 +955,9 @@ var pxt;
                 }
                 return f;
             });
-            var html = marked(src, {
-                sanitize: true,
-                smartypants: true,
-            });
+            var html = marked(src);
+            // support for breaks which somehow don't work out of the box
+            html = html.replace(/&lt;br\s*\/&gt;/ig, "<br/>");
             var endBox = "";
             html = html.replace(/<h\d[^>]+>\s*([~@])\s*(.*?)<\/h\d>/g, function (f, tp, body) {
                 var m = /^(\w+)\s+(.*)/.exec(body);
@@ -956,20 +999,22 @@ var pxt;
                     }
                 }
             });
-            if (pubinfo) {
-                params["title"] = pubinfo["name"];
+            if (!params["title"]) {
+                var titleM = /<h1[^<>]*>([^<>]+)<\/h1>/.exec(html);
+                if (titleM)
+                    params["title"] = html2Quote(titleM[1]);
             }
-            else {
-                if (!params["title"]) {
-                    var titleM = /<h1[^<>]*>([^<>]+)<\/h1>/.exec(html);
-                    if (titleM)
-                        params["title"] = html2Quote(titleM[1]);
-                }
-                if (!params["description"]) {
-                    var descM = /<p>(.+?)<\/p>/.exec(html);
-                    if (descM)
-                        params["description"] = html2Quote(descM[1]);
-                }
+            if (!params["description"]) {
+                var descM = /<p>(.+?)<\/p>/.exec(html);
+                if (descM)
+                    params["description"] = html2Quote(descM[1]);
+            }
+            var breadcrumbHtml = '';
+            if (breadcrumb && breadcrumb.length > 1) {
+                breadcrumbHtml = "\n            <div class=\"ui breadcrumb\">\n                " + breadcrumb.map(function (b, i) {
+                    return ("<a class=\"" + (i == breadcrumb.length - 1 ? "active" : "") + " section\" \n                        href=\"" + html2Quote(b.href) + "\">" + html2Quote(b.name) + "</a>");
+                })
+                    .join('<i class="right chevron icon divider"></i>') + "\n            </div>";
             }
             var registers = {};
             registers["main"] = ""; // first
@@ -1011,10 +1056,11 @@ var pxt;
             };
             params["body"] = html;
             params["menu"] = (theme.docMenu || []).map(function (e) { return recMenu(e, 0); }).join("\n");
+            params["breadcrumb"] = breadcrumbHtml;
             params["targetname"] = theme.name || "PXT";
-            params["targetlogo"] = theme.docsLogo ? "<img src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
+            params["targetlogo"] = theme.docsLogo ? "<img class=\"ui image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
             params["name"] = params["title"] + " - " + params["targetname"];
-            return injectHtml(template, params, ["body", "menu", "targetlogo"]);
+            return injectHtml(template, params, ["body", "menu", "breadcrumb", "targetlogo"]);
         }
         docs.renderMarkdown = renderMarkdown;
         function injectHtml(template, vars, quoted) {
