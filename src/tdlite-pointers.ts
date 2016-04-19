@@ -552,11 +552,11 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
 
 async function getTargetThemeAsync(targetName: string) {
     let theme = null
-    if (targetName) {
-        let ptrx = await core.getPubAsync("ptr-" + targetName + "-theme-json", "pointer")
-        if (ptrx && ptrx["pub"]["artid"])
-            theme = await tdliteArt.getJsonArtFileAsync(ptrx["pub"]["artid"])
-    }
+    let pref = "ptr-"
+    if (targetName) pref = pref + targetName + "-"
+    let ptrx = await core.getPubAsync(pref + "theme-json", "pointer")
+    if (ptrx && ptrx["pub"]["artid"])
+        theme = await tdliteArt.getJsonArtFileAsync(ptrx["pub"]["artid"])
     return theme || {}
 }
 

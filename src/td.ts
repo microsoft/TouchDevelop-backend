@@ -241,7 +241,7 @@ export function replaceAll(self: string, old: string, new_: string): string {
 }
 
 export function replaceFn(self: string, regexp: RegExp, f: (m: string[]) => string) {
-    return self.replace(regexp, function() {
+    return self.replace(regexp, function () {
         var arr = []
         for (var i = 0; i < arguments.length; ++i) arr.push(arguments[i])
         return f(arr)
@@ -346,9 +346,9 @@ export function json(className: any, fieldName: string) {
             break;
         default:
             throw new Error("Type " + t.name + " not supported for @td.json")
-            //e.toJson = v => v;
-            //e.fromJson = v => v;
-            //break;
+        //e.toJson = v => v;
+        //e.fromJson = v => v;
+        //break;
     }
 
     className.__fields.push(e)
@@ -979,14 +979,14 @@ export async function downloadTextAsync(url: string): Promise<string> {
 
 function fixupSockets() {
     var origConnect = net.Socket.prototype.connect
-    net.Socket.prototype.connect = function(options) {
+    net.Socket.prototype.connect = function (options) {
         if (options && typeof options.host == "string")
             this.tdHost = options.host
         return origConnect.apply(this, arguments)
     }
 
     var origDestroy = net.Socket.prototype._destroy
-    net.Socket.prototype._destroy = function(exn) {
+    net.Socket.prototype._destroy = function (exn) {
         if (typeof exn == "object" && (this.tdHost || this.tdUnrefed)) {
             if (!exn.tdMeta) exn.tdMeta = {}
             exn.tdMeta.socketHost = this.tdHost
@@ -1002,12 +1002,12 @@ function fixupSockets() {
     }
 
     var origRef = net.Socket.prototype.ref
-    net.Socket.prototype.ref = function() {
+    net.Socket.prototype.ref = function () {
         this.tdUnrefed = false
         return origRef.apply(this, arguments)
     }
     var origUnref = net.Socket.prototype.unref
-    net.Socket.prototype.unref = function() {
+    net.Socket.prototype.unref = function () {
         this.tdUnrefed = true
         return origUnref.apply(this, arguments)
     }
@@ -1022,6 +1022,9 @@ function initTd() {
     })
 
     fixupSockets();
+
+    (global as any).btoa = (str: string) => new Buffer(str, "binary").toString("base64");
+    (global as any).atob = (str: string) => new Buffer(str, "base64").toString("binary");
 }
 
 initTd();
