@@ -17,7 +17,7 @@ function mkdirP(thePath) {
 
 function handle(req) {
     if (req.empty && !req.buildpath)
-        req.buildpath = "/home/build/prj"
+        req.buildpath = "/home/build/prj2"
     let rootdir = req.buildpath || "/home/build/microbit-touchdevelop";
     if (!fs.existsSync(rootdir))
         fs.mkdirSync(rootdir)
