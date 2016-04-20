@@ -274,7 +274,7 @@ export async function initAsync(): Promise<void> {
         isValidDomain: s =>
             s + "/" == core.self ||
             core.serviceSettings.domains.hasOwnProperty(s.replace(/^https:\/\//i, "").toLowerCase()),
-        requestEmail: true,
+        requestEmail: false,
         redirectOnError: "/#loginerror"
     });
     if (core.hasSetting("AZURE_AD_CLIENT_SECRET")) {
