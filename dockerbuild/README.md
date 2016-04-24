@@ -41,7 +41,7 @@ git clone https://github.com/Microsoft/TouchDevelop-backend.git
 cd TouchDevelop-backend/dockerbuild
 ```
 
-Here you will need to create `config.json` file with a key. Then run the server in screen session.
+Run `node server.js` and create `config.json` file as prompted. Then run the server in screen session.
 
 ```
 screen
