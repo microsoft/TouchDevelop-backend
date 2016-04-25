@@ -23,14 +23,13 @@ mkdir /docker
 mount -a
 systemctl daemon-reload
 systemctl restart docker
-docker import base.tgz
+docker pull mmoskal/yotta
 ```
 
-Install node.js:
+Install node.js (on host, not in docker):
 ```
 curl -sL https://deb.nodesource.com/setup_4.x | bash -
 apt-get install nodejs
-
 ```
 
 Clone TD-backend repo:
@@ -41,10 +40,13 @@ git clone https://github.com/Microsoft/TouchDevelop-backend.git
 cd TouchDevelop-backend/dockerbuild
 ```
 
-Run `node server.js` and create `config.json` file as prompted. Then run the server in screen session.
+Copy `.yotta/config.json` with the right credentials to `yottaconfig.json`.
 
+Run `node server.js` and create `config.json` file as prompted. 
+
+Then run the server in screen session.
 ```
 screen
 node server.js
-^A^D
+Ctrl-A Ctrl-D
 ```
