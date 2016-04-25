@@ -32,6 +32,10 @@ function handle(req) {
     let cmd = `git pull --tags && git checkout ${req.gittag} && yotta update`
     if (req.empty)
         cmd = `yotta target ${req.target} && yotta update`
+    if (req.yottaconfig) {
+        mkdirP(process.env["HOME"] + "/.yotta")
+        fs.writeFileSync(process.env["HOME"] + "/.yotta/config.json", JSON.stringify(req.yottaconfig, null, 4))
+    }
     let res = child_process.spawnSync("bash", ["-c", cmd], { encoding: "utf8" })
     let resp = {
         stdout: res.stdout || "",
