@@ -14,6 +14,8 @@
             "text": "#include \"pxt.h\"\nint main() { \n uBit.init(); \n pxt::start(); \n return 0; \n}\n"
         }
     ],
+    "target": "bbc-microbit-classic-gcc",
+    "hexfile": "source/pxt-microbit-app-combined.hex",
     "image": "mmoskal/yotta",
     "empty": true
 }
