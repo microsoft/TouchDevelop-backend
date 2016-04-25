@@ -16,7 +16,14 @@ if (!fs.existsSync("config.json")) {
     process.exit(1)
 }
 
+
+if (!fs.existsSync("yottaconfig.json")) {
+    console.log("Please copy ~/.yotta/config.json to yottaconfig.json")
+    process.exit(1)
+}
+
 var cfg = JSON.parse(fs.readFileSync("config.json", "utf8"))
+var ycfg = JSON.parse(fs.readFileSync("yottaconfig.json", "utf8"))
 
 function err(res, code, msg) {
     console.log("err: " + code + ": " + msg)
@@ -42,6 +49,7 @@ function build(js, outp) {
             "sh", "-c", "node go.js 2>&1"],
             {})
         js.builderJs = builderJs
+        js.yottaconfig = ycfg
         ch.stdin.write(JSON.stringify(js))
         ch.stdin.end()
         ch.stdout.pipe(outp)

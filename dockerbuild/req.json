@@ -17,13 +17,5 @@
     "target": "bbc-microbit-classic-gcc",
     "hexfile": "source/pxt-microbit-app-combined.hex",
     "image": "mmoskal/yotta",
-    "yottaconfig": {
-        "github": {
-            "authtoken": "0123abcdef"
-        },
-        "mbed": {
-            "authtoken": "xxxfoobar"
-        }
-    },
     "empty": true
 }
