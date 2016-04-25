@@ -45,7 +45,7 @@ function build(js, outp) {
         var ch = child_process.spawn("docker", [
             "run", "--rm", "-i",
             "-w", "/home/build", "-u", "build",
-            js.image || "mmoskal/yotta",
+            js.image || "pext/yotta",
             "sh", "-c", "node go.js 2>&1"],
             {})
         js.builderJs = builderJs
