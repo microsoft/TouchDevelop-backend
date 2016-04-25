@@ -1,3 +1,19 @@
 {
-    "gittag": "v75"
+    "op": "buildex",
+    "files": [
+        {
+            "name": "module.json",
+            "text": "{\n \"name\": \"pxt-microbit-app\",\n \"version\": \"0.0.0\",\n \"description\": \"Auto-generated. Do not edit.\",\n \"license\": \"n/a\",\n \"dependencies\": {\n \"pxt-microbit-core\": \"microsoft/pxt-microbit-core#v0.1.8\"\n },\n \"targetDependencies\": {},\n \"bin\": \"./source\"\n}\n"
+        },
+        {
+            "name": "config.json",
+            "text": "{\n \"microbit-dal\": {\n \"bluetooth\": {\n \"enabled\": 0\n }\n }\n}\n"
+        },
+        {
+            "name": "source/main.cpp",
+            "text": "#include \"pxt.h\"\nint main() { \n uBit.init(); \n pxt::start(); \n return 0; \n}\n"
+        }
+    ],
+    "image": "mmoskal/yotta",
+    "empty": true
 }

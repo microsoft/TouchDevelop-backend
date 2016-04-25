@@ -5,6 +5,7 @@ var child_process = require("child_process");
 var crypto = require("crypto");
 var fs = require("fs");
 var domain = require("domain");
+var async = require("async");
 
 if (!fs.existsSync("config.json")) {
     var cfg = {
