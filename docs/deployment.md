@@ -85,7 +85,16 @@ especially when deploying tens of machines---otherwise there might be problems
 with npm throttling.
 
 `KEY_VAULT_CLIENT_ID` and `KEY_VAULT_CLIENT_SECRET` should let the shell read
-`KEY_VAULT_URL`. To set up a key vault follow instructions here: TODO
+`KEY_VAULT_URL`. 
+
+To set up a key vault follow 
+[Azure instructions](https://azure.microsoft.com/en-gb/documentation/articles/key-vault-get-started/).
+You can skip the 'Add a key or secret to the key vault' part.
+You will need to authorize your AD app for read/write access to secrets (but none to keys).
+In particular, where the tutorial says `-PermissionsToSecrets Get` instead
+use `-PermissionsToSecrets Get,Set`. After granting permission, you can stop
+following the steps - no need to HSM or deleting anything.
+
 The `KEY_VAULT_URL` should point to a JSON file in the Azure Key Vault. The JSON
 file has `string->string` mapping defining environment variables.
 It can be uploaded by running shell from command line, or using PowerShell. 
