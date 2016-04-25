@@ -14,5 +14,5 @@ Following docs are available:
 * [shell and remote.js](deployment.md)
 * [generating SSL certs](ssl.md)
 * [general source architecture](map.md)
-
+* [REST APIs description](REST-APIs.md)
 
