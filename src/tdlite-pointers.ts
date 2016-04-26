@@ -319,6 +319,32 @@ export async function initAsync(): Promise<void> {
             }
         })
 
+        // TODO /api/md/
+        // TODO throttle
+        // TODO add cache of MD        
+        restify.server().routeRegex("GET", "/rawmd/.*", async (req, res) => {
+            let lang = await handleLanguageAsync(req);
+            let path = splitLang(pathToPtr(req.url().slice(6)))
+            if (path.lang == core.serviceSettings.defaultLang) path.lang = "";
+            else if (!path.lang) path.lang = lang;
+            let suff = lang ? "@" + lang : ""
+            let ptr = await core.getPubAsync(path.base + suff, "pointer")
+            if (!ptr && suff)
+                ptr = await core.getPubAsync(path.base, "pointer")
+            if (!ptr) {
+                res.sendError(httpCode._404NotFound, "Missing.")
+            } else {
+                let artobj = await core.getPubAsync(ptr["pub"]["artid"], "art")
+                if (artobj && artobj["contentType"] == "text/markdown") {
+                    let url = tdliteArt.getBlobUrl(artobj)
+                    let resp = await td.createRequest(url).sendAsync()
+                    res.sendText(resp.content(), artobj["contentType"])
+                } else {
+                    res.sendError(httpCode._400BadRequest, "Invalid type.")
+                }
+            }
+        })
+
         core.addRoute("GET", "oembed", "", async (req: core.ApiRequest) => {
             let id = orEmpty(req.queryOptions["url"]).replace(/^[a-z]+:\/\/[^\/]+/, "").replace(/^\/+/, "")
             let fmt = withDefault(req.queryOptions["format"], "json")
@@ -961,6 +987,20 @@ function domainOfTarget(trg: string) {
     return null
 }
 
+function splitLang(path: string) {
+    let m = /(.*)@([a-z]+(-[a-z]+)?)$/i.exec(path)
+    if (m)
+        return {
+            base: m[1],
+            lang: m[2]
+        }
+    else
+        return {
+            base: path,
+            lang: ""
+        }
+}
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let lang = await handleLanguageAsync(req);
     let urlFile = req.url().replace(/\?.*/g, "")
@@ -1021,14 +1061,14 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         fn = "home";
     }
     let id = pathToPtr(fn);
-    let pathLang = orEmpty((/@([a-z][a-z])$/.exec(id) || [])[1]);
-    if (pathLang != "") {
-        if (pathLang == core.serviceSettings.defaultLang) {
-            id = id.replace(/@..$/g, "");
+    let spl = splitLang(id)
+    if (spl.lang != "") {
+        if (spl.lang == core.serviceSettings.defaultLang) {
+            id = spl.base;
             lang = "";
         }
         else {
-            lang = "@" + pathLang;
+            lang = "@" + spl.lang;
         }
     }
     if (templateSuffix != "" && core.serviceSettings.envrewrite.hasOwnProperty(id.replace(/^ptr-/g, ""))) {
@@ -1060,8 +1100,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         let subfile = ""
 
         let existing = await core.getPubAsync(id, "pointer");
-        if (existing == null && /@[a-z][a-z]$/.test(id)) {
-            existing = await core.getPubAsync(id.replace(/@..$/g, ""), "pointer");
+        let spl = splitLang(id)
+        if (existing == null && spl.lang) {
+            existing = await core.getPubAsync(spl.base, "pointer");
         }
 
         if (!existing && id.indexOf("---") > 0) {
@@ -1228,7 +1269,7 @@ async function pointerErrorAsync(msg: string, v: CachedPage, lang: string) {
 }
 
 function hasPtrPermission(req: core.ApiRequest, currptr: string): boolean {
-    currptr = currptr.replace(/@..$/g, "");
+    currptr = splitLang(currptr).base
     while (currptr != "") {
         if (core.callerHasPermission(req, "write-" + currptr)) {
             return true;
@@ -1302,7 +1343,7 @@ export async function handleLanguageAsync(req: restify.Request): Promise<string>
             break;
         }
     }
-    let cookieLang = orEmpty((/TD_LANG=([a-z][a-z])/.exec(orEmpty(req.header("Cookie"))) || [])[1]);
+    let cookieLang = orEmpty((/TD_LANG=([A-Za-z\-]+)/.exec(orEmpty(req.header("Cookie"))) || [])[1]);
     if (core.serviceSettings.langs.hasOwnProperty(cookieLang)) {
         lang = cookieLang;
     }

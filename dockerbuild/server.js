@@ -2,13 +2,28 @@
 
 var http = require('http');
 var child_process = require("child_process");
-var async = require("async");
 var crypto = require("crypto");
 var fs = require("fs");
 var domain = require("domain");
-var azure = require("azure-storage");
+var async = require("async");
+
+if (!fs.existsSync("config.json")) {
+    var cfg = {
+        key: crypto.randomBytes(32).toString("hex")
+    };
+    console.log("Please create config.json, for example one like this:")
+    console.log(JSON.stringify(cfg, null, 4))
+    process.exit(1)
+}
+
+
+if (!fs.existsSync("yottaconfig.json")) {
+    console.log("Please copy ~/.yotta/config.json to yottaconfig.json")
+    process.exit(1)
+}
 
 var cfg = JSON.parse(fs.readFileSync("config.json", "utf8"))
+var ycfg = JSON.parse(fs.readFileSync("yottaconfig.json", "utf8"))
 
 function err(res, code, msg) {
     console.log("err: " + code + ": " + msg)
@@ -17,30 +32,31 @@ function err(res, code, msg) {
 
 var key = new Buffer(cfg.key, "hex")
 
-process.on('uncaughtException', function(err) {
+process.on('uncaughtException', function (err) {
     console.log(err);
 })
 
 var builderJs = fs.readFileSync("builder.js", "utf8")
 
-var buildq = async.queue(function(f, cb) { f(cb) }, 8)
+var buildq = async.queue(function (f, cb) { f(cb) }, 8)
 function build(js, outp) {
-    buildq.push(function(cb) {
+    buildq.push(function (cb) {
         console.log("Build")
         var ch = child_process.spawn("docker", [
             "run", "--rm", "-i",
             "-w", "/home/build", "-u", "build",
-            js.image || "1647",
+            js.image || "pext/yotta",
             "sh", "-c", "node go.js 2>&1"],
             {})
         js.builderJs = builderJs
+        js.yottaconfig = ycfg
         ch.stdin.write(JSON.stringify(js))
         ch.stdin.end()
         ch.stdout.pipe(outp)
 
         ch.stderr.setEncoding("utf8")
         var remove = ""
-        ch.stderr.on("data", function(d) {
+        ch.stderr.on("data", function (d) {
             var m = /Cannot destroy container ([0-9a-f]{20,})/.exec(d)
             if (m) {
                 remove = m[1]
@@ -48,10 +64,10 @@ function build(js, outp) {
                 console.log(d)
             }
         })
-        ch.on("exit", function() {
+        ch.on("exit", function () {
             cb(null)
             if (remove)
-                setTimeout(function() {
+                setTimeout(function () {
                     console.log("remove container " + remove)
                     var ch = child_process.spawn("docker", ["rm", remove])
                     ch.stderr.pipe(process.stderr)
@@ -76,8 +92,8 @@ function handleReq(req, res) {
     var ciph = crypto.createDecipheriv("AES256", key, iv)
     ciph.setEncoding("utf8")
     var dd = ""
-    ciph.on("data", function(d) { dd += d })
-    ciph.on("end", function() {
+    ciph.on("data", function (d) { dd += d })
+    ciph.on("end", function () {
         if (dd.length < 128) {
             err(res, 403, "too short")
             return
@@ -106,9 +122,9 @@ if (process.argv[2]) {
     let f = fs.readFileSync(process.argv[2], "utf8");
     build(JSON.parse(f), process.stdout)
 } else {
-    http.createServer(function(req, res) {
+    http.createServer(function (req, res) {
         var d = domain.create();
-        d.on('error', function(er) {
+        d.on('error', function (er) {
             console.error('error', er.stack);
             try {
                 res.statusCode = 500;
@@ -119,7 +135,7 @@ if (process.argv[2]) {
         })
         d.add(req);
         d.add(res);
-        d.run(function() { handleReq(req, res) })
+        d.run(function () { handleReq(req, res) })
 
     }).listen(2424);
 }

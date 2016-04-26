@@ -1,6 +1,0 @@
-{
-  "key": "32-hex-encoded-bytes",
-  "blobAccount": "accountname",
-  "blobContainer": "containeranme",
-  "blobKey": "accountKey=="
-}

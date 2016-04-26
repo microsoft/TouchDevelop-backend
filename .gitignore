@@ -8,3 +8,4 @@ web/_site/
 templater.sh
 web/_temp
 dockerbuild/config.json
+dockerbuild/yottaconfig.json
