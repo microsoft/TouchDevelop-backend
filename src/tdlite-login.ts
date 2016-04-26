@@ -151,7 +151,7 @@ export class LoginSession
     public async updateTermsVersionAsync(req: restify.Request, userjs: IUser) {
         let ver = core.serviceSettings.termsversion || "default"
         if (userjs.termsversion != ver) {
-            userjs = await tdliteUsers.updateAsync(this.userid, async(entry1) => {
+            userjs = await tdliteUsers.updateAsync(this.userid, async (entry1) => {
                 entry1.termsversion = ver;
             });
             await audit.logAsync(audit.buildAuditApiRequest(req), "user-agree", {
@@ -214,7 +214,7 @@ export async function initAsync(): Promise<void> {
     initialApprovals = core.myChannel == "test";
     tokensTable = await core.tableClient.createTableIfNotExistsAsync("tokens");
 
-    restify.server().get("/api/ready/:userid", async(req1: restify.Request, res1: restify.Response) => {
+    restify.server().get("/api/ready/:userid", async (req1: restify.Request, res1: restify.Response) => {
         core.handleHttps(req1, res1);
         let throttleKey = core.sha256(req1.remoteIp()) + ":ready";
         if (await core.throttleCoreAsync(throttleKey, 1)) {
@@ -253,18 +253,18 @@ export async function initAsync(): Promise<void> {
     loginHtml = td.clone(jsb);
 
     serverAuth.init({
-        makeJwt: async(profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) => {
+        makeJwt: async (profile: serverAuth.UserInfo, oauthReq: serverAuth.OauthRequest) => {
             let url2 = await loginFederatedAsync(profile, oauthReq);
             return {
                 "http redirect": url2
             }
         },
-        getData: async(key: string) => {
+        getData: async (key: string) => {
             let value: string;
             value = await core.redisClient.getAsync("authsess:" + key);
             return value;
         },
-        setData: async(key1: string, value1: string) => {
+        setData: async (key1: string, value1: string) => {
             let minutes = 30;
             await core.redisClient.setpxAsync("authsess:" + key1, value1, minutes * 60 * 1000);
         },
@@ -296,10 +296,10 @@ export async function initAsync(): Promise<void> {
         serverAuth.addGitHub();
     }
 
-    restify.server().get("/user/logout", async(req: restify.Request, res: restify.Response) => {
+    restify.server().get("/user/logout", async (req: restify.Request, res: restify.Response) => {
         res.redirect(302, "/signout");
     });
-    restify.server().get("/oauth/providers", async(req1: restify.Request, res1: restify.Response) => {
+    restify.server().get("/oauth/providers", async (req1: restify.Request, res1: restify.Response) => {
         serverAuth.validateOauthParameters(req1, res1);
         core.handleBasicAuth(req1, res1);
         if (!res1.finished()) {
@@ -311,7 +311,7 @@ export async function initAsync(): Promise<void> {
             res1.html(html);
         }
     });
-    restify.server().get("/oauth/dialog", async(req: restify.Request, res: restify.Response) => {
+    restify.server().get("/oauth/dialog", async (req: restify.Request, res: restify.Response) => {
         let session = await LoginSession.loadAsync(req.query()["td_session"]);
         if (!session) {
             session = new LoginSession();
@@ -324,7 +324,7 @@ export async function initAsync(): Promise<void> {
         if (session.oauthHost && req.header("host") && req.header("host").toLowerCase() != session.oauthHost) {
             res.redirect(302, "https://" + session.oauthHost + req.url())
             return
-        }         
+        }
         await createKidUserWhenUsernamePresentAsync(req, session, res);
         if (!res.finished()) {
             let accessCode = orEmpty(req.query()["td_state"]);
@@ -334,7 +334,7 @@ export async function initAsync(): Promise<void> {
             else if (accessCode == core.tokenSecret && session.userid != "") {
                 // **this is to be used during initial setup of a new cloud deployment**
                 await session.createUserIfNeededAsync(req);
-                await tdliteUsers.updateAsync(session.userid, async(entry) => {
+                await tdliteUsers.updateAsync(session.userid, async (entry) => {
                     entry.credit = 1000;
                     entry.totalcredit = 1000;
                     entry.permissions = ",admin,";
@@ -346,22 +346,22 @@ export async function initAsync(): Promise<void> {
             }
         }
     });
-    restify.server().get("/oauth/gettoken", async(req3: restify.Request, res3: restify.Response) => {
+    restify.server().get("/oauth/gettoken", async (req3: restify.Request, res3: restify.Response) => {
         let s3 = req3.serverUrl() + "/oauth/login?state=foobar&response_type=token&client_id=no-cookie&redirect_uri=" + encodeURIComponent(req3.serverUrl() + "/oauth/gettokencallback") + "&u=" + encodeURIComponent(orEmpty(req3.query()["u"]));
         res3.redirect(303, s3);
     });
-    restify.server().get("/oauth/gettokencallback", async(req4: restify.Request, res4: restify.Response) => {
+    restify.server().get("/oauth/gettokencallback", async (req4: restify.Request, res4: restify.Response) => {
         let _new = "<p>Your access token is below. Only paste in applications you absolutely trust.</p>\n<pre id=\"token\">\nloading...\n</pre>\n<p>You could have added <code>?u=xyzw</code> to get access token for a different user (given the right permissions).\n</p>\n<script>\nsetTimeout(function() {\nvar h = document.location.href.replace(/oauth\\/gettoken.*access_token/, \"?access_token\").replace(/&.*/, \"\");\ndocument.getElementById(\"token\").textContent = h;\n}, 100)\n</script>";
         res4.html(td.replaceAll(td.replaceAll(template_html, "@JS@", ""), "@BODY@", _new));
     });
 
-    core.addRoute("POST", "*user", "logout", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "logout", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
         await logoutEverywhereAsync(req.rootId);
         req.response = {};
     })
 
-    core.addRoute("POST", "logout", "", async(req3: core.ApiRequest) => {
+    core.addRoute("POST", "logout", "", async (req3: core.ApiRequest) => {
         if (req3.userid != "") {
             if (core.orFalse(req3.body["everywhere"])) {
                 await logoutEverywhereAsync(req3.userid);
@@ -384,7 +384,7 @@ export async function initAsync(): Promise<void> {
         }
     });
 
-    core.addRoute("POST", "*user", "token", async(req7: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "token", async (req7: core.ApiRequest) => {
         core.checkPermission(req7, "signin-" + req7.rootId);
         if (req7.status == 200) {
             let resp = {};
@@ -412,7 +412,7 @@ export async function initAsync(): Promise<void> {
 
 async function logoutEverywhereAsync(uid: string) {
     let entities = await tokensTable.createQuery().partitionKeyIs(uid).fetchAllAsync();
-    await parallel.forAsync(entities.length, async(x: number) => {
+    await parallel.forAsync(entities.length, async (x: number) => {
         let json = entities[x];
         // TODO: filter out reason=admin?
         let token = core.Token.createFromJson(json);
@@ -431,7 +431,7 @@ async function generateTokenAsync(user: string, reason: string, client_id: strin
     if (orEmpty(client_id) != "no-cookie") {
         token.cookie = td.createRandomId(32);
     }
-    await tdliteUsers.updateAsync(user, async(entry) => {
+    await tdliteUsers.updateAsync(user, async (entry) => {
         entry.lastlogin = await core.nowSecondsAsync();
     });
     await tokensTable.insertEntityAsync(token.toJson(), "or merge");
@@ -485,7 +485,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     let modernId = profileId;
     let upointer = await tdliteUsers.passcodesContainer.getAsync(profileId);
     // ## Legacy profiles
-    if (1>1) {
+    if (1 > 1) {
         if (upointer == null) {
             let legacyId = "id/" + provider + "/" + core.sha256(providerUserId);
             let entry = await tdliteUsers.passcodesContainer.getAsync(legacyId);
@@ -504,7 +504,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         }
         // If we have a legacy pointer, update it
         if (modernId != profileId && upointer != null) {
-            await tdliteUsers.passcodesContainer.updateAsync(modernId, async(entry3: JsonBuilder) => {
+            await tdliteUsers.passcodesContainer.updateAsync(modernId, async (entry3: JsonBuilder) => {
                 td.jsonCopyFrom(entry3, upointer);
             });
         }
@@ -517,7 +517,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
             userjs = entry31;
             let logins = (userjs.altLogins || []).concat([userjs.login])
             if (logins.indexOf(profileId) < 0) {
-                userjs = await tdliteUsers.updateAsync(userjs.id, async(entry4) => {
+                userjs = await tdliteUsers.updateAsync(userjs.id, async (entry4) => {
                     if (!entry4.login)
                         entry4.login = profileId;
                     else {
@@ -533,7 +533,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     let session = new LoginSession();
     session.federatedUserInfo = <any>profile.toJson();
     session.profileId = profileId;
-    session.providerId = provider;    
+    session.providerId = provider;
     let m = /^https:\/\/([^/]+)/.exec(clientOAuth.redirect_uri)
     session.oauthHost = m ? m[1].toLowerCase() : core.myHost
     session.oauthClientId = clientOAuth.client_id;
@@ -568,7 +568,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     if (session.userCreated()) {
         let linkedSession = await session.getLinkedSessionAsync();
         if (linkedSession && linkedSession.profileId) {
-            let last = await tdliteUsers.passcodesContainer.updateAsync(linkedSession.profileId, async(v) => {
+            let last = await tdliteUsers.passcodesContainer.updateAsync(linkedSession.profileId, async (v) => {
                 let kind = v["kind"]
                 if (!kind || kind == "reserved" || kind == "userpointer") {
                     v["kind"] = "userpointer";
@@ -578,7 +578,7 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
                 }
             })
             if (last["userid"] == session.userid)
-                await tdliteUsers.updateAsync(session.userid, async(v) => {
+                await tdliteUsers.updateAsync(session.userid, async (v) => {
                     if (!v.altLogins) v.altLogins = [];
                     v.altLogins.push(linkedSession.profileId);
                 })
@@ -625,7 +625,7 @@ async function createKidUserWhenUsernamePresentAsync(req: restify.Request, sessi
             session.pass = session.passwords[0];
         }
         // this can go negative; maybe we should reject it in this case?
-        await tdliteUsers.updateAsync(session.ownerId, async(entry) => {
+        await tdliteUsers.updateAsync(session.ownerId, async (entry) => {
             entry.credit -= 1;
         });
         logger.tick("PubUser@code");
@@ -763,7 +763,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
                     let delEntry = await tdliteUsers.getAsync(session.userid);
                     if (delEntry != null && !delEntry["termsversion"] && !delEntry["permissions"]) {
                         let delok = await core.deleteAsync(delEntry);
-                        await core.pubsContainer.updateAsync(session.userid, async(entry: JsonBuilder) => {
+                        await core.pubsContainer.updateAsync(session.userid, async (entry: JsonBuilder) => {
                             entry["settings"] = {};
                             entry["pub"] = {};
                             entry["login"] = "";
