@@ -585,7 +585,11 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
         }
     }
 
-    if (core.fullTD) {
+    if (core.pxt) {
+        session.termsOk = orEmpty(userjs["termsversion"]) == core.serviceSettings.termsversion;
+        session.codeOk = true;
+        session.legacyCodes = {};
+    } else if (core.fullTD) {
         session.termsOk = true;
         session.codeOk = true;
         session.legacyCodes = null;
@@ -835,6 +839,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
             params["MSG"] = msg;
             params["AGREEURL"] = agreeurl;
             params["DISAGREEURL"] = disagreeurl;
+            params["USERNAME"] = session.federatedUserInfo.name;
             let ht = await getLoginHtmlAsync(inner, lang)
             ht = ht.replace(/@(\w+)@/g, (m, n) => params.hasOwnProperty(n) ? params[n] : m)
             res.html(ht);
