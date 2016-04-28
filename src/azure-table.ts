@@ -396,10 +396,10 @@ export class Client {
     /**
      * Creates a new table if there is not already a table with the same name
      */
-    public async createTableIfNotExistsAsync(name: string): Promise<Table> {
+    public async createTableIfNotExistsAsync(name: string, force = false): Promise<Table> {
         let client: Client = this;
         let table = new Table(name, client);
-        if (!assumeTablesExists_) {
+        if (!assumeTablesExists_ || force) {
             logger.debug("create table " + name);
             await new Promise(resume => {
                 client.handle.createTable(name, { ignoreIfExists: true }, (error, result) => {
@@ -419,6 +419,18 @@ export class Client {
         return table;
     }
 
+
+    public async deleteTableAsync(name: string): Promise<void> {
+        await new Promise(resume => {
+            this.handle.deleteTable(name, (error, result) => {
+                if (error) {
+                    throw error;
+                } else {
+                    resume()
+                }
+            })
+        });
+    }
 
     public getTable(name: string): Table {
         return new Table(name, this);
