@@ -17,55 +17,50 @@ var logger: td.AppLogger;
 var assumeTablesExists_: boolean = false;
 
 
-export class Table
-{
-    constructor(public name:string, public client:Client)
-    {
+export class Table {
+    constructor(public name: string, public client: Client) {
     }
 
-    private async tableOpCoreAsync(op: string, entity: JsonObject, withEtag: boolean) : Promise<string>
-    {
+    private async tableOpCoreAsync(op: string, entity: JsonObject, withEtag: boolean): Promise<string> {
         let table: Table = this;
         let error: string;
         let start = logger.loggerDuration();
         await new Promise(resume => {
-            var cb = function(err) {
-              if (err) {
-                 if (err.statusCode == 412 || err.statusCode == 409) error = "normal:" + err.code
-                 else if (err.message) error = err.message;
-                 else error = util.inspect(err);
-              }     
-              else error = "";
-              //lib.App.log("table: stop " + suff + " " + error)
-              resume()
+            var cb = function (err) {
+                if (err) {
+                    if (err.statusCode == 412 || err.statusCode == 409) error = "normal:" + err.code
+                    else if (err.message) error = err.message;
+                    else error = util.inspect(err);
+                }
+                else error = "";
+                //lib.App.log("table: stop " + suff + " " + error)
+                resume()
             }
             var ent = entity
             //var suff = op + " " + ent.PartitionKey + "/" + ent.RowKey
             //lib.App.log("table: start " + suff)
-            
+
             if (withEtag && !ent["__etag"])
-              table.client.handle[op](table.name, ent, {force:true}, cb)
+                table.client.handle[op](table.name, ent, { force: true }, cb)
             else
-              table.client.handle[op](table.name, ent, cb)
+                table.client.handle[op](table.name, ent, cb)
         });
         table.timeOpCore(start, "write");
         return error;
     }
 
-    private async tableOpAsync(op: string, entity: JsonObject, withEtag: boolean) : Promise<void>
-    {
+    private async tableOpAsync(op: string, entity: JsonObject, withEtag: boolean): Promise<void> {
         let err = await this.tableOpCoreAsync(op, prepEntity(entity), withEtag);
         assert(err == "", op + " failed: " + err);
     }
 
-    private async tryTableOpAsync(op: string, entity: JsonObject, withEtag: boolean) : Promise<boolean>
-    {
+    private async tryTableOpAsync(op: string, entity: JsonObject, withEtag: boolean): Promise<boolean> {
         let err = await this.tableOpCoreAsync(op, prepEntity(entity), withEtag);
         if (err == "") {
             return true;
         }
         else {
-            if ( ! /^normal:/.test(err)) {
+            if (! /^normal:/.test(err)) {
                 logger.info(op + " failed: " + err);
             }
             return false;
@@ -76,8 +71,7 @@ export class Table
      * Insert an entity into a table (can merge or replace when its already present)
      * {hints:when present:,or merge,or replace}
      */
-    public insertEntityAsync(entity: JsonObject, whenPresent: string = "") : Promise<void>
-    {
+    public insertEntityAsync(entity: JsonObject, whenPresent: string = ""): Promise<void> {
         let op = "";
         if (whenPresent == "") {
             op = "insertEntity";
@@ -94,13 +88,11 @@ export class Table
         return this.tableOpAsync(op, entity, false);
     }
 
-    public insertOrMergeEntityAsync(entity: JsonObject) : Promise<void>
-    {
+    public insertOrMergeEntityAsync(entity: JsonObject): Promise<void> {
         return this.insertEntityAsync(entity, "or merge")
     }
 
-    public insertOrReplaceEntityAsync(entity: JsonObject) : Promise<void>
-    {
+    public insertOrReplaceEntityAsync(entity: JsonObject): Promise<void> {
         return this.insertEntityAsync(entity, "or replace")
     }
 
@@ -108,13 +100,11 @@ export class Table
      * Update an existing entity in a table (can merge with existing fields or completely replace it)
      * {hints:mode:merge,replace}
      */
-    public updateEntityAsync(entity: JsonObject, mode: string = "replace") : Promise<void>
-    {
+    public updateEntityAsync(entity: JsonObject, mode: string = "replace"): Promise<void> {
         return this.tableOpAsync(getUpdateOp(mode), entity, true);
     }
 
-    public mergeEntityAsync(entity: JsonObject) : Promise<void>
-    {
+    public mergeEntityAsync(entity: JsonObject): Promise<void> {
         return this.updateEntityAsync(entity, "merge")
     }
 
@@ -122,8 +112,7 @@ export class Table
      * Try to update an existing entity in a table (can merge with existing fields or completely replace it)
      * {hints:mode:merge,replace}
      */
-    public tryUpdateEntityAsync(entity: JsonObject, mode: string = "replace") : Promise<boolean>
-    {
+    public tryUpdateEntityAsync(entity: JsonObject, mode: string = "replace"): Promise<boolean> {
         let op = getUpdateOp(mode);
         return this.tryTableOpAsync(op, entity, true);
     }
@@ -131,32 +120,29 @@ export class Table
     /**
      * Remove an existing entity from a table
      */
-    public deleteEntityAsync(entity: JsonObject) : Promise<void>
-    {
+    public deleteEntityAsync(entity: JsonObject): Promise<void> {
         return this.tableOpAsync("deleteEntity", entity, true);
     }
 
     /**
      * Remove an existing table
      */
-    public async deleteTableAsync() : Promise<void>
-    {
+    public async deleteTableAsync(): Promise<void> {
         let table: Table = this;
         logger.debug("delete table " + table);
         let err = await table.tableStaticOpCoreAsync("deleteTable");
         assert(err == "", "delete table failed: " + err);
     }
 
-    private async tableStaticOpCoreAsync(op: string) : Promise<string>
-    {
+    private async tableStaticOpCoreAsync(op: string): Promise<string> {
         let table: Table = this;
         let error: string;
         let start = logger.loggerDuration();
         await new Promise(resume => {
             table.client.handle[op](table.name, (err) => {
-              if (err) error = err + "";
-              else error = "";
-              resume()
+                if (err) error = err + "";
+                else error = "";
+                resume()
             })
         });
         table.timeOpCore(start, "write");
@@ -166,8 +152,7 @@ export class Table
     /**
      * Initializes a table query
      */
-    public createQuery() : TableQuery
-    {
+    public createQuery(): TableQuery {
         let query = new TableQuery();
         query.initQuery(this);
         return query;
@@ -176,21 +161,20 @@ export class Table
     /**
      * Retrieve a specific entity from a table; returns invalid if missing
      */
-    public async getEntityAsync(PartitionKey: string, RowKey: string) : Promise<JsonObject>
-    {
+    public async getEntityAsync(PartitionKey: string, RowKey: string): Promise<JsonObject> {
         let table: Table = this;
         let result: JsonObject;
         let start = logger.loggerDuration();
         await new Promise(resume => {
             table.client.handle.getEntity(table.name, PartitionKey, RowKey,
                 (err, ent) => {
-                  if (err) {
-                     if (err.statusCode == 404) {}
-                     else td.checkAndLog(err);
-                  } else if (ent) {
-                      result = ent;
-                  }
-                  resume()
+                    if (err) {
+                        if (err.statusCode == 404) { }
+                        else td.checkAndLog(err);
+                    } else if (ent) {
+                        result = ent;
+                    }
+                    resume()
                 })
         });
         table.timeOpCore(start, "read");
@@ -200,27 +184,23 @@ export class Table
     /**
      * Try adding a new entity into a table
      */
-    public tryInsertEntityAsync(entity: JsonObject) : Promise<boolean>
-    {
+    public tryInsertEntityAsync(entity: JsonObject): Promise<boolean> {
         return this.tryTableOpAsync("insertEntity", entity, false);
     }
 
     /**
      * Try to remove an existing entity from a table
      */
-    public tryDeleteEntityAsync(entity: JsonObject) : Promise<boolean>
-    {
+    public tryDeleteEntityAsync(entity: JsonObject): Promise<boolean> {
         return this.tryTableOpAsync("deleteEntity", entity, true);
     }
 
-    public timeOpCore(start: number, id: string) : void
-    {
+    public timeOpCore(start: number, id: string): void {
         let delta = logger.loggerDuration() - start;
         logger.measure(id + this.suffix(), delta);
     }
 
-    private suffix() : string
-    {
+    private suffix(): string {
         return "@" + this.client.tdAccount;
     }
 
@@ -228,8 +208,7 @@ export class Table
      * Insert an entity into a table (can merge or replace when its already present)
      * {hints:when present:,or merge,or replace}
      */
-    public tryInsertEntityExtAsync(entity: JsonObject, whenPresent: string = "") : Promise<boolean>
-    {
+    public tryInsertEntityExtAsync(entity: JsonObject, whenPresent: string = ""): Promise<boolean> {
         let op = "";
         if (whenPresent == "") {
             op = "insertEntity";
@@ -248,8 +227,7 @@ export class Table
 
 }
 
-export class TableQuery
-{
+export class TableQuery {
     public table: Table;
     public onlyTop: number;
     public onlyFields: string[];
@@ -261,8 +239,7 @@ export class TableQuery
     public forceEtags: boolean;
     private hadWhere = false;
 
-    public initQuery(table: Table) : void
-    {
+    public initQuery(table: Table): void {
         let query: TableQuery = this;
         query.table = table;
         query.onlyTop = Number.POSITIVE_INFINITY;
@@ -272,19 +249,16 @@ export class TableQuery
     /**
      * Return at most `count` elements.
      */
-    public top(count: number) : TableQuery
-    {
+    public top(count: number): TableQuery {
         this.onlyTop = count;
         return this.pageSize(count);
     }
 
-    public partitionKeyIs(PartitionKey: string) : TableQuery
-    {
+    public partitionKeyIs(PartitionKey: string): TableQuery {
         return this.where("PartitionKey", "==", PartitionKey);
     }
 
-    private exprCore(op: string, field: string, comparison: string, argument: string) : TableQuery
-    {
+    private exprCore(op: string, field: string, comparison: string, argument: string): TableQuery {
         if (this.hadWhere && op == "where") op = "and";
         if (op == "where") this.hadWhere = true;
         if (comparison == "=") comparison = "==";
@@ -296,16 +270,14 @@ export class TableQuery
      * Adds AND clause to the query. Cannot be first.
      * {hints:comparison:==,!=,<,>,<=,>=}
      */
-    public and(field: string, comparison: string, argument: string) : TableQuery
-    {
+    public and(field: string, comparison: string, argument: string): TableQuery {
         return this.exprCore("and", field, comparison, argument);
     }
 
     /**
      * Don't return more than `count` elements at the same time.
      */
-    public pageSize(count: number) : TableQuery
-    {
+    public pageSize(count: number): TableQuery {
         this.limitTo = count;
         return this;
     }
@@ -313,8 +285,7 @@ export class TableQuery
     /**
      * Fetch all (or `->top`) results of the query.
      */
-    public async fetchAllAsync() : Promise<JsonObject[]>
-    {
+    public async fetchAllAsync(): Promise<JsonObject[]> {
         let query: TableQuery = this;
         let coll = [];
         let hasMore = true;
@@ -342,8 +313,7 @@ export class TableQuery
      * Adds a clause to the query. Has to be first.
      * {hints:comparison:==,!=,<,>,<=,>=}
      */
-    public where(field: string, comparison: string, argument: string) : TableQuery
-    {
+    public where(field: string, comparison: string, argument: string): TableQuery {
         return this.exprCore("where", field, comparison, argument);
     }
 
@@ -351,36 +321,33 @@ export class TableQuery
      * Adds OR clause to the query. Cannot be first.
      * {hints:comparison:==,!=,<,>,<=,>=}
      */
-    public or(field: string, comparison: string, argument: string) : TableQuery
-    {
+    public or(field: string, comparison: string, argument: string): TableQuery {
         return this.exprCore("or", field, comparison, argument);
     }
 
     /**
      * Restart a query at `token`.
      */
-    public continueAt(token: string) : TableQuery
-    {
+    public continueAt(token: string): TableQuery {
         if (token)
-          this.continuation = token.split(/\//);
+            this.continuation = token.split(/\//);
         else
-          this.continuation = null;
+            this.continuation = null;
         return this;
     }
 
-    private async fetchCoreAsync() : Promise<JsonObject[]>
-    {
+    private async fetchCoreAsync(): Promise<JsonObject[]> {
         let entities: JsonObject[];
         let token: string;
         let start = logger.loggerDuration();
         let table = this.table
         await new Promise(resume => {
             table.client.handle.queryEntities(table.name, this, (err, res, cont) => {
-              if (err)
-                throw new Error("error executing query on azure table " + table.name + ": " + err);
-              entities = res;
-              res.token = cont ? cont.join("/") : ""
-              resume();
+                if (err)
+                    throw new Error("error executing query on azure table " + table.name + ": " + err);
+                entities = res;
+                res.token = cont ? cont.join("/") : ""
+                resume();
             });
         });
         table.timeOpCore(start, "read");
@@ -390,8 +357,7 @@ export class TableQuery
     /**
      * Include `__etag` field to each returned entry.
      */
-    public withEtags() : TableQuery
-    {
+    public withEtags(): TableQuery {
         this.forceEtags = true;
         return this;
     }
@@ -399,8 +365,7 @@ export class TableQuery
     /**
      * Fetch one page (~1000 or `->page size`) results of the query, and allow for continuation.
      */
-    public async fetchPageAsync() : Promise<QueryResult>
-    {
+    public async fetchPageAsync(): Promise<QueryResult> {
         let items = await this.fetchCoreAsync();
         let entities = new QueryResult();
         entities.items = items;
@@ -411,11 +376,10 @@ export class TableQuery
 }
 
 export class QueryResult
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public items: JsonObject[];
     @td.json public continuation: string = "";
-    static createFromJson(o:JsonObject) { let r = new QueryResult(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new QueryResult(); r.fromJson(o); return r; }
 }
 
 export interface IInitOptions {
@@ -425,29 +389,27 @@ export interface IInitOptions {
     storageAccessKey?: string;
 }
 
-export class Client
-{
-    public handle:any;
-    public tdAccount:string;
+export class Client {
+    public handle: any;
+    public tdAccount: string;
 
     /**
      * Creates a new table if there is not already a table with the same name
      */
-    public async createTableIfNotExistsAsync(name: string) : Promise<Table>
-    {
+    public async createTableIfNotExistsAsync(name: string): Promise<Table> {
         let client: Client = this;
         let table = new Table(name, client);
-        if ( ! assumeTablesExists_) {
+        if (!assumeTablesExists_) {
             logger.debug("create table " + name);
             await new Promise(resume => {
-                client.handle.createTable(name, {ignoreIfExists: true}, (error, result) => {
-                  if (error) {
-                      table = null
-                      throw new Error("cannot create table " + error.message)
-                  } else {
-                      // ok
-                      resume()
-                  }
+                client.handle.createTable(name, { ignoreIfExists: true }, (error, result) => {
+                    if (error) {
+                        table = null
+                        throw new Error("cannot create table " + error.message)
+                    } else {
+                        // ok
+                        resume()
+                    }
                 })
             });
         }
@@ -456,18 +418,17 @@ export class Client
         }
         return table;
     }
-    
-    public getTable(name: string): Table
-    {
-        return new Table(name, this);        
+
+
+    public getTable(name: string): Table {
+        return new Table(name, this);
     }
 }
 
 /**
  * Create a client for Azure table service. The account options default to environment variables ``AZURE_STORAGE_ACCOUNT`` and ``AZURE_STORAGE_ACCESS_KEY``.
  */
-export function createClient(options: IInitOptions = {}) : Client
-{
+export function createClient(options: IInitOptions = {}): Client {
     let client: Client;
     if (logger == null) {
         logger = td.createLogger("tables");
@@ -485,22 +446,22 @@ export function createClient(options: IInitOptions = {}) : Client
 
     // Setup azure client
     var azureTable = azure_table_node;
-    
-    var opts:any = {}
+
+    var opts: any = {}
     var agent = td.mkAgent("https:")
-    
+
     var co = options
     if (co.timeout) opts.timeout = co.timeout;
     if (co.retries) opts.retry = { retries: co.retries };
-    
+
     var account = co.storageAccount
     var key = co.storageAccessKey
     opts.accountName = account
     opts.accountUrl = 'https://' + account + '.table.core.windows.net/'
     opts.accountKey = key
-    
+
     opts.agent = agent
-    
+
     client = new Client();
     client.tdAccount = account;
     client.handle = azureTable.createClient(opts);
@@ -508,8 +469,7 @@ export function createClient(options: IInitOptions = {}) : Client
     return client;
 }
 
-function prepEntity(js: JsonObject) : JsonObject
-{
+function prepEntity(js: JsonObject): JsonObject {
     let res: JsonObject;
     checkPartitionOrRowKey(js["PartitionKey"]);
     checkPartitionOrRowKey(js["RowKey"]);
@@ -520,8 +480,7 @@ function prepEntity(js: JsonObject) : JsonObject
     return res;
 }
 
-function getUpdateOp(mode: string) : string
-{
+function getUpdateOp(mode: string): string {
     let op: string;
     op = "";
     if (mode == "merge") {
@@ -539,8 +498,7 @@ function getUpdateOp(mode: string) : string
 /**
  * Creates an entity with just a partition key and a row key
  */
-export function createEntity(PartitionKey: string, RowKey: string) : JsonBuilder
-{
+export function createEntity(PartitionKey: string, RowKey: string): JsonBuilder {
     let entity: JsonBuilder;
     entity = {};
     entity["PartitionKey"] = PartitionKey;
@@ -551,13 +509,12 @@ export function createEntity(PartitionKey: string, RowKey: string) : JsonBuilder
 /**
  * Creates a log id (in decreasing order)
  */
-export function createLogId(tm?:number) : string
-{
+export function createLogId(tm?: number): string {
     if (tm == null)
         tm = Date.now();
     let x = 20000000000000 - tm;
     logSeqNo += 1;
-    return x + "." + logSeqNo + "." + instanceId;    
+    return x + "." + logSeqNo + "." + instanceId;
 }
 
 /**
@@ -565,8 +522,7 @@ export function createLogId(tm?:number) : string
  */
 export var createRandomId = td.createRandomId;
 
-async function exampleAsync() : Promise<void>
-{
+async function exampleAsync(): Promise<void> {
     // This library gives access to the [Azure Storage Service](http://azure.microsoft.com/en-us/documentation/articles/storage-nodejs-how-to-use-table-storage/).
     // ### initializing the library
     // The azure module will read the environment variables ``AZURE_STORAGE_ACCOUNT`` and ``AZURE_STORAGE_ACCESS_KEY``, or ``AZURE_STORAGE_CONNECTION_STRING`` for information required to connect to your Azure storage account.
@@ -604,26 +560,23 @@ async function exampleAsync() : Promise<void>
     let entities = await resQuery2.fetchAllAsync();
 }
 
-function checkPartitionOrRowKey(s: string) : void
-{
+function checkPartitionOrRowKey(s: string): void {
     assert(s != null, "Partition/RowKey must be present");
     assert(s != "", "Partition/RowKey must be non-empty");
-    assert( ! /[\/\\\?#]/.test(s), "Partition/RowKey cannot contain \\ / ? #");
+    assert(! /[\/\\\?#]/.test(s), "Partition/RowKey cannot contain \\ / ? #");
 }
 
 /**
  * Assume tables already exists for `create table if not exists`
  */
-export function assumeTablesExists() : void
-{
+export function assumeTablesExists(): void {
     assumeTablesExists_ = true;
 }
 
 /**
  * Creates a log id (in increasing order)
  */
-export function createReverseLogId() : string
-{
+export function createReverseLogId(): string {
     let x = Date.now();
     logSeqNo += 1;
     return x + "." + logSeqNo + "." + instanceId;
