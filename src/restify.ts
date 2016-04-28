@@ -287,10 +287,10 @@ export class Request {
         let body: Buffer;
         await new Promise(resume => {
             var bufs = []
-            this.handle.on("data", function(data) {
+            this.handle.on("data", function (data) {
                 bufs.push(data)
             })
-            this.handle.on("end", function() {
+            this.handle.on("end", function () {
                 body = Buffer.concat(bufs)
                 resume()
             })
@@ -453,7 +453,7 @@ export class Response {
         if (this.req.method() != "HEAD") {
             buf = new Buffer(content, "utf8");
         }
-        
+
         this.handle.setHeader('content-type', contentType + '; charset=utf8');
         this.handle.setHeader('content-length', buf.length);
         this.handle.writeHead(opts.status || 200);
@@ -547,7 +547,7 @@ function example(): void {
     // ## routing
     // You define routing path using ``get``, ``post``, ... Each function will match the HTTP method. ``all`` matches all methods.
     // * define new routes to handle requests
-    ser.get("/ping", async(req: Request, res: Response) => {
+    ser.get("/ping", async (req: Request, res: Response) => {
         res.send(new Date().getTime().toString());
     });
     // ## middleware
@@ -580,20 +580,23 @@ export function handleRequest(req, res) {
 }
 
 function restifyErrorResponse(e, req, res, route) {
-    if (!e.tdMeta) e.tdMeta = {}
-    e.body = {
-        message: e.message,
-        stack: e.tdMeta.compressedStack,
-        //        origStack: typeof e.stack == "string" ? e.stack.split(/\n/) : [],
-        reportId: e.tdMeta.reportId,
+    try {
+        if (!e.tdMeta) e.tdMeta = {}
+        e.body = {
+            message: e.message,
+            stack: e.tdMeta.compressedStack,
+            //        origStack: typeof e.stack == "string" ? e.stack.split(/\n/) : [],
+            reportId: e.tdMeta.reportId,
+        }
+        if (route && route.name)
+            e.tdMeta.routeName = route.name
+        if (req) {
+            e.tdMeta.reqUrl = req.method + " " + (req.url || "???").replace(/access_token=.*/, "[secure]")
+            e.tdNodeRequest = req
+        }
+        e.tdMeta.interesting = true
+    } catch (x) {
     }
-    if (route && route.name)
-        e.tdMeta.routeName = route.name
-    if (req) {
-        e.tdMeta.reqUrl = req.method + " " + (req.url || "???").replace(/access_token=.*/, "[secure]")
-        e.tdNodeRequest = req
-    }
-    e.tdMeta.interesting = true
 }
 
 function restifyHandlerFactory(handler: RequestHandler) {
@@ -641,9 +644,9 @@ function initProxy(logger: td.AppLogger): void {
     var server = restify.createServer()
     rootRestifyApp = new Server()
     rootRestifyApp.handle = server
-    
+
     // hack for NPM
-    server.use(function(req, res, next) {
+    server.use(function (req, res, next) {
         if (/application\/x-tar/.test(req.header('accept'))) {
             delete req.headers['accept'];
         }
@@ -765,7 +768,7 @@ export function http() {
 }
 
 function setupHandler(method: string, path: string, then: RequestHandler): RequestHandler {
-    return async(req: Request, res: Response) => {
+    return async (req: Request, res: Response) => {
 
         logger.newContext();
         let url = req.url().replace(/access_token=.*/g, "[secure]");
@@ -778,7 +781,7 @@ function setupHandler(method: string, path: string, then: RequestHandler): Reque
             res.handle.tdFinished = true;
         }
         if (!res.handle.origEnd) res.handle.origEnd = res.handle.end;
-        res.handle.end = function() {
+        res.handle.end = function () {
             this.origEnd.apply(this, arguments);
             fin();
         }
@@ -787,7 +790,7 @@ function setupHandler(method: string, path: string, then: RequestHandler): Reque
 }
 
 export function disableTicks(): void {
-    logger.customTick = function() { }
+    logger.customTick = function () { }
 }
 
 export function finishStartup(): void {
@@ -809,7 +812,7 @@ export function setupShellHooks(): void {
         return true;
     }
 
-    server().get("/-tdevmgmt-/:key/ready", async(req, res) => {
+    server().get("/-tdevmgmt-/:key/ready", async (req, res) => {
         if (wrong(req, res)) return;
         if (!isReady)
             res.sendError(503, "Not yet ready")
@@ -818,13 +821,13 @@ export function setupShellHooks(): void {
     })
 
     // Once we get that we should not start any new background tasks    
-    server().get("/-tdevmgmt-/:key/shutdown", async(req, res) => {
+    server().get("/-tdevmgmt-/:key/shutdown", async (req, res) => {
         if (wrong(req, res)) return;
         server().inShutdownMode = true;
         res.json({ accepted: true })
     })
 
-    server().get("/-tdevmgmt-/:key/info/:which", async(req, res) => {
+    server().get("/-tdevmgmt-/:key/info/:which", async (req, res) => {
         if (wrong(req, res)) return;
         var needed = td.toDictionary(req.param("which").split(/,/), s => s)
         res.json({
