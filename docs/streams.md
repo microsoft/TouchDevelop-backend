@@ -1,7 +1,5 @@
 # Streaming data API
 
-Note: even though we use JavaScript syntax for input/output of requests here,
-the actual APIs use JSON, with proper quoting etc.
 
 ## Creating a stream
 
@@ -14,13 +12,20 @@ POST /api/streams
 
 The name is optional. The response will look like this (in JSON):
 
-```
-{ kind: 'stream',
-  id: 'lxmsmqjlwucg',
-  time: 1461862043,
-  name: 'My stream',
-  meta: { fields: [], size: 0, rows: 0, batches: 0 },
-  privatekey: 'XPbHZzTsBiimirjvVgVlzmIX' }
+```json
+{
+  "kind": "stream",
+  "id": "lxmsmqjlwucg",
+  "time": 1461862043,
+  "name": "My stream",
+  "meta": {
+    "fields": [],
+    "size": 0,
+    "rows": 0,
+    "batches": 0
+  },
+  "privatekey": "XPbHZzTsBiimirjvVgVlzmIX"
+}
 ```
 
 ## Posting data to a stream
@@ -49,7 +54,7 @@ and have to match `/^[a-zA-Z][a-zA-Z0-9_]*$/`. Values can be numbers or `null`.
 
 The response is:
 
-```
+```json
 {
   "meta": { ... },
   "quotaUsedHere": 46,
