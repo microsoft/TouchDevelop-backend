@@ -599,6 +599,12 @@ function restifyErrorResponse(e, req, res, route) {
     }
 }
 
+function wrapError(e: any): any {
+    if (typeof e == "string" || !e || typeof e == "number" || typeof e == "boolean")
+        return new Error(e + "")
+    return e
+}
+
 function restifyHandlerFactory(handler: RequestHandler) {
     return (req, res, next) => {
         res.__next = next;
@@ -611,6 +617,7 @@ function restifyHandlerFactory(handler: RequestHandler) {
 
         var d = domain.create()
         d.on("error", e => {
+            e = wrapError(e)
             restifyErrorResponse(e, req, res, null)
             td.App.logException(e)
             if (!res.finished && !res.tdFinished) {
