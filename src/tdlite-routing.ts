@@ -260,7 +260,7 @@ function sendResponse(apiRequest: core.ApiRequest, req: restify.Request, res: re
             if (apiRequest.status < 310 && apiRequest.headers != null && apiRequest.headers.hasOwnProperty("location")) {
                 res.setHeader("location", apiRequest.headers["location"]);
             }            
-            res.sendError(apiRequest.status, "");
+            res.sendError(apiRequest.status, apiRequest.errorMessage || "");
         }
     }
     else if (apiRequest.response == null) {

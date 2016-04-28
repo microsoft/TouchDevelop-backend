@@ -157,6 +157,7 @@ export class ApiRequest {
     public subArgument: string = "";
     public subSubArgument: string = "";
     public status: number = 0;
+    public errorMessage: string = "";
     public response: JsonObject;
     public responseContentType: string = "";
     public isUpgrade: boolean = false;
@@ -282,6 +283,7 @@ export interface IRouteOptions {
     sizeCheckExcludes?: string;
     cacheKey?: string;
     override?: boolean;
+    sizeLimit?: number; // defaults to 20000
 }
 
 /**
@@ -308,7 +310,7 @@ export function addRoute(method: string, root: string, verb: string, handler: Ap
                     size = JSON.stringify(req.body).length;
                 }
             }
-            if (size > 20000) {
+            if (size > (options_.sizeLimit || 20000)) {
                 req.status = httpCode._413RequestEntityTooLarge;
             }
             else {
@@ -449,6 +451,7 @@ export interface IResolveOptions {
     byPublicationid?: boolean;
     anonList?: boolean;
     anonSearch?: boolean;
+    listPermission?: string;
 }
 
 export function checkRelexedGlobalList(req: ApiRequest) {
@@ -476,6 +479,8 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
     }
     addRoute("GET", plural, "", async(req1: ApiRequest) => {
         let q = orEmpty(req1.queryOptions["q"]);
+        if (options_.listPermission && !checkPermission(req1, options_.listPermission))
+            return;
         if (q == "") {
             if (!options_.anonList) {
                 checkRelexedGlobalList(req1);

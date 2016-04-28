@@ -283,6 +283,10 @@ export function toDictionary<T>(arr: T[], f: (t: T) => string): SMap<T> {
     return r
 }
 
+export function values<T>(dict: SMap<T>): T[] {
+    return Object.keys(dict).map(k => dict[k])
+}
+
 export function toNumber(v: any): number {
     if (v == null) return null
 

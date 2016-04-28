@@ -52,12 +52,13 @@ import * as tdliteLegacy from "./tdlite-legacy"
 import * as tdliteCounters from "./tdlite-counters"
 import * as tdliteProgress from "./tdlite-progress"
 import * as tdliteI18N from "./tdlite-i18n"
+import * as tdliteStreams from "./tdlite-streams"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
 
 
-var reinit = false;
+var reinit = true;
 
 var logger = core.logger;
 var httpCode = restify.http();
@@ -236,6 +237,7 @@ async function initSubsystems() : Promise<void>
     await tdliteCppCompiler.initAsync();
     await tdliteProgress.initAsync();
     await tdliteI18N.initAsync();
+    await tdliteStreams.initAsync();
     if (core.fullTD && core.hasSetting("LEGACY_ACCOUNT")) {
         await tdliteLegacy.initAsync();
     }    

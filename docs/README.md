@@ -15,4 +15,5 @@ Following docs are available:
 * [generating SSL certs](ssl.md)
 * [general source architecture](map.md)
 * [REST APIs description](REST-APIs.md)
+* [Streams APIs description](streams.md)
 
