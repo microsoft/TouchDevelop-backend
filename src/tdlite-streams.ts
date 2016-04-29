@@ -227,13 +227,21 @@ export async function initAsync(): Promise<void> {
     core.addRoute("GET", "*stream", "data.csv", async (req: core.ApiRequest) => {
         let resp = await fetchDataAsync(req)
         if (!resp) return
+        let fldNames = resp.fields.map(f => f.name)
+        let partId = fldNames.indexOf("partition")
+        if (partId >= 0) fldNames.splice(partId, 1)
         let resCsv = [
-            csv(["Time"].concat(resp.fields.map(f => f.name)))
+            csv(fldNames)
         ]
         for (let row of resp.values) {
-            let strs = row.map(k => k === null ? "" : "" + k)
-            let isoDate = new Date(row[0]).toISOString() 
-            resCsv.push(csv([isoDate].concat(strs)))
+            let isoDate = new Date(row[0]).toISOString().replace("T", " ").replace("Z", "")
+            let strs = [isoDate]
+            for (let i = 1; i < row.length; ++i) {
+                let k = row[i]
+                if (i != partId)
+                    strs.push(k === null ? "" : "" + k)
+            }
+            resCsv.push(csv(strs))
         }
         if (resp.continuationUrl)
             resCsv.push("\n", csv(["More items at:", resp.continuationUrl]))
@@ -245,9 +253,73 @@ export async function initAsync(): Promise<void> {
         req.response = await fetchDataAsync(req)
     })
 
-    // stream limits: 32k max request size, 
-    // 50MB max stream size, max 1req per minute per stream (up to 60 in burst),
-    // max 32 fields per stream
+    core.addRoute("GET", "*stream", "odata", async (req: core.ApiRequest) => {
+        let odataroot = core.self + "api/" + req.rootId + "/odata/"
+
+        if (req.argument == "") {
+            let info = `<?xml version="1.0" encoding="utf-8"?>
+            <service xml:base="http://services.odata.org/V3/OData/OData.svc/" 
+                     xmlns="http://www.w3.org/2007/app" 
+                     xmlns:atom="http://www.w3.org/2005/Atom">
+               <workspace>
+                 <atom:title>Default</atom:title>
+                 <collection href="${odataroot}Samples">
+                   <atom:title>Samples</atom:title>
+                 </collection>
+               </workspace>
+            </service>`
+            req.response = info
+            req.responseContentType = "application/xml"
+        } else if (req.argument == "Samples") {
+            let resp = await fetchDataAsync(req)
+            if (!resp) return
+
+            let xml = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" 
+  xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" 
+  xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" 
+  xmlns:georss="http://www.georss.org/georss" 
+  xmlns:gml="http://www.opengis.net/gml" 
+  xml:base="${odataroot}">
+<id>${odataroot}Samples</id>
+<title type="text">Samples</title>
+<updated>${new Date().toISOString()}</updated>
+<link rel="self" title="Samples" href="${odataroot}Samples"/>
+`
+            if (resp.continuationUrl)
+                xml += `<link rel="next" href="${resp.continuationUrl}"/>`
+
+
+            for (let row of resp.values) {
+                xml += `
+<entry>
+<category term="Edm.ComplexType" scheme="http://schemas.microsoft.com/ado/2007/08/dataservices/scheme" />
+<content type="application/xml">
+<m:properties>
+<d:Timestamp m:type="Edm.DateTimeOffset">${new Date(row[0]).toISOString()}</d:Timestamp>
+`
+                resp.fields.forEach((fi, i) => {
+                    if (i == 0) return
+                    xml += `<d:${fi.name} m:type="Edm.Double">${row[i]}</d:${fi.name}>\n`
+                })
+
+                xml += `</m:properties></content></entry>`
+            }
+
+            xml += `</feed>`
+            req.response = xml
+            req.responseContentType = "application/atom+xml;type=feed"
+        } else {
+            req.status = httpCode._400BadRequest
+        }
+        /*
+        req.response = {
+            "@odata.context": strurl + "$metadata#Samples",
+            "@odata.next": resp.continuationUrl || undefined,
+            "value": 
+        }
+        */
+    })
 
     core.addRoute("POST", "*stream", "data", async (req: core.ApiRequest) => {
         if (!checkPerm(req)) return

@@ -652,9 +652,13 @@ function initProxy(logger: td.AppLogger): void {
     rootRestifyApp = new Server()
     rootRestifyApp.handle = server
 
-    // hack for NPM
     server.use(function (req, res, next) {
+        // hack for NPM
         if (/application\/x-tar/.test(req.header('accept'))) {
+            delete req.headers['accept'];
+        }
+        // hack for odata/Excel
+        if (/xml/.test(req.header('accept'))) {
             delete req.headers['accept'];
         }
         next();
