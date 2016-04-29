@@ -905,6 +905,21 @@ async function lookupScreenshotIdAsync(pub: {}) {
     return "";
 }
 
+async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string, domain: string) {
+    let req = core.buildApiRequest("/api")
+    let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, streamjson, req);
+    let templ = "templates/stream"
+
+    let targetName: string = pub["target"]
+    let theme = await getTargetThemeAsync(targetName)
+
+    pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
+    pub["apiroot"] = "https://" + domain + "/api/"
+
+    let templTxt = await getTemplateTextAsync(templ, lang)
+    v.text = tdliteDocs.renderMarkdown(templTxt, "", theme, pub)
+}
+
 async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string) {
     let req = core.buildApiRequest("/api")
     req.rootId = scriptjson["id"];    // this is to make sure we show hidden scripts
@@ -1146,14 +1161,18 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     await errorAsync("No such publication");
                 }
                 else {
-                    if (core.pxt && entry["kind"] == "script") {
+                    let ekind = entry["kind"]
+                    if (core.pxt && (ekind == "script" || ekind == "stream")) {
                         let domain = domainOfTarget(entry["pub"]["target"])
                         if (domain && domain != host) {
                             v.redirect = "https://" + domain + "/" + bareFn
                         } else {
-                            await renderScriptPageAsync(entry, v, lang)
+                            if (ekind == "stream")
+                                await renderStreamPageAsync(entry, v, lang, host)
+                            else
+                                await renderScriptPageAsync(entry, v, lang)
                         }
-                    } else if (core.fullTD && entry["kind"] == "script") {
+                    } else if (core.fullTD && ekind == "script") {
                         await renderScriptPageAsync(entry, v, lang)
                     } else {
                         v.redirect = "/app/#pub:" + entry["id"];
