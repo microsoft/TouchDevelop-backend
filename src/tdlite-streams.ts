@@ -29,7 +29,8 @@ export class PubStream
     extends core.IdObject {
     @td.json public time: number = 0;
     @td.json public name: string = "";
-    @td.json public meta: StreamInfo;
+    @td.json public target: string = "";
+    @td.json public meta: {};
 
     static createFromJson(o: JsonObject) { let r = new PubStream(); r.fromJson(o); return r; }
 }
@@ -59,6 +60,15 @@ export async function initAsync(): Promise<void> {
         blobService: blobService,
         noCache: true
     });
+    
+    function userMeta(info:StreamInfo) {
+        return {
+            fields: td.values(info.fields),
+            rows: info.rows,
+            size: info.size,
+            batches: info.batches
+        }
+    }
 
     streams = await indexedStore.createStoreAsync(core.pubsContainer, "stream");
     await core.setResolveAsync(streams, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
@@ -67,8 +77,7 @@ export async function initAsync(): Promise<void> {
         let i = 0
         for (let e of fetchResult.items) {
             let s = PubStream.createFromJson(e["pub"])
-            s.meta = metas[i++] as StreamInfo
-            if (s.meta) s.meta.fields = td.values(s.meta.fields) as any
+            s.meta = userMeta(metas[i++] as StreamInfo)
             coll.push(s)
         }
         fetchResult.items = td.arrayToJson(coll);
@@ -80,11 +89,17 @@ export async function initAsync(): Promise<void> {
         await core.throttleAsync(req, "stream", 120);
         if (req.status != 200) return;
 
-        let report = new PubStream();
-        report.name = orEmpty(req.body["name"]);
-        report.time = await core.nowSecondsAsync();
+        if (!core.isValidTargetName(req.body["target"])) {
+            req.status = httpCode._400BadRequest
+            return
+        }
+
+        let stream = new PubStream();
+        stream.name = orEmpty(req.body["name"]);
+        stream.time = await core.nowSecondsAsync();
+        stream.target = orEmpty(req.body["target"]);
         let jsb = {
-            pub: report.toJson(),
+            pub: stream.toJson(),
             privatekey: td.createRandomId(24),
         }
         await core.generateIdAsync(jsb, 12);
@@ -461,7 +476,7 @@ export async function initAsync(): Promise<void> {
         await table.insertEntityAsync(ent)
 
         req.response = {
-            meta: finalMeta,
+            meta: userMeta(finalMeta),
             quotaUsedHere: size,
             quotaLeft: quota - finalMeta.size,
         }
