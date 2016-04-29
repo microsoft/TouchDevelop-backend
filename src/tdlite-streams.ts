@@ -154,7 +154,12 @@ export async function initAsync(): Promise<void> {
     }
 
     function csv(l: string[]) {
-        return l.map(s => "\"" + (s || "").replace(/[\\"]/g, " ") + "\"").join(",") + "\n"
+        return l.map(s => {
+            if (!s) s = ""
+            if (/[^A-Za-z0-9:.\-]/.test(s))
+                return "\"" + s.replace(/[\\"]/g, " ") + "\""
+            else return s
+        }).join(",") + "\n"
     }
 
     async function fetchDataAsync(req: core.ApiRequest) {
@@ -162,7 +167,7 @@ export async function initAsync(): Promise<void> {
         let stop = parseTime(req.queryOptions["stop"], "-0s")
         let part = parseInt(req.queryOptions["partition"] || "0") + ""
         if (!start || !stop) {
-            req.status = httpCode._422UnprocessableEntity
+            req.status = httpCode._400BadRequest
             req.errorMessage = "Invalid start= or stop= parameter; use -100s, -10h, etc. or milliseconds since epoch"
             return
         }
@@ -227,12 +232,12 @@ export async function initAsync(): Promise<void> {
         ]
         for (let row of resp.values) {
             let strs = row.map(k => k === null ? "" : "" + k)
-            strs.unshift(new Date(row[0]).toISOString())
-            resCsv.push(csv(strs))
+            let isoDate = new Date(row[0]).toISOString() 
+            resCsv.push(csv([isoDate].concat(strs)))
         }
         if (resp.continuationUrl)
             resCsv.push("\n", csv(["More items at:", resp.continuationUrl]))
-        req.response = resCsv.join()
+        req.response = resCsv.join("")
         req.responseContentType = "text/csv"
     })
 

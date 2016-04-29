@@ -1,6 +1,5 @@
 # Streaming data API
 
-
 ## Creating a stream
 
 ```
@@ -180,3 +179,17 @@ posting and querying.
 * 32 fields per stream max
 * At most 1 post per stream per minute (bursts of up to 60 every hour acceptable)
 * Similarly, for queries
+* At most 1 api request from an IP per 2 seconds
+
+## Error responses
+
+All endpoints describe here return HTTP 200 on success.
+
+In case you exceed throttling limit they return HTTP 429. It applies to creating streams,
+posting data, and querying. In case you're just a few seconds over the throttling limit,
+the server will block for these few seconds and then return HTTP 200.
+
+If you exceed the 50MB quota, you'll get HTTP 412 when posting data.
+
+HTTP 400 signals various error with the input request. Inspect JSON response for
+exact error message.
