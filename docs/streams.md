@@ -5,11 +5,13 @@
 ```
 POST /api/streams
 {
-    "name": "My stream"
+    "name": "My stream",
+    "target": "microbit"
 }
 ```
 
-The name is optional. The response will look like this (in JSON):
+The name and target are optional. Both are used when rendering the stream page at
+`/lxmsmqjlwucg`. The response will look like this (in JSON):
 
 ```json
 {
@@ -17,6 +19,7 @@ The name is optional. The response will look like this (in JSON):
   "id": "lxmsmqjlwucg",
   "time": 1461862043,
   "name": "My stream",
+  "target": "microbit",
   "meta": {
     "fields": [],
     "size": 0,
@@ -45,7 +48,7 @@ and then specify one or more rows of values (samples) in `values`.
 
 The first field has to be `timestamp` and specify the time when the sample was
 taken as number of milliseconds since epoch (Jan 1st 1970). This is what JavaScript
-`Date.getTime()` function returns.
+`Date.getTime()` method returns.
 
 All `fields` and each row of `values` has to have the same number of element.
 Use `null` to indicate no value. Field names have to be at most 60 characters
@@ -163,7 +166,17 @@ GET /api/lxmsmqjlwucg/data?start=-3h&stop=-0s
 }
 ```
 
-Instead of `.../data` you can use `.../data.csv` to get data in CSV format.
+Instead of `.../data` you can use `.../data.csv` to get data in CSV format. The CSV data
+omits partition (as it's the same in the entire file), and converts timestamp field
+into a UTC time representation that Excel understands.
+
+## OData
+
+It's best avoided.
+
+There is some OData support at `/api/lxmsmqjlwucg/odata/` and 
+`/api/lxmsmqjlwucg/odata/Samples`, but it's far from complete.
+Also, when importing into Excel, it rounds up time to seconds (instead of milliseconds).
 
 ## Partitions
 
