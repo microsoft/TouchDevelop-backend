@@ -176,4 +176,103 @@ is beta and production environment they will share `env.json` and then
 override variables like `SELF` using `setenv`. You should not use
 `setenv` to store anything sensitive.
 
+## Storage accounts
+
+A TDB instances uses several storage accounts. If your service is named `foo`
+the following storage accounts are used:
+
+* foo - main storage account that contains most of the publication data
+* foowstab - tables storing pointers to the current state of all user's workspaces
+* foohist - tables storing pointers to the previous versions of all user's workspaces
+* foows0, foows1, foows2, and foows3 - blobs containing user's workspaces;
+  this is divided by the last letter of user's ID modulo 4
+* foonot - tables storing notifications for users
+* fooaudit - tables and blobs with audit logs (may contain encrypted IPs,
+  records of deletion etc)
+* foocompile - not used anymore
+* foostreams - streaming data, see [streams.md]
+* foobackup - used for backup of all the other accounts, see below
+
+These accounts can be all created using `scripts/mkaccounts.sh`. You
+need to edit this file before executing to replace `foo` with your service
+name and pick the right region for your storage accounts.
+
+You will also need `azure-cli` npm package, and authenticate in it.
+
+Running this script will (after a few minutes, creating accounts takes time)
+create two files `envadd.json` to add to `env.json` mentioned above
+and also `accounts.json` which is useful when restoring backup.
+
+
+## Backup
+
+Backup script in `backup-script/backup.js` copies data from a number of the storage
+accounts used by TDB instance, to a single backup account. The data is stored in
+compressed and encrypted form. 
+
+Backup script is run from a Linux virtual machine, usually in the same data center
+as the storage accounts. It can be run from a separate subscription for added security.
+Backup script has to have full access to instance storage accounts, even though
+it only uses read access.
+
+Backup script does not look into Redis or Azure Search. In fact, Redis is treated purely
+as cache and can be fully flushed at any time without much effect on a running TDB instance.
+Azure Search index can be re-created from storage.
+
+### Setting up backup
+
+* provision a Ubuntu server virtual machine
+* git clone the TouchDevelop-backend repo into home directory of a user (doesn't have to be privileged user) 
+* create symlink: `cd; ln -s TouchDevelop-backend/backup-script/ bkp`
+* setup `~/bkp/envbkp.json` with the following:
+```json
+{
+    "KEY_VAULT_CLIENT_ID": "782abcde-8812-4242-12ed-e9282ceedaab",
+    "KEY_VAULT_CLIENT_SECRET": "262QV/1ikZEpGOs4jCagV3ekiIRFyX1T54FkS44ODp8=",
+    "KEY_VAULT_URL": "https://myservice.vault.azure.net/secrets/env",
+    "BACKUP_ACCOUNT": "myservicebkp",
+    "BACKUP_KEY": "Q0QCMXEbPZ9nbjF4YMYUgdm4F9n9pATRmS1i0SoAEmnC0vBFoKNc7SrYwdzmPH7r3XPqRgi6euey8Jmd4rR6ow==",
+    "ENCKEY_BACKUP0": "someRandomString"
+}
+```
+* do a `cd ~/bkp; mkdir logs; ./go.sh` and see if it all works
+* put the following line in user's crontab (by running `crontab -e`) to run the backup daily at 4:42 am
+```
+42 4 * * * $HOME/bkp/cron.sh
+```
+
+### Restoring backup
+
+First, take `accounts.json` file created using `mkaccounts.sh` and add it to `~/bkp/envbkp.json`,
+like this (leaving the previous content in):
+
+```json
+{
+    ...
+    "accounts": {
+      "foo": "YTOFalp1peDySsMAZ9LXjiN566yCzjM310yFks+TZb+5QjRgtRuntGoR4PzUOk71HURK/tnBE7me+jmVYVf26A==",
+      "foows0": "4f+yR/OLPjD730lh2D2XYovL33QUeMYP8x9fMpnEUktmY1Dya+ye3/plefP41ZwPxc9nR6QG7WMsCen06Rg2cg==",
+      ...
+    }
+}
+```
+
+Make sure you these are empty accounts you're adding under `accounts`. They
+will be overwritten.
+
+Run the following in `~/bkp`:
+```
+RESTORE_BACKUP=foo node backup.js < envbkp.json
+```
+
+### Backup retention
+
+The backup script will keep at least 30 previous backups. It will also 
+not delete more than 5 old backups at a time.
+
+The backup process is somewhat incremental, in that is uses previous backup
+to speed up creating the current one. However, every backup (i.e., storage
+container in `foobackup` account) contains the full information.
+
+Full TouchDevelop cloud backup takes about 50GB.
 
