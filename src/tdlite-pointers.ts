@@ -319,12 +319,9 @@ export async function initAsync(): Promise<void> {
             }
         })
 
-        // TODO /api/md/
-        // TODO throttle
-        // TODO add cache of MD        
-        restify.server().routeRegex("GET", "/rawmd/.*", async (req, res) => {
-            let lang = await handleLanguageAsync(req);
-            let path = splitLang(pathToPtr(req.url().slice(6)))
+        core.addRoute("GET", "md", "*", async (req) => {
+            let lang = await handleLanguageAsync(req.restifyReq);
+            let path = splitLang(pathToPtr(req.origUrl.slice(8)))
             if (path.lang == core.serviceSettings.defaultLang) path.lang = "";
             else if (!path.lang) path.lang = lang;
             let suff = lang ? "@" + lang : ""
@@ -332,15 +329,15 @@ export async function initAsync(): Promise<void> {
             if (!ptr && suff)
                 ptr = await core.getPubAsync(path.base, "pointer")
             if (!ptr) {
-                res.sendError(httpCode._404NotFound, "Missing.")
+                req.status = httpCode._404NotFound
             } else {
                 let artobj = await core.getPubAsync(ptr["pub"]["artid"], "art")
                 if (artobj && artobj["contentType"] == "text/markdown") {
-                    let url = tdliteArt.getBlobUrl(artobj)
-                    let resp = await td.createRequest(url).sendAsync()
-                    res.sendText(resp.content(), artobj["contentType"])
+                    let text = await getArtTextAsync(artobj)
+                    req.responseContentType = artobj["contentType"]
+                    req.response = text || "?"
                 } else {
-                    res.sendError(httpCode._400BadRequest, "Invalid type.")
+                    req.status = httpCode._400BadRequest
                 }
             }
         })
@@ -423,9 +420,7 @@ export function pathToPtr(fn: string): string {
 
 async function extractMarkdownProps(artobj: {}, ptr: {}) {
     let pub = ptr["pub"]
-    let url = tdliteArt.getBlobUrl(artobj)
-    let resp = await td.createRequest(url).sendAsync();
-    let textObj = resp.content();
+    let textObj = await getArtTextAsync(artobj)
 
     if (!textObj) return
 
@@ -588,9 +583,7 @@ async function getTargetThemeAsync(targetName: string) {
 
 async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string, targetName: string) {
     let theme = await getTargetThemeAsync(targetName)
-    let url = tdliteArt.getBlobUrl(artobj)
-    let resp = await td.createRequest(url).sendAsync();
-    let textObj = resp.content();
+    let textObj = await getArtTextAsync(artobj)
     if (!textObj) textObj = "Art object not found."
     let templ = await getTemplateTextAsync("templates/docs", lang)
 
@@ -627,15 +620,28 @@ async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string, ta
     return tdliteDocs.renderMarkdown(templ, textObj, theme, {}, breadcrumb)
 }
 
+async function getArtTextAsync(artobj: {}) {
+    let redisKey = "arttext:" + artobj["id"]
+    let existing = await core.redisClient.getAsync(redisKey)
+    if (existing != null) {
+        return existing
+    }
+    let url = tdliteArt.getBlobUrl(artobj)
+    let resp = await td.createRequest(url).sendAsync();
+    let textObj = resp.content();
+    if (textObj != null) {
+        await core.redisClient.setpxAsync(redisKey, textObj, 7200 * 1000)
+    }
+    return textObj
+}
+
 async function getHtmlArtAsync(templid: string, lang: string) {
     let artjs = await core.getPubAsync(templid, "art");
     if (artjs == null) {
         return "Template art missing";
     }
     else if (orEmpty(artjs["contentType"]) == "text/plain") {
-        let url = tdliteArt.getBlobUrl(artjs)
-        let resp = await td.createRequest(url).sendAsync();
-        let textObj = resp.content();
+        let textObj = await getArtTextAsync(artjs)
         if (!textObj) {
             return "Art text not found.";
         }
