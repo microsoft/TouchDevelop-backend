@@ -147,6 +147,12 @@ export async function initAsync(): Promise<void> {
             let ptr1 = new PubPointer();
             ptr1.path = orEmpty(body["path"]).replace(/^\/+/g, "");
             ptr1.id = pathToPtr(ptr1.path);
+            let lang = splitLang(ptr1.id).lang
+            if (toSupportedLang(lang) != lang) {
+                req.status = httpCode._405MethodNotAllowed
+                req.errorMessage = "Unsupported langauge"
+                return
+            }
             if (!checkPostPointerPermissions(req))
                 return;
             let matches = (/^usercontent\/([a-z]+)$/.exec(ptr1.path) || []);
