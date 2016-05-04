@@ -741,7 +741,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
     if (!res.finished()) {
         await core.refreshSettingsAsync();
         let params = {
-            LANG: lang,
+            //LANG: core.normalizeLang(lang),
         };
         let inner = "kidornot";
         if (accessCode == "kid") {
@@ -847,7 +847,7 @@ async function loginHandleCodeAsync(accessCode: string, res: restify.Response, r
     }
 }
 
-async function getLoginHtmlAsync(inner: string, lang: string): Promise<string> {
+async function getLoginHtmlAsync(inner: string, lang: string[]): Promise<string> {
     let text = await tdlitePointers.simplePointerCacheAsync("signin/" + inner, lang);
     if (text.length < 100) {
         text = loginHtml[inner];

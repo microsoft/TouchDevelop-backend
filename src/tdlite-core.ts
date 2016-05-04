@@ -298,7 +298,7 @@ export function addRoute(method: string, root: string, verb: string, handler: Ap
         route.handler = handler;
     }
     else {
-        route.handler = async(req: ApiRequest) => {
+        route.handler = async (req: ApiRequest) => {
             let size = 0;
             if (req.body != null) {
                 if (options_.sizeCheckExcludes) {
@@ -464,7 +464,7 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
         options_.anonSearch = true;
     }
     (<DecoratedStore><any>store).myResolve = resolutionCallback;
-    addRoute("GET", "*" + store.kind, "", async(req: ApiRequest) => {
+    addRoute("GET", "*" + store.kind, "", async (req: ApiRequest) => {
         let fetchResult = store.singleFetchResult(req.rootPub);
         await resolveAsync(store, fetchResult, req);
         req.response = fetchResult.items[0];
@@ -477,7 +477,7 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
     if (plural == "arts") {
         plural = "art";
     }
-    addRoute("GET", plural, "", async(req1: ApiRequest) => {
+    addRoute("GET", plural, "", async (req1: ApiRequest) => {
         let q = orEmpty(req1.queryOptions["q"]);
         if (options_.listPermission && !checkPermission(req1, options_.listPermission))
             return;
@@ -505,7 +505,7 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
         if (pubPlural == "groups") {
             pubPlural = "owngroups";
         }
-        addRoute("GET", "*user", pubPlural, async(req2: ApiRequest) => {
+        addRoute("GET", "*user", pubPlural, async (req2: ApiRequest) => {
             await anyListAsync(store, req2, "userid", req2.rootId);
         });
     }
@@ -519,7 +519,7 @@ export async function setResolveAsync(store: indexedStore.Store, resolutionCallb
             pluralPub = "pubauditlogs";
         }
         await store.createIndexAsync("publicationid", entry2 => entry2["pub"]["publicationid"]);
-        addRoute("GET", "*pub", pluralPub, async(req3: ApiRequest) => {
+        addRoute("GET", "*pub", pluralPub, async (req3: ApiRequest) => {
             if (req3.rootPub["kind"] == "group" && req3.rootPub["pub"]["isclass"]) {
                 if (req3.userid == "") {
                     req3.status = httpCode._401Unauthorized;
@@ -764,7 +764,7 @@ export function handleBasicAuth(req: restify.Request, res: restify.Response, rel
         if (fullTD && req.url().startsWith("/templates")) return
         if (pxt && req.url().startsWith("/app/")) return
         if (pxt && /--([a-z]+)$/.test(req.url())) return
-        
+
         if (orEmpty(req.query()["anon_token"]) == basicCreds) {
             // OK
         }
@@ -989,7 +989,7 @@ export function hasSpecialDelete(jsonpub: JsonObject): boolean {
 
 export async function tryInsertPubPointerAsync(key: string, pointsTo: string): Promise<boolean> {
     let ref = false;
-    await pubsContainer.updateAsync(key, async(entry: JsonBuilder) => {
+    await pubsContainer.updateAsync(key, async (entry: JsonBuilder) => {
         if (withDefault(entry["kind"], "reserved") == "reserved") {
             entry["kind"] = "pubpointer";
             entry["pointer"] = pointsTo;
@@ -1059,7 +1059,7 @@ export function hasSetting(key: string): boolean {
 }
 
 export function progress(message: string): void {
-        // logger.debug(message);
+    // logger.debug(message);
 }
 
 export function bareIncrement(entry: JsonBuilder, key: string): void {
@@ -1108,7 +1108,7 @@ export function setHtmlHeaders(req: restify.Request): void {
     res.setHeader("X-XSS-Protection", "1");
     res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    
+
     res.setHeader("Access-Control-Allow-Origin", "*");
 }
 
@@ -1425,7 +1425,7 @@ export async function initFinalAsync() {
         td.serverSetting("SELF").replace(/^https?:\/\//, "").replace(/\/.*/, "")
             .replace(/^((test|stage|live|www|alpha|beta)\.)/, "")
 
-    addRoute("GET", "clientconfig", "", async(req: ApiRequest) => {
+    addRoute("GET", "clientconfig", "", async (req: ApiRequest) => {
         req.response = currClientConfig.toJson();
     });
 
@@ -1510,7 +1510,7 @@ export async function getSettingsNoCacheAsync(name: string): Promise<JsonObject>
 
 async function bumpSettingsVersionAsync() {
     let vr = td.createRandomId(12);
-    await settingsContainer.updateAsync("version", async(v: {}) => {
+    await settingsContainer.updateAsync("version", async (v: {}) => {
         v["version"] = vr;
     });
     return vr;
@@ -1619,13 +1619,17 @@ export function normalizeLang(lang: string) {
     return lang;
 }
 
-export function translateMessage(msg: string, lang: string): string {
-    lang = normalizeLang(lang);
-    if (!lang)
+export function translateMessage(msg: string, lang: string[]): string {
+    if (!lang || !lang.length)
         return msg;
     var s = settingsCache["translations"] || {};
-    if (!s[lang]) return msg;
-    return s[lang][msg] || msg;
+    for (let l of lang) {
+        if (l == serviceSettings.defaultLang)
+            return msg
+        if (s[l] && s[l][msg])
+            return s[l][msg]
+    }
+    return msg
 }
 
 export async function deleteAsync(delEntry: JsonObject): Promise<boolean> {
@@ -1717,7 +1721,7 @@ export async function retryAsync<T>(times: number, f: () => Promise<T>): Promise
         });
         if (!isErr) return res;
     }
-    
+
     // last try
     res = await f();
     return res;

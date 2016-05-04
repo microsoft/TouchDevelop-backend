@@ -27,15 +27,10 @@ async function downloadCachedTranslationAsync(filename:string, lang:string)
 	return dat
 }
 
-export async function translateHtmlAsync(html:string, lang:string)
+export async function translateHtmlAsync(html:string, lang:string[])
 {
-	if (!crowdin.enabled) return html;
-	
-    lang = core.normalizeLang(lang);
-    if (!lang)
-        return html;
-	
-	let trdata = await downloadCachedTranslationAsync("website.json", lang)
+	if (!crowdin.enabled || !lang || !lang[0]) return html;
+	let trdata = await downloadCachedTranslationAsync("website.json", lang[0])
 	let res = crowdin.translate(html, trdata)
 	return res.text
 }
@@ -60,7 +55,7 @@ export async function initAsync() {
 		await parallel.forJsonAsync(strs, async(fn) => {
 			let ptr = await core.getPubAsync(fn, "pointer")
 			if (ptr && ptr["pub"]["htmlartid"]) {
-				let text = await tdlitePointers.getTemplateTextAsync(fn.replace(/^ptr-/, ""), "")
+				let text = await tdlitePointers.getTemplateTextAsync(fn.replace(/^ptr-/, ""), [])
 				td.jsonCopyFrom(res, crowdin.translate(text, {}).missing)
 			}
 		}, 10)
@@ -75,7 +70,7 @@ export async function initAsync() {
 	});
 
 	core.addRoute("GET", "*pointer", "i18n", async(req) => {
-		let text = await tdlitePointers.getTemplateTextAsync(req.rootId.replace(/^ptr-/, ""), "")
+		let text = await tdlitePointers.getTemplateTextAsync(req.rootId.replace(/^ptr-/, ""), [])
 		req.response = crowdin.translate(text, {}).missing;
 	})
 }

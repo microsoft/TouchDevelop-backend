@@ -320,14 +320,9 @@ export async function initAsync(): Promise<void> {
         })
 
         core.addRoute("GET", "md", "*", async (req) => {
-            let lang = await handleLanguageAsync(req.restifyReq);
             let path = splitLang(pathToPtr(req.origUrl.slice(8)))
-            if (path.lang == core.serviceSettings.defaultLang) path.lang = "";
-            else if (!path.lang) path.lang = lang;
-            let suff = lang ? "@" + lang : ""
-            let ptr = await core.getPubAsync(path.base + suff, "pointer")
-            if (!ptr && suff)
-                ptr = await core.getPubAsync(path.base, "pointer")
+            let lang = await handleLanguageAsync(req.restifyReq, path.lang);
+            let ptr = await getPtrObjectAsync(path.base, lang)
             if (!ptr) {
                 req.status = httpCode._404NotFound
             } else {
@@ -581,7 +576,7 @@ async function getTargetThemeAsync(targetName: string) {
     return theme || {}
 }
 
-async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string, targetName: string) {
+async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string[], targetName: string) {
     let theme = await getTargetThemeAsync(targetName)
     let textObj = await getArtTextAsync(artobj)
     if (!textObj) textObj = "Art object not found."
@@ -635,7 +630,7 @@ async function getArtTextAsync(artobj: {}) {
     return textObj
 }
 
-async function getHtmlArtAsync(templid: string, lang: string) {
+async function getHtmlArtAsync(templid: string, lang: string[]) {
     let artjs = await core.getPubAsync(templid, "art");
     if (artjs == null) {
         return "Template art missing";
@@ -652,12 +647,19 @@ async function getHtmlArtAsync(templid: string, lang: string) {
 
 }
 
-export async function getTemplateTextAsync(templatename: string, lang: string): Promise<string> {
-    let id = pathToPtr(templatename.replace(/:.*/g, ""));
-    let entry3 = await core.getPubAsync(id + lang, "pointer");
-    if (entry3 == null && lang != "") {
-        entry3 = await core.getPubAsync(id, "pointer");
+export async function getPtrObjectAsync(id: string, langs: string[]) {
+    for (let lang of langs) {
+        if (lang == core.serviceSettings.defaultLang)
+            return await core.getPubAsync(id, "pointer")
+        let entry = await core.getPubAsync(id + "@" + lang, "pointer");
+        if (entry != null) return entry
     }
+    return await core.getPubAsync(id, "pointer")
+}
+
+export async function getTemplateTextAsync(templatename: string, lang: string[]): Promise<string> {
+    let id = pathToPtr(templatename.replace(/:.*/g, ""));
+    let entry3 = await getPtrObjectAsync(id, lang)
     if (entry3 == null) {
         return "Template pointer leads to nowhere";
     }
@@ -816,8 +818,8 @@ async function cacheRootVersionAsync(id: string, withCloud: boolean) {
     return ver + "." + rootVer
 }
 
-async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite: td.Action1<CachedPage>): Promise<void> {
-    let path = "ptrcache/" + core.myChannel + "/" + id;
+async function rewriteAndCachePointerAsync(id: string, langs: string[], res: restify.Response, rewrite: td.Action1<CachedPage>): Promise<void> {
+    let path = ptrcachePath(id, langs)
     let rootTask = /* async */ cacheRootVersionAsync(id, true)
     let cachedPage = <CachedPage>(await tdliteReleases.cacheRewritten.getAsync(path));
     let ver = await rootTask
@@ -834,7 +836,7 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
         (core.orZero(cachedPage.expiration) > 0 && cachedPage.expiration < await core.nowSecondsAsync())) {
         let lock = await core.acquireCacheLockAsync(path);
         if (lock == "") {
-            await rewriteAndCachePointerAsync(id, res, rewrite);
+            await rewriteAndCachePointerAsync(id, langs, res, rewrite);
             return;
         }
 
@@ -902,7 +904,7 @@ async function lookupScreenshotIdAsync(pub: {}) {
     return "";
 }
 
-async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string, domain: string) {
+async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string[], domain: string) {
     let req = core.buildApiRequest("/api")
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, streamjson, req);
     let templ = "templates/stream"
@@ -917,7 +919,7 @@ async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string
     v.text = tdliteDocs.renderMarkdown(templTxt, "", theme, pub)
 }
 
-async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string) {
+async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string[]) {
     let req = core.buildApiRequest("/api")
     req.rootId = scriptjson["id"];    // this is to make sure we show hidden scripts
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, req);
@@ -1000,7 +1002,7 @@ function domainOfTarget(trg: string) {
 }
 
 function splitLang(path: string) {
-    let m = /(.*)@([a-z]+(-[a-z]+)?)$/i.exec(path)
+    let m = /(.*)@([a-z\-]+)$/i.exec(path)
     if (m)
         return {
             base: m[1],
@@ -1014,7 +1016,6 @@ function splitLang(path: string) {
 }
 
 export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {
-    let lang = await handleLanguageAsync(req);
     let urlFile = req.url().replace(/\?.*/g, "")
     let fn = urlFile.replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
     let bareFn = fn
@@ -1074,19 +1075,10 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     }
     let id = pathToPtr(fn);
     let spl = splitLang(id)
-    if (spl.lang != "") {
-        if (spl.lang == core.serviceSettings.defaultLang) {
-            id = spl.base;
-            lang = "";
-        }
-        else {
-            lang = "@" + spl.lang;
-        }
-    }
+    let langs = await handleLanguageAsync(req, spl.lang);
     if (templateSuffix != "" && core.serviceSettings.envrewrite.hasOwnProperty(id.replace(/^ptr-/g, ""))) {
         id = id + templateSuffix;
     }
-    id = id + lang;
 
     if (!core.fullTD && req.query()["update"] == "true" && /^[a-z]+$/.test(fn)) {
         let entry = await core.getPubAsync(fn, "script")
@@ -1097,10 +1089,10 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         }
     }
 
-    await rewriteAndCachePointerAsync(id, res, async (v: CachedPage) => {
+    await rewriteAndCachePointerAsync(id, langs, res, async (v: CachedPage) => {
         let pubdata = {};
         let errorAsync = async (msg: string) => {
-            await pointerErrorAsync(msg, v, lang)
+            await pointerErrorAsync(msg, v, langs)
         }
         v.redirect = "";
         v.text = "";
@@ -1111,11 +1103,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
         let subfile = ""
 
-        let existing = await core.getPubAsync(id, "pointer");
-        let spl = splitLang(id)
-        if (existing == null && spl.lang) {
-            existing = await core.getPubAsync(spl.base, "pointer");
-        }
+        let existing = await getPtrObjectAsync(id, langs)
 
         if (!existing && id.indexOf("---") > 0) {
             let mm = /^(.*)---(.*)$/.exec(id)
@@ -1150,7 +1138,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             }
             else if (td.startsWith(fn, "preview/")) {
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
-                await renderFinalAsync(pubdata, v, lang);
+                await renderFinalAsync(pubdata, v, langs);
             }
             else if (/^[a-z]+$/.test(bareFn)) {
                 let entry = await core.pubsContainer.getAsync(bareFn);
@@ -1165,12 +1153,12 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                             v.redirect = "https://" + domain + "/" + bareFn
                         } else {
                             if (ekind == "stream")
-                                await renderStreamPageAsync(entry, v, lang, host)
+                                await renderStreamPageAsync(entry, v, langs, host)
                             else
-                                await renderScriptPageAsync(entry, v, lang)
+                                await renderScriptPageAsync(entry, v, langs)
                         }
                     } else if (core.fullTD && ekind == "script") {
-                        await renderScriptPageAsync(entry, v, lang)
+                        await renderScriptPageAsync(entry, v, langs)
                     } else {
                         v.redirect = "/app/#pub:" + entry["id"];
                     }
@@ -1190,13 +1178,13 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     await errorAsync("No such art: /" + ptr.artid)
                 } else {
                     if (artobj["contentType"] == "text/markdown") {
-                        v.text = await renderMarkdownAsync(ptr, artobj, lang, vhostDirName)
+                        v.text = await renderMarkdownAsync(ptr, artobj, langs, vhostDirName)
                     } else {
                         v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                     }
                 }
             } else if (ptr.htmlartid) {
-                v.text = await getHtmlArtAsync(ptr.htmlartid, lang);
+                v.text = await getHtmlArtAsync(ptr.htmlartid, langs);
                 if (/-txt$/.test(ptr.id)) {
                     v.contentType = "text/plain; charset=utf-8"
                 }
@@ -1229,13 +1217,13 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 breadcrumb = "<a href=\"/home\">Home</a>" + sep + breadcrumb;
                 pubdata["breadcrumb"] = breadcrumb;
 
-                await renderFinalAsync(pubdata, v, lang);
+                await renderFinalAsync(pubdata, v, langs);
             }
         }
     });
 }
 
-async function renderFinalAsync(pubdata: {}, v: CachedPage, lang: string) {
+async function renderFinalAsync(pubdata: {}, v: CachedPage, lang: string[]) {
     if (pubdata["msg"]) {
         await pointerErrorAsync(pubdata["msg"], v, lang);
         return;
@@ -1258,7 +1246,7 @@ async function renderFinalAsync(pubdata: {}, v: CachedPage, lang: string) {
     v.text = await tdliteDocs.formatAsync(templText, pubdata);
 }
 
-async function errorHtmlAsync(header: string, info: string, lang: string) {
+async function errorHtmlAsync(header: string, info: string, lang: string[]) {
     let pubdata = {
         name: header,
         body: core.htmlQuote(info)
@@ -1272,7 +1260,7 @@ async function errorHtmlAsync(header: string, info: string, lang: string) {
     }
 }
 
-async function pointerErrorAsync(msg: string, v: CachedPage, lang: string) {
+async function pointerErrorAsync(msg: string, v: CachedPage, lang: string[]) {
     v.expiration = await core.nowSecondsAsync() + 5 * 60;
     let header = "Whoops, something went wrong.";
     v.status = 500;
@@ -1346,37 +1334,66 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
     return jsb;
 }
 
-
-export async function handleLanguageAsync(req: restify.Request, simple = false): Promise<string> {
-    if (!req) return "";
-
-    await core.refreshSettingsAsync();
-    let lang = core.serviceSettings.defaultLang;
-    for (let s of orEmpty(req.header("Accept-Language")).split(",")) {
-        let headerLang = orEmpty((/^\s*([a-z][a-z])/.exec(s) || [])[1]);
-        if (core.serviceSettings.langs.hasOwnProperty(headerLang)) {
-            lang = headerLang;
-            break;
-        }
-    }
-    let cookieLang = orEmpty((/TD_LANG=([A-Za-z\-]+)/.exec(orEmpty(req.header("Cookie"))) || [])[1]);
-    if (core.serviceSettings.langs.hasOwnProperty(cookieLang)) {
-        lang = cookieLang;
-    }
-    if (lang == core.serviceSettings.defaultLang) {
-        lang = "";
-    }
-    else {
-        lang = "@" + lang;
-    }
-    return lang;
+function toSupportedLang(l: string) {
+    if (!l) return ""
+    l = l.toLowerCase()
+    let langs = core.serviceSettings.langs
+    let m = /^([a-z]+)(-([a-z]+))/.exec(l)
+    if (!m) return ""
+    if (langs.hasOwnProperty(m[0]))
+        l = m[0]
+    else if (langs.hasOwnProperty(m[1]))
+        l = m[1]
+    else
+        l = ""
+    return l
 }
 
-export async function simplePointerCacheAsync(urlPath: string, lang: string): Promise<string> {
+export async function handleLanguageAsync(req: restify.Request, override = ""): Promise<string[]> {
+    if (!req) return [];
+
+    await core.refreshSettingsAsync();
+    let langs: string[] = []
+    let defl = core.serviceSettings.defaultLang
+
+    if (override) {
+        override = toSupportedLang(override)
+        if (!override || override == defl) return []
+        else return [override]
+    }
+
+    let cookieLang = orEmpty((/TD_LANG=([A-Za-z\-]+)/.exec(orEmpty(req.header("Cookie"))) || [])[1]);
+
+    cookieLang = toSupportedLang(cookieLang)
+    if (cookieLang) {
+        if (cookieLang == defl) return []
+        else return [cookieLang]
+    }
+
+    for (let s of orEmpty(req.header("Accept-Language")).split(",")) {
+        let headerLang = orEmpty((/^\s*([A-Za-z\-]+)/.exec(s) || [])[1]);
+        if (headerLang) {
+            headerLang = toSupportedLang(headerLang)
+            if (headerLang && langs.indexOf(headerLang) == -1) {
+                langs.push(headerLang)
+                if (langs.length >= 2) break
+            }
+        }
+    }
+
+    return langs
+}
+
+function ptrcachePath(id: string, lang: string[]) {
+    return "ptrcache/" + core.myChannel + "/" + id +
+        (lang && lang.length ? "@" + lang.join("@") : "")
+}
+
+export async function simplePointerCacheAsync(urlPath: string, lang: string[]): Promise<string> {
     urlPath = urlPath + templateSuffix;
     let id = pathToPtr(urlPath);
     let rootTask = /* async */ cacheRootVersionAsync(id, true)
-    let path = "ptrcache/" + core.myChannel + "/" + id + lang;
+    let path = ptrcachePath(id, lang)
     let entry2 = await tdliteReleases.cacheRewritten.getAsync(path);
     let versionMarker = await rootTask;
     if (entry2 == null || orEmpty(entry2["version"]) != versionMarker) {
