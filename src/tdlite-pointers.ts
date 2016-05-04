@@ -946,12 +946,15 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         let targetName: string = pub["target"]
         let theme = await getTargetThemeAsync(targetName, lang)
         let readmeMd = ""
-        let textObj = await tdliteScripts.getScriptTextAsync(scriptjson["id"])
-        if (textObj) {
-            try {
-                let files = JSON.parse(textObj["text"])
-                readmeMd = files["README.md"] || ""
-            } catch (e) {
+
+        if (pub["userid"] != core.serviceSettings.accounts["anonscript"]) {
+            let textObj = await tdliteScripts.getScriptTextAsync(scriptjson["id"])
+            if (textObj) {
+                try {
+                    let files = JSON.parse(textObj["text"])
+                    readmeMd = files["README.md"] || ""
+                } catch (e) {
+                }
             }
         }
 
