@@ -1339,7 +1339,7 @@ function toSupportedLang(l: string) {
     if (!l) return ""
     l = l.toLowerCase()
     let langs = core.serviceSettings.langs
-    let m = /^([a-z]+)(-([a-z]+))/.exec(l)
+    let m = /^([a-z]+)(-([a-z]+))?/.exec(l)
     if (!m) return ""
     if (langs.hasOwnProperty(m[0]))
         l = m[0]

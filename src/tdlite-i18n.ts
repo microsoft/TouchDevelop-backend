@@ -30,6 +30,7 @@ async function downloadCachedTranslationAsync(filename:string, lang:string)
 
 export async function translateHtmlAsync(html:string, lang:string[])
 {
+	//logger.debug(`crowdin translate html: ${crowdin.enabled} '${lang[0]}' ${html.length}`)
 	if (!crowdin.enabled || !lang || !lang[0]) return html;
 	let trdata = await downloadCachedTranslationAsync("website.json", lang[0])
 	let res = crowdin.translate(html, trdata)
