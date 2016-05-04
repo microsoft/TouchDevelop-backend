@@ -27,8 +27,7 @@ var httpCode = core.httpCode;
 var tdDeployments: azureBlobStorage.Container;
 var deploymentMeta: JsonObject;
 
-async function copyDeploymentAsync(req: core.ApiRequest, target: string) : Promise<void>
-{
+async function copyDeploymentAsync(req: core.ApiRequest, target: string): Promise<void> {
     core.checkPermission(req, "root");
     if (req.status == 200) {
         let jsb2 = JSON.parse((await tdDeployments.getBlobToTextAsync("000ch-" + core.myChannel)).text());
@@ -37,14 +36,13 @@ async function copyDeploymentAsync(req: core.ApiRequest, target: string) : Promi
         let result = await tdDeployments.createBlockBlobFromTextAsync("000ch-" + target, JSON.stringify(req.response), {
             contentType: "application/json;charset=utf8"
         });
-        if ( ! result.succeded()) {
+        if (!result.succeded()) {
             req.status = 400;
         }
     }
 }
 
-export async function initAsync()
-{
+export async function initAsync() {
     tdDeployments = await core.blobService.createContainerIfNotExistsAsync("tddeployments", "private");
     deploymentMeta = JSON.parse(withDefault(td.serverSetting("TD_DEPLOYMENT_META", true), "{}"));
     core.addRoute("GET", "stats", "dmeta", async (req: core.ApiRequest) => {
@@ -80,27 +78,27 @@ export async function initAsync()
             req2.response = JSON.parse((await tdDeployments.getBlobToTextAsync("000ch-" + ch)).text());
         }
     });
-    core.addRoute("POST", "admin", "copydeployment", async(req3: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "copydeployment", async (req3: core.ApiRequest) => {
         if (!core.checkPermission(req3, "root")) return;
         await audit.logAsync(req3, "copydeployment", {
             data: req3.argument
         });
         await copyDeploymentAsync(req3, req3.argument);
     });
-    core.addRoute("POST", "admin", "restart", async(req4: core.ApiRequest) => {
-        if (!core.checkPermission(req4, "root")) return;        
+    core.addRoute("POST", "admin", "restart", async (req4: core.ApiRequest) => {
+        if (!core.checkPermission(req4, "root")) return;
         await audit.logAsync(req4, "copydeployment", {
             data: "restart"
         });
         await copyDeploymentAsync(req4, core.myChannel);
     });
-    core.addRoute("POST", "admin", "flushredis", async(req4: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "flushredis", async (req4: core.ApiRequest) => {
         if (!core.checkPermission(req4, "root")) return;
         await audit.logAsync(req4, "copydeployment", {
             data: "flushredis"
         });
         await core.redisClient.sendCommandAsync("flushall", []);
-        req4.response = {};        
+        req4.response = {};
     });
     core.addRoute("GET", "admin", "raw", async (req5: core.ApiRequest) => {
         core.checkPermission(req5, "root");
@@ -162,8 +160,7 @@ export async function initAsync()
     initConfig();
 }
 
-function initConfig() : void
-{
+function initConfig(): void {
     core.addRoute("GET", "config", "*", async (req: core.ApiRequest) => {
         if (req.verb == "promo") {
             core.checkPermission(req, "script-promo");
@@ -172,7 +169,7 @@ function initConfig() : void
             core.checkPermission(req, "root");
         }
         if (req.status == 200) {
-            let entry = await core.getSettingsNoCacheAsync(req.verb);                
+            let entry = await core.getSettingsNoCacheAsync(req.verb);
             if (entry == null) {
                 req.response = ({});
             }
