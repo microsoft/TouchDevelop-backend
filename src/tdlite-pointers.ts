@@ -1075,6 +1075,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
     }
     let id = pathToPtr(fn);
     let spl = splitLang(id)
+    id = spl.base
     let langs = await handleLanguageAsync(req, spl.lang);
     if (templateSuffix != "" && core.serviceSettings.envrewrite.hasOwnProperty(id.replace(/^ptr-/g, ""))) {
         id = id + templateSuffix;

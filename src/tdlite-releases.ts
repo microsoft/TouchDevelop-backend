@@ -455,7 +455,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
 
     if (relid != "") {
         if (fn == "" && relid == "2519967637668242448-920d9e58.a88e.4fa8.bcd1.9be5ba29da9f-workerjs") {
-            let s = await tdlitePointers.simplePointerCacheAsync("/worker.js", "") || "";
+            let s = await tdlitePointers.simplePointerCacheAsync("/worker.js", []) || "";
             res.sendText(s, "application/javascript");
         }
         else if (fn == "") {

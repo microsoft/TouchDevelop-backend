@@ -18,6 +18,10 @@ export function init(): Promise<void> {
     enabled = true;
     logger = td.createLogger("crowdin");
     suff = "?key=" + td.serverSetting("CROWDIN_KEY");
+    let prj = td.serverSetting("CROWDIN_PROJECT", true)
+    if (prj) {
+        apiRoot = "https://api.crowdin.com/api/project/" + prj + "/"
+    }
     logger.info("initialized");
 }
 

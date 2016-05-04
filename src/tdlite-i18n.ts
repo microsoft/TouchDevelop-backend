@@ -23,6 +23,7 @@ async function downloadCachedTranslationAsync(filename:string, lang:string)
 		return JSON.parse(f)
 	let dat = await crowdin.downloadTranslationAsync(filename, lang)
 	dat = dat || {}
+	logger.info(`crowdin dl: ${key} - ${Object.keys(dat).length}`)
 	await core.redisClient.setpxAsync(key, JSON.stringify(dat), 10*60*1000)
 	return dat
 }
