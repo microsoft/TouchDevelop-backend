@@ -572,18 +572,29 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     }
 }
 
-async function getTargetThemeAsync(targetName: string) {
+async function getTargetThemeAsync(targetName: string, langs: string[]) {
     let theme = null
     let pref = "ptr-"
     if (targetName) pref = pref + targetName + "-"
     let ptrx = await core.getPubAsync(pref + "theme-json", "pointer")
     if (ptrx && ptrx["pub"]["artid"])
         theme = await tdliteArt.getJsonArtFileAsync(ptrx["pub"]["artid"])
+    if (theme && theme["locales"] && langs && langs.length) {
+        for (let lng of langs) {
+            if (lng == core.serviceSettings.defaultLang)
+                break
+            let spec = theme["locales"][lng]
+            if (spec) {
+                td.jsonCopyFrom(theme, spec)
+                break
+            }
+        }
+    }
     return theme || {}
 }
 
 async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string[], targetName: string) {
-    let theme = await getTargetThemeAsync(targetName)
+    let theme = await getTargetThemeAsync(targetName, lang)
     let textObj = await getArtTextAsync(artobj)
     if (!textObj) textObj = "Art object not found."
     let templ = await getTemplateTextAsync("templates/docs", lang)
@@ -916,7 +927,7 @@ async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string
     let templ = "templates/stream"
 
     let targetName: string = pub["target"]
-    let theme = await getTargetThemeAsync(targetName)
+    let theme = await getTargetThemeAsync(targetName, lang)
 
     pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
     pub["apiroot"] = "https://" + domain + "/api/"
@@ -933,7 +944,7 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
 
     if (core.pxt) {
         let targetName: string = pub["target"]
-        let theme = await getTargetThemeAsync(targetName)
+        let theme = await getTargetThemeAsync(targetName, lang)
         let readmeMd = ""
         let textObj = await tdliteScripts.getScriptTextAsync(scriptjson["id"])
         if (textObj) {
