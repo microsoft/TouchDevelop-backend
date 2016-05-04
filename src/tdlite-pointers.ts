@@ -1374,6 +1374,8 @@ export async function handleLanguageAsync(req: restify.Request, override = ""): 
         let headerLang = orEmpty((/^\s*([A-Za-z\-]+)/.exec(s) || [])[1]);
         if (headerLang) {
             headerLang = toSupportedLang(headerLang)
+            if (headerLang == defl && langs.length == 0)
+                return []
             if (headerLang && langs.indexOf(headerLang) == -1) {
                 langs.push(headerLang)
                 if (langs.length >= 2) break
