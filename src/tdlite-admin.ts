@@ -100,6 +100,14 @@ export async function initAsync() {
         await core.redisClient.sendCommandAsync("flushall", []);
         req4.response = {};
     });
+    core.addRoute("POST", "admin", "redis", async (req: core.ApiRequest) => {
+        if (!core.checkPermission(req, "root")) return;
+        await audit.logAsync(req, "redis", {
+            data: "flushredis"
+        });
+        let r = await core.redisClient.sendCommandAsync(req.body["cmd"], req.body["args"] || []);
+        req.response = { redis: r };
+    });
     core.addRoute("GET", "admin", "raw", async (req5: core.ApiRequest) => {
         core.checkPermission(req5, "root");
         if (req5.status == 200) {
