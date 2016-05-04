@@ -956,11 +956,13 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
                 } catch (e) {
                 }
             }
+            pub["byuser"] = core.translateMessage("by", lang) + " " + pub["username"]
         }
 
         pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
         pub["oembedurl"] = `${core.self}api/oembed?url=${encodeURIComponent(core.self + req.rootId)}`
-
+        pub["title"] = pub["name"]
+        
         let templTxt = await getTemplateTextAsync(templ, lang)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
