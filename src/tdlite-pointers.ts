@@ -707,32 +707,12 @@ export async function getTemplateTextAsync(templatename: string, lang: string): 
 async function clearPtrCacheAsync(entry: {}): Promise<void> {
     let id = td.toString(entry["id"])
 
-    async function clearIdAsync(id: string) {
-        logger.debug("Clear PTR " + id)
-        for (let chname of deployChannels) {
-            await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id, async (entry1: JsonBuilder) => {
-                entry1["version"] = "outdated";
-            });
-            if (! /@\w+$/.test(id)) {
-                for (let lang of Object.keys(core.serviceSettings.langs)) {
-                    await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id + "@" + lang, async (entry2: JsonBuilder) => {
-                        entry2["version"] = "outdated";
-                    });
-                }
-            }
-        }
-    }
+    await tdliteReleases.cacheRewritten.updateAsync(cacheRoot(id), async (entry2: JsonBuilder) => {
+        entry2["version"] = td.createRandomId(10);
+    });
 
-    await clearIdAsync(id)
     if (td.startsWith(id, "ptr-templates-")) {
         await tdliteReleases.pokeReleaseAsync("cloud", 0);
-    }
-
-    let relid = td.toString(entry["pub"]["releaseid"])
-    if (relid) {
-        for (let suff of Object.keys(subFiles)) {
-            await clearIdAsync(id + "---" + suff)
-        }
     }
 }
 
@@ -825,11 +805,22 @@ async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonB
     }
 }
 
+function cacheRoot(ptrid: string) {
+    return "ptrroot/" + splitLang(ptrid).base.replace(/---[a-z]+$/, "")
+}
+
+async function cacheRootVersionAsync(id: string, withCloud: boolean) {
+    let rootObj = await tdliteReleases.cacheRewritten.getAsync(cacheRoot(id))
+    let ver = withCloud ? await core.getCloudRelidAsync(true) : "simple";
+    let rootVer = withDefault((rootObj || {})["version"], "none")
+    return ver + "." + rootVer
+}
 
 async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite: td.Action1<CachedPage>): Promise<void> {
     let path = "ptrcache/" + core.myChannel + "/" + id;
+    let rootTask = /* async */ cacheRootVersionAsync(id, true)
     let cachedPage = <CachedPage>(await tdliteReleases.cacheRewritten.getAsync(path));
-    let ver = await core.getCloudRelidAsync(true);
+    let ver = await rootTask
 
     let event = "ServePtr";
     let cat = "other";
@@ -1356,7 +1347,7 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
 }
 
 
-export async function handleLanguageAsync(req: restify.Request): Promise<string> {
+export async function handleLanguageAsync(req: restify.Request, simple = false): Promise<string> {
     if (!req) return "";
 
     await core.refreshSettingsAsync();
@@ -1382,11 +1373,12 @@ export async function handleLanguageAsync(req: restify.Request): Promise<string>
 }
 
 export async function simplePointerCacheAsync(urlPath: string, lang: string): Promise<string> {
-    let versionMarker = "simple3";
     urlPath = urlPath + templateSuffix;
     let id = pathToPtr(urlPath);
+    let rootTask = /* async */ cacheRootVersionAsync(id, true)
     let path = "ptrcache/" + core.myChannel + "/" + id + lang;
     let entry2 = await tdliteReleases.cacheRewritten.getAsync(path);
+    let versionMarker = await rootTask;
     if (entry2 == null || orEmpty(entry2["version"]) != versionMarker) {
         let jsb2 = {};
         jsb2["version"] = versionMarker;
