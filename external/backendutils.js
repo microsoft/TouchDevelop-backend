@@ -1058,7 +1058,7 @@ var pxt;
             params["menu"] = (theme.docMenu || []).map(function (e) { return recMenu(e, 0); }).join("\n");
             params["breadcrumb"] = breadcrumbHtml;
             params["targetname"] = theme.name || "PXT";
-            params["targetlogo"] = theme.docsLogo ? "<img class=\"ui image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
+            params["targetlogo"] = theme.docsLogo ? "<img class=\"ui mini image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
             params["name"] = params["title"] + " - " + params["targetname"];
             return injectHtml(template, params, ["body", "menu", "breadcrumb", "targetlogo"]);
         }
