@@ -54,6 +54,7 @@ var excludedTables = [
 ]
 
 
+var baseAccountName = ""
 var accountNames = [
 "microbit0",
 "microbitws0",
@@ -794,6 +795,7 @@ function restore(newpref, cb) {
         function(info, cb) {
             var origname = info.account
             var newname = info.account.replace(/^microbit(0?)/, newpref)
+            if (baseAccountName) newname = origname.replace(baseAccountName, newpref)
             if (newname == "mbitaudit") newname = newpref + "audit"
             if (origname == newname) throw new Error("same name")
             if (!accounts[newname]) throw new Error("no key for " + newname)
@@ -888,6 +890,7 @@ function setupKeys(cb) {
             if(bad(err,cb))return;
 
             if (env["AZURE_STORAGE_ACCOUNT"] != "microbit0") {
+                baseAccountName = env["AZURE_STORAGE_ACCOUNT"]
                 accountNames = [
                     env["AUDIT_BLOB_ACCOUNT"],
                     env["AZURE_STORAGE_ACCOUNT"],
