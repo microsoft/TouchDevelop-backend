@@ -87,6 +87,9 @@ export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: str
 
 export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
 {
+    if (!td.serverSetting("TDC_ENDPOINT", true))
+        return {}
+    
     let totalResp: JsonObject;
     let js = (<JsonObject>null);
     let canCache = /^[\w\/\-]+$/.test(api);
