@@ -32,6 +32,14 @@ the machine(s) running the shell (after updating the cert in key vault).
 Typically, shells are configured to run on single core machines and run only
 one instance of worker.
 
+### Creating services
+
+Go the new Azure Portal and create the following:
+* Redis Cache
+* Azure Search
+
+Both take a while to setup up, so it's good to start with that.
+
 ### Building shell
 
 To build shell issue `jake azure` in `TouchDevelop` repo. This will create
@@ -68,24 +76,39 @@ The service needs a `.cscfg` file for deployment. For example:
     <Instances count="2" />
     <Certificates />
   </Role>
+
+  <NetworkConfiguration>
+    <AddressAssignments>
+      <ReservedIPs>
+       <ReservedIP name="myserviceProd"/>
+      </ReservedIPs>
+    </AddressAssignments>
+  </NetworkConfiguration>
 </ServiceConfiguration>
 ```
 
-`TD_BLOB_DEPLOY_CHANNEL` is used when there is for example beta and production
+The ``<NetworkConfiguration>`` section contains the name of your reserved IP,
+see below.
+
+``TD_BLOB_DEPLOY_CHANNEL`` is used when there is for example beta and production
 deployment - they would sit on different channels. 
 
-`TD_DEPLOYMENT_KEY` should be long random string and is used when making
+``TD_DEPLOYMENT_KEY`` should be long random string and is used when making
 management calls against the shell (for example, deploying new versions of
-workers).
+workers). You can use the following command to generate this:
 
-`ZIP_URL` should contain `node.msi` with appropriate, 32-bit version of
-node.js. It can also contain folder `node_modules` with pre-installed modules.
+```bash
+node -p 'require("crypto").randomBytes(30).toString("base64").replace(/[^\w]/g, "")'
+```
+
+``ZIP_URL`` should contain `node.msi` with appropriate, 32-bit version of
+node.js. It can also contain folder ``node_modules`` with pre-installed modules.
 While optional, it's a good idea to package all the needed modules there,
 especially when deploying tens of machines---otherwise there might be problems
 with npm throttling.
 
-`KEY_VAULT_CLIENT_ID` and `KEY_VAULT_CLIENT_SECRET` should let the shell read
-`KEY_VAULT_URL`. 
+``KEY_VAULT_CLIENT_ID`` and ``KEY_VAULT_CLIENT_SECRET`` should let the shell read
+``KEY_VAULT_URL``. 
 
 To set up a key vault follow 
 [Azure instructions](https://azure.microsoft.com/en-gb/documentation/articles/key-vault-get-started/).
@@ -95,8 +118,8 @@ In particular, where the tutorial says `-PermissionsToSecrets Get` instead
 use `-PermissionsToSecrets Get,Set`. After granting permission, you can stop
 following the steps - no need to HSM or deleting anything.
 
-The `KEY_VAULT_URL` should point to a JSON file in the Azure Key Vault. The JSON
-file has `string->string` mapping defining environment variables.
+The ``KEY_VAULT_URL`` should point to a JSON file in the Azure Key Vault. The JSON
+file has ``string->string`` mapping defining environment variables.
 It can be uploaded by running shell from command line, or using PowerShell. 
 Typically, you would create `putsecret.sh` file, with something like this:
 
@@ -117,17 +140,67 @@ that you either need to wait 15 minutes for workers to be restarted, or
 restart them using `remote.js`. When running TDB locally, you can pass
 `env.json` as an argument.
 
-The `AZURE_STORAGE_ACCOUNT` and friends are not used when using Azure Key
+The ``AZURE_STORAGE_ACCOUNT`` and friends are not used when using Azure Key
 Vault. They have to be present in the XML file though (otherwise deployment
 will fail).
 
+### Creating env.json
+
+You can take ``env.json`` from an existing deployment. You will then need to
+do the following updates:
+* replace ``TOKEN_SECRET``, and ``LOGIN_SECRET`` with fresh random strings
+* replace ``MBEDINT_KEY`` with a random string --- this can later be used to
+setup cloud build service
+* ``TDC_*`` variables are only needed for Touch Develop-based deployments
+* update ``REDIS_HOST`` and ``REDIS_SECRET`` with a freshly created redis
+  instance
+* update ``AZURE_SEARCH_SERVICE_NAME`` and ``AZURE_SEARCH_API_KEY`` with the
+  credentials of freshly created search service
+* either create a CDN endpoint, and set ``CDN_URL``, or use main blob storage
+  account URL as the CDN url; note that there is no slash at the end of this URL
+* you can re-fresh ``ENCKEY_*`` variables; but if you're restoring backup don't
+* depending on chosen domain name, you may need to update ``TD_HTTPS_PFX``,
+  see [SSL certs](ssl.md)
+
 ### Deploying shell
 
-Following PowerShell command can be used:
+
+First, select login or import the management certificate and select the right
+subscription with ``Set-AzureSubscription -SubscriptionName  '...'``
+
+Next, create the main cloud service:
 
 ```powershell
-New-AzureDeployment -ServiceName myservice -Package c:\touchdevelop\build\azure\tdshell.cspkg -Configuration C:\somewhere\safe\myservice.cscfg -Slot Staging
+New-AzureService myservice -Location "East US"
 ```
+
+You'll need to reserve at least two IPs, one for production and one for staging.
+
+```powershell
+New-AzureReservedIP –ReservedIPName myserviceProd –Location "East US"
+New-AzureReservedIP –ReservedIPName myserviceStage –Location "East US"
+```
+
+Next, deploy the shell:
+
+```powershell
+New-AzureDeployment -ServiceName myservice -Package c:\touchdevelop\build\azure\tdshell.cspkg -Configuration C:\somewhere\safe\myservice.cscfg -Slot Production
+```
+
+In future, you will want to deploy to ``Staging`` and swap after you see it's
+working. When you do that, you will also need to put ``myserviceStage`` reserved
+IP in the `.cscfg` file.
+
+Point your DNS to the ``myserviceProd`` IP. For temporary testing, you can add
+the following line to your ``/etc/hosts` or ``C:\Windows\System32\drivers\etc\hosts``:
+
+```
+42.42.108.108   test.myservice.com
+```
+
+where ``42.42.108.108`` is your reserved production IP and ``test.myservice.com`` 
+is the name you have the certificate for (e.g., it could ``*.myservice.com`` certificate).
+
 
 ## remote.js
 
