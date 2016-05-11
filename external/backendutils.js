@@ -5,6 +5,7 @@ var ts;
     (function (pxt) {
         var Util;
         (function (Util) {
+            Util.debug = false;
             function assert(cond, msg) {
                 if (msg === void 0) { msg = "Assertion failed"; }
                 if (!cond) {
@@ -86,6 +87,17 @@ var ts;
                 return r;
             }
             Util.concat = concat;
+            function jsonMergeFrom(trg, src) {
+                if (!src)
+                    return;
+                Object.keys(src).forEach(function (k) {
+                    if (typeof trg[k] === 'object' && typeof src[k] === "object")
+                        jsonMergeFrom(trg[k], src[k]);
+                    else
+                        trg[k] = clone(src[k]);
+                });
+            }
+            Util.jsonMergeFrom = jsonMergeFrom;
             function jsonCopyFrom(trg, src) {
                 var v = clone(src);
                 for (var _i = 0, _a = Object.keys(src); _i < _a.length; _i++) {
@@ -320,7 +332,7 @@ var ts;
                 return Util.httpRequestCoreAsync(options)
                     .then(function (resp) {
                     if (resp.statusCode != 200 && !options.allowHttpErrors) {
-                        var msg = Util.lf("Bad HTTP status code: {0} at {1}", resp.statusCode, options.url);
+                        var msg = Util.lf("Bad HTTP status code: {0} at {1}; message: {2}", resp.statusCode, options.url, (resp.text || "").slice(0, 500));
                         var err = new Error(msg);
                         err.statusCode = resp.statusCode;
                         return Promise.reject(err);
@@ -490,9 +502,9 @@ var ts;
             function updateLocalizationAsync(baseUrl, code) {
                 // normalize code (keep synched with localized files)
                 if (!/^(es|pt|zh)/i.test(code))
-                    code = code.split('-')[0];
+                    code = code.split("-")[0];
                 if (_localizeLang != code) {
-                    return Util.httpGetJsonAsync(baseUrl + 'locales/' + code + '/strings.json')
+                    return Util.httpGetJsonAsync(baseUrl + "locales/" + code + "/strings.json")
                         .then(function (tr) {
                         _localizeStrings = tr || {};
                         _localizeLang = code;
@@ -609,8 +621,15 @@ var ts;
                 return lf_va(format, args);
             }
             Util.lf = lf;
+            function capitalize(n) {
+                return n ? (n[0].toLocaleUpperCase() + n.slice(1)) : n;
+            }
+            Util.capitalize = capitalize;
             function toDataUri(data, mimetype) {
                 // TODO does this only support trusted data?
+                // weed out urls
+                if (/^http?s:/i.test(data))
+                    return data;
                 // already a data uri?       
                 if (/^data:/i.test(data))
                     return data;
@@ -623,7 +642,7 @@ var ts;
                 if (/xml|svg/.test(mimetype))
                     return "data:" + mimetype + "," + encodeURIComponent(data);
                 else
-                    return "data:" + mimetype + ";base64," + btoa(toUTF8(data));
+                    return "data:" + (mimetype || "image/png") + ";base64," + btoa(toUTF8(data));
             }
             Util.toDataUri = toDataUri;
         })(Util = pxt.Util || (pxt.Util = {}));
@@ -1060,6 +1079,10 @@ var pxt;
             params["targetname"] = theme.name || "PXT";
             params["targetlogo"] = theme.docsLogo ? "<img class=\"ui mini image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
             params["name"] = params["title"] + " - " + params["targetname"];
+            var style = '';
+            if (theme.accentColor)
+                style += "\n.ui.accent { color: " + theme.accentColor + "; }\n.ui.inverted.accent { background: " + theme.accentColor + "; }\n";
+            params["targetstyle"] = style;
             return injectHtml(template, params, ["body", "menu", "breadcrumb", "targetlogo"]);
         }
         docs.renderMarkdown = renderMarkdown;
