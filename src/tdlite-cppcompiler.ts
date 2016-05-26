@@ -27,17 +27,16 @@ var httpCode = core.httpCode;
 var mbedVersion = 2;
 var mbedCache = true;
 var compileContainer: azureBlobStorage.Container;
-var githubCache: cachedStore.Container; 
+var githubCache: cachedStore.Container;
 var cppCache: cachedStore.Container;
 
 export class CompileReq
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public config: string = "";
     @td.json public source: string = "";
     @td.json public meta: JsonObject;
     @td.json public repohash: string = "";
-    static createFromJson(o:JsonObject) { let r = new CompileReq(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new CompileReq(); r.fromJson(o); return r; }
 }
 
 export interface ICompileReq {
@@ -48,10 +47,9 @@ export interface ICompileReq {
 }
 
 export class CompileResp
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public statusurl: string = "";
-    static createFromJson(o:JsonObject) { let r = new CompileResp(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new CompileResp(); r.fromJson(o); return r; }
 }
 
 export interface ICompileResp {
@@ -59,14 +57,13 @@ export interface ICompileResp {
 }
 
 export class CompileStatus
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public success: boolean = false;
     @td.json public hexurl: string = "";
     @td.json public mbedresponse: JsonBuilder;
     @td.json public messages: JsonObject[];
     @td.json public bugReportId: string = "";
-    static createFromJson(o:JsonObject) { let r = new CompileStatus(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new CompileStatus(); r.fromJson(o); return r; }
 }
 
 export interface ICompileStatus {
@@ -77,15 +74,15 @@ export interface ICompileStatus {
 }
 
 export class CompilerConfig
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public repourl: string = "";
     @td.json public platform: string = "";
     @td.json public hexfilename: string = "";
     @td.json public hexcontenttype: string = "";
     @td.json public target_binary: string = "";
     @td.json public internalUrl: string = "";
-    static createFromJson(o:JsonObject) { let r = new CompilerConfig(); r.fromJson(o); return r; }
+    @td.json public internalKey: string = "";
+    static createFromJson(o: JsonObject) { let r = new CompilerConfig(); r.fromJson(o); return r; }
 }
 
 export interface ICompilerConfig {
@@ -97,8 +94,7 @@ export interface ICompilerConfig {
     internalUrl: string;
 }
 
-export async function initAsync()
-{
+export async function initAsync() {
     mbedworkshopCompiler.init();
     mbedworkshopCompiler.setVerbosity("debug");
 
@@ -106,7 +102,7 @@ export async function initAsync()
     githubCache = await cachedStore.createContainerAsync("cachegithub");
     cppCache = await cachedStore.createContainerAsync("cachecpp");
 
-    core.addRoute("POST", "admin", "mbedint", async (req9: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "mbedint", async(req9: core.ApiRequest) => {
         core.checkPermission(req9, "root");
         if (req9.status == 200) {
             let ccfg = CompilerConfig.createFromJson(core.getSettings("compile")[req9.argument]);
@@ -115,31 +111,31 @@ export async function initAsync()
             req9.response = response2.contentAsJson();
         }
     });
-    
+
     core.addRoute("POST", "compile", "extension", async(req) => {
         //if (!core.checkPermission(req, "root")) return;
         await mbedCompileExtAsync(req);
     }, { noSizeCheck: true })
-    
+
     core.addRoute("GET", "*script", "hex", async(req) => {
         let pub = req.rootPub
-        
+
         if (core.orFalse(req.queryOptions["applyupdates"])) {
-            pub = await tdliteScripts.updateScriptAsync(pub) 
+            pub = await tdliteScripts.updateScriptAsync(pub)
         }
-        
+
         if (pub["pub"]["unmoderated"]) {
             req.status = httpCode._400BadRequest
             return
         }
-        
+
         let ver = await core.getCloudRelidAsync(false);
         // include some randomness (TDC_ACCESS_TOKEN) to make these non-predictable just in case
         let key = core.sha256(ver + "." + pub["id"] + "." + core.rewriteVersion + "." + td.serverSetting("TDC_ACCESS_TOKEN"))
         let name = pub["pub"]["name"] || "script"
         name = name.replace(/[^a-zA-Z0-9]+/g, "-")
         let blobName = key + "/microbit-" + name + ".hex"
-        
+
         let curr = await cppCache.getAsync(key + "-hexstatus")
         if (curr == null) {
             if (await core.throttleAsync(req, "compile", 20))
@@ -163,19 +159,18 @@ export async function initAsync()
                 }
             }
         }
-        
+
         req.headers = {
             "location": curr["url"]
         }
         req.status = httpCode._302MovedTemporarily;
     });
-    
+
 
 }
 
 
-export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
-{
+export async function mbedCompileAsync(req: core.ApiRequest): Promise<void> {
     let compileReq = CompileReq.createFromJson(req.body);
     let name = "my script";
     if (compileReq.meta != null) {
@@ -244,7 +239,7 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
             if (isFota) {
                 ccfg.target_binary = td.replaceAll(orEmpty(ccfg.target_binary), "-combined", "");
             }
-            if (! ccfg.repourl) {
+            if (!ccfg.repourl) {
                 req.status = httpCode._404NotFound;
                 return;
             }
@@ -284,7 +279,7 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
                 /* async */ mbedintDownloadAsync(sha, jsb, ccfg);
                 req.response = compileResp.toJson();
             }
-            else if (! ccfg.target_binary) {
+            else if (!ccfg.target_binary) {
                 req.status = httpCode._404NotFound;
             }
             else {
@@ -295,7 +290,7 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
                 let compile = mbedworkshopCompiler.createCompilation(ccfg.platform, ccfg.repourl, ccfg.target_binary);
                 compile.replaceFiles["/source/main.cpp"] = src;
                 let started = await compile.startAsync();
-                if ( ! started) {
+                if (!started) {
                     logger.tick("MbedWsCompileStartFailed");
                     req.status = httpCode._424FailedDependency;
                 }
@@ -308,7 +303,7 @@ export async function mbedCompileAsync(req: core.ApiRequest) : Promise<void>
     }
 }
 
-async function githubFetchAsync(ccfg: CompilerConfig, path: string):Promise<string> {
+async function githubFetchAsync(ccfg: CompilerConfig, path: string): Promise<string> {
     let metaUrl = ccfg.repourl
         .replace(/^https:\/\/github.com/, "https://raw.githubusercontent.com")
         .replace(/\.git#.*/, "/" + path)
@@ -342,23 +337,23 @@ interface IntCompileStatus {
 }
 
 async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
-    
+
     await core.throttleAsync(req, "compile", 5); // pay for the initial processing
     if (req.status != 200) return;
-    
+
     let buf = new Buffer(req.body["data"], "base64")
     // the request is base64 encoded in data field to avoid any issues with sha256 client-side computation yielding different results    
     let sha = td.sha256(buf)
-    
+
     if (buf.length > 200000) {
         req.status = httpCode._413RequestEntityTooLarge;
         return;
     }
-    
+
     let hexurl = compileContainer.url() + "/" + sha + ".hex";
     req.response = { ready: false, hex: hexurl }
     let now = await core.nowSecondsAsync();
-    let currStatus = <IntCompileStatus> await cppCache.getAsync(sha + "-status");
+    let currStatus = <IntCompileStatus>await cppCache.getAsync(sha + "-status");
     if (currStatus) {
         // if not success, we let them retry after two minutes (below) 
         if (currStatus.finished && currStatus.success) {
@@ -366,14 +361,14 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             req.response = { ready: true, hex: hexurl }
             return;
         }
-        if (now - currStatus.starttime < 2 * 60) {            
+        if (now - currStatus.starttime < 2 * 60) {
             return;
         }
     }
-    
+
     let shouldStart = false;
-    
-    await cppCache.updateAsync(sha + "-status", async(entry:IntCompileStatus) => {
+
+    await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
         let starttime = entry.starttime
         if (now - starttime < 2 * 60) {
             logger.info("race on compile start for " + sha)
@@ -384,11 +379,11 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             shouldStart = true;
         }
     })
-    
-    if (!shouldStart) {        
+
+    if (!shouldStart) {
         return;
     }
-        
+
     let compileReq: CompileExtReq = JSON.parse(buf.toString("utf8"))
 
     let cfg = core.getSettings("compile");
@@ -407,11 +402,11 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             req.status = httpCode._404NotFound;
             return;
         }
-        
+
         let tag = orEmpty(compileReq.tag)
-        
+
         ccfg.hexfilename = "";
-        if (orEmpty(ccfg.internalUrl) != "" || !ccfg.target_binary) {
+        if (!ccfg.target_binary) {
             req.status = httpCode._404NotFound;
             return;
         }
@@ -419,47 +414,61 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             ccfg.repourl = ccfg.repourl.replace(/#.*/g, "#" + compileReq.tag);
         } else {
             req.status = httpCode._400BadRequest;
-            return;            
+            return;
         }
-        
+
         let metainfo = await githubFetchAsync(ccfg, tag + "/generated/metainfo.json");
         if (metainfo == null) {
             req.status = httpCode._412PreconditionFailed;
             return;
         }
-        
+
         if (compileReq.dependencies && Object.keys(compileReq.dependencies).length > 0) {
             let modulejson = JSON.parse(await githubFetchAsync(ccfg, tag + "/module.json"));
             td.jsonCopyFrom(modulejson["dependencies"], compileReq.dependencies);
             compileReq.replaceFiles["/module.json"] = JSON.stringify(modulejson, null, 2) + "\n"
         }
-        
+
         let result2 = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "-metainfo.json", new Buffer(metainfo, "utf8"), {
             contentType: "application/json; charset=utf-8"
         });
 
         logger.debug("compile at " + ccfg.repourl);
-        let compile = mbedworkshopCompiler.createCompilation(ccfg.platform, ccfg.repourl, ccfg.target_binary);
-        compile.replaceFiles = compileReq.replaceFiles;
 
-        let started = await compile.startAsync();
-        if (!started) {
-            logger.tick("MbedWsCompileStartFailed");
-            req.status = httpCode._424FailedDependency;
-        }
-        else {
-            /* async */ mbedwsDownloadAsync(sha, compile, ccfg, true);
+        if (ccfg.internalUrl) {
+            let jsb = {
+                op: "buildex",
+                files: Object.keys(compileReq.replaceFiles).map(k => { return { name: k.replace(/^\/+/, ""), text: compileReq.replaceFiles[k] } }),
+                gittag: ccfg.repourl.replace(/.*#/, ""),
+            };
+            /* async */ mbedintDownloadAsync(sha, jsb, ccfg, true);
             req.response = {
                 ready: false,
                 started: true,
                 hex: hexurl
             }
+
+        } else {
+            let compile = mbedworkshopCompiler.createCompilation(ccfg.platform, ccfg.repourl, ccfg.target_binary);
+            compile.replaceFiles = compileReq.replaceFiles;
+            let started = await compile.startAsync();
+            if (!started) {
+                logger.tick("MbedWsCompileStartFailed");
+                req.status = httpCode._424FailedDependency;
+            }
+            else {
+                /* async */ mbedwsDownloadAsync(sha, compile, ccfg, true);
+                req.response = {
+                    ready: false,
+                    started: true,
+                    hex: hexurl
+                }
+            }
         }
     }
 }
 
-async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.CompilationRequest, ccfg: CompilerConfig, saveSt = false) : Promise<void>
-{
+async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.CompilationRequest, ccfg: CompilerConfig, saveSt = false): Promise<void> {
     logger.newContext();
     let task = await compile.statusAsync(true);
     // TODO: mbed seems to need a second call
@@ -467,7 +476,7 @@ async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.Co
     task = await compile.statusAsync(false);
     let st = new CompileStatus();
     logger.measure("MbedWsCompileTime", logger.contextDuration());
-    st.success = task.success;    
+    st.success = task.success;
     if (task.success) {
         let bytes = await task.downloadAsync(compile);
         if (bytes.length == 0) {
@@ -477,49 +486,48 @@ async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.Co
         else {
             let hexname = sha + "/" + ccfg.hexfilename;
             if (!ccfg.hexfilename)
-                hexname = sha + ".hex";    
+                hexname = sha + ".hex";
             st.hexurl = compileContainer.url() + "/" + hexname;
-                
+
             let result = await compileContainer.createGzippedBlockBlobFromBufferAsync(hexname, bytes, {
                 contentType: ccfg.hexcontenttype
             });
             logger.tick("MbedHexCreated");
         }
     }
-    
+
     var err: any = null;
     if (!task.success) {
         err = new Error("Compilation failed");
         st.bugReportId = raygun.mkReportId()
         err.tdMeta = { reportId: st.bugReportId }
         let payload = JSON.parse(JSON.stringify(task.payload).replace(/\w+@github.com/g, "[...]@github.com"))
-        delete payload["replace_files"];         
+        delete payload["replace_files"];
         err.bugAttachments = [
             core.withDefault(payload.result ? payload.result.exception : null, "Cannot find exception")
                 .replace(/(\\r)?\\n/g, "\n")
-                .replace(/['"], ["']/g, "\n"),                
-            JSON.stringify(payload, null, 1)            
+                .replace(/['"], ["']/g, "\n"),
+            JSON.stringify(payload, null, 1)
         ];
         for (let k of Object.keys(compile.replaceFiles)) {
             err.bugAttachments.push(k + ":\n" + compile.replaceFiles[k])
-        }        
-        st.mbedresponse = { result: { exception: "ReportID: " + st.bugReportId }}
+        }
+        st.mbedresponse = { result: { exception: "ReportID: " + st.bugReportId } }
     }
-    
+
     let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
-    
+
     if (saveSt)
         await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
             entry.finished = true;
             entry.success = task.success;
         })
-    
-    if (err)    
+
+    if (err)
         throw err;
 }
 
-async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: CompilerConfig) : Promise<void>
-{
+async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: CompilerConfig, saveSt = false): Promise<void> {
     logger.newContext();
     jsb2["hexfile"] = "source/" + ccfg.target_binary;
     jsb2["target"] = ccfg.platform;
@@ -529,7 +537,7 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
     logger.measure("MbedIntCompileTime", logger.contextDuration());
     // Just in case...
     if (response.statusCode() != 200 || respJson == null) {
-        setMbedresponse(st, "Code: " + response.statusCode());
+        setMbedresponse(st, "Code: " + response.statusCode() + " / " + (response.content() || "???").slice(0,300));
     }
     else {
         let hexfile = respJson["hexfile"];
@@ -539,29 +547,35 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
         }
         else {
             st.success = true;
-            st.hexurl = compileContainer.url() + "/" + sha + "/" + ccfg.hexfilename;
-            let result = await compileContainer.createGzippedBlockBlobFromBufferAsync(sha + "/" + ccfg.hexfilename, new Buffer(hexfile, "utf8"), {
+            let hexname = ccfg.hexfilename ? sha + "/" + ccfg.hexfilename : sha + ".hex" 
+            st.hexurl = compileContainer.url() + "/" + hexname;
+            let result = await compileContainer.createGzippedBlockBlobFromBufferAsync(hexname, new Buffer(hexfile, "utf8"), {
                 contentType: ccfg.hexcontenttype
             });
             logger.tick("MbedHexCreated");
         }
     }
     let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
+    
+    if (saveSt)
+        await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
+            entry.finished = true;
+            entry.success = st.success;
+        })
+
 }
 
-function setMbedresponse(st: CompileStatus, msg: string) : void
-{
+function setMbedresponse(st: CompileStatus, msg: string): void {
     let jsb = ({ "result": {} });
     jsb["result"]["exception"] = msg;
     st.mbedresponse = jsb;
 }
 
-async function mbedintRequestAsync(ccfg: CompilerConfig, jsb2: JsonBuilder) : Promise<td.WebResponse>
-{
+async function mbedintRequestAsync(ccfg: CompilerConfig, jsb2: JsonBuilder): Promise<td.WebResponse> {
     jsb2["requestId"] = azureTable.createRandomId(128);
     let request = td.createRequest(ccfg.internalUrl);
     let iv = crypto.randomBytes(16);
-    let key = new Buffer(td.serverSetting("MBEDINT_KEY", false), "hex");
+    let key = new Buffer(ccfg.internalKey || td.serverSetting("MBEDINT_KEY", false), "hex");
     let cipher = crypto.createCipheriv("aes256", key, iv);
     request.setHeader("x-iv", iv.toString("hex"));
     let enciphered = cipher.update(new Buffer(JSON.stringify(jsb2), "utf8"));

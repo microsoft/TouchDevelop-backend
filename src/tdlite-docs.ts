@@ -1,22 +1,41 @@
 /// <reference path='../typings/node/node.d.ts' />
+/// <reference path='../typings/marked/marked.d.ts' />
 
 'use strict';
 
 import * as td from './td';
 import * as assert from 'assert';
+import * as marked from 'marked';
 
 type JsonObject = td.JsonObject;
 type JsonBuilder = td.JsonBuilder;
 
 
-
-
 var expandInfo: td.Action1<JsonBuilder>;
 
+export function renderMarkdown(src: string): td.SMap<string> {
+    let res: td.SMap<string> = {}
+    res["body"] = marked(src, {
+        sanitize: true,
+        smartypants: true,
+    })
+    return res
+}
+
+export function injectHtml(template: string, vars: td.SMap<string>) {
+    return td.replaceFn(template, /@(\w+)@/g, (elt1: string[]) => {
+        let result1: string;
+        let key = elt1[1];
+        result1 = orEmpty(vars[key]);
+        if (! /^(body)$/.test(key)) {
+            result1 = htmlQuote(result1);
+        }
+        return result1;
+    });
+}
 
 
-export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise<string>
-{
+export async function formatAsync(templ: string, pubdata: JsonBuilder): Promise<string> {
     if (pubdata["time"] != null) {
         pubdata["timems"] = pubdata["time"] * 1000;
         pubdata["humantime"] = humanTime(new Date(pubdata["timems"]));
@@ -71,7 +90,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
             pubdata["isvolatile"] = true;
         }
         for (let fn of Object.keys(pubdata)) {
-            if ( ! sectjs.hasOwnProperty(fn)) {
+            if (!sectjs.hasOwnProperty(fn)) {
                 sectjs[fn] = td.clone(pubdata[fn]);
             }
         }
@@ -103,7 +122,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
                 let result1: string;
                 let key = elt1[1];
                 result1 = orEmpty(sectjs[key]);
-                if ( ! /^(body)$/.test(key)) {
+                if (! /^(body)$/.test(key)) {
                     result1 = htmlQuote(result1);
                 }
                 return result1;
@@ -117,7 +136,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
         if (mtch[2] == ":hide") {
             if (val.trim()) return "";
             else return "display:none;"
-        }        
+        }
         return val;
     });
     return expanded1;
@@ -125,8 +144,7 @@ export async function formatAsync(templ: string, pubdata: JsonBuilder) : Promise
 
 var orEmpty = td.orEmpty;
 
-export function htmlQuote(s: string) : string
-{
+export function htmlQuote(s: string): string {
     s = td.replaceAll(s, "&", "&amp;")
     s = td.replaceAll(s, "<", "&lt;")
     s = td.replaceAll(s, ">", "&gt;")
@@ -135,16 +153,14 @@ export function htmlQuote(s: string) : string
     return s;
 }
 
-export function init(expandInfo_:td.Action1<JsonBuilder>) : void
-{
+export function init(expandInfo_: td.Action1<JsonBuilder>): void {
     expandInfo = expandInfo_;
 }
 
 /**
  * {language:html:html}
  */
-function fmt(promo: JsonBuilder, html: string) : string
-{
+function fmt(promo: JsonBuilder, html: string): string {
     let replRes = td.replaceFn(html, /@([a-zA-Z0-9_\.]+)@/g, (elt: string[]) => {
         let result: string;
         let jsb = promo;
@@ -165,15 +181,13 @@ function fmt(promo: JsonBuilder, html: string) : string
     return replRes;
 }
 
-function twoDigit(p: number) : string
-{
+function twoDigit(p: number): string {
     let s2 = "00" + p;
     return s2.substr(s2.length - 2, 2);
 }
 
-export function humanTime(p: Date) : string
-{
-    return p.getFullYear() + "-" + twoDigit(p.getMonth() + 1) + "-" + twoDigit(p.getDate()) + 
+export function humanTime(p: Date): string {
+    return p.getFullYear() + "-" + twoDigit(p.getMonth() + 1) + "-" + twoDigit(p.getDate()) +
         " " + twoDigit(p.getHours()) + ":" + twoDigit(p.getMinutes());
 }
 

@@ -10,6 +10,9 @@
     },
     "bluebird/bluebird.d.ts": {
       "commit": "68d9d43ce884e1ffb6ec0daf4ee7be9392c5b7bc"
+    },
+    "marked/marked.d.ts": {
+      "commit": "0d622d857f97d44ea7dcad2b3edec1f23c48fe9e"
     }
   }
 }

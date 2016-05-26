@@ -39,21 +39,21 @@ var deployChannels: string[];
 export var templateSuffix: string = "";
 
 export class PubPointer
-    extends core.Publication
-{
+    extends core.Publication {
     @td.json public path: string = "";
     @td.json public scriptid: string = "";
     @td.json public artid: string = "";
     @td.json public htmlartid: string = "";
+    @td.json public releaseid: string = "";
     @td.json public redirect: string = "";
     @td.json public description: string = "";
-    @td.json public comments: number = 0;    
+    @td.json public comments: number = 0;
     @td.json public parentpath: string = "";
     @td.json public scriptname: string = "";
     @td.json public scriptdescription: string = "";
     @td.json public breadcrumbtitle: string = "";
     @td.json public customtick: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubPointer(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubPointer(); r.fromJson(o); return r; }
 }
 
 export async function reindexStoreAsync(req: core.ApiRequest, store: indexedStore.Store, processOneAsync: td.Action1<{}>) {
@@ -70,8 +70,7 @@ export async function reindexStoreAsync(req: core.ApiRequest, store: indexedStor
     req.response = resp;
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     deployChannels = withDefault(td.serverSetting("CHANNELS", false), core.myChannel).split(",");
     templateSuffix = orEmpty(td.serverSetting("TEMPLATE_SUFFIX", true));
 
@@ -82,7 +81,7 @@ export async function initAsync() : Promise<void>
         deleteWithAuthor: true,
         specialDeleteAsync: clearPtrCacheAsync,
     })
-    await core.setResolveAsync(pointers, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(pointers, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await core.addUsernameEtcAsync(fetchResult);
         let coll = (<PubPointer[]>[]);
         for (let jsb of fetchResult.items) {
@@ -91,31 +90,31 @@ export async function initAsync() : Promise<void>
         }
         fetchResult.items = td.arrayToJson(coll);
     }, {
-        byUserid: true,
-        anonSearch: true
-    });
+            byUserid: true,
+            anonSearch: true
+        });
 
     await pointers.createIndexAsync("rootns", entry => orEmpty(entry["id"]).replace(/^ptr-/, "").replace(/-.*/, ""));
-    
+
     core.addRoute("GET", "pointers", "*", async(req) => {
-        await core.anyListAsync(pointers, req, "rootns", req.verb);    
+        await core.anyListAsync(pointers, req, "rootns", req.verb);
     })
-    
+
     core.addRoute("GET", "pointers", "doctoc", async(req) => {
-        let lst = await pointers.getIndex("rootns").fetchAllAsync("docs");        
+        let lst = await pointers.getIndex("rootns").fetchAllAsync("docs");
         lst = lst.filter(e => !!e["pub"]["scriptid"])
         let tot = 0
         let totC = 0
         for (let e of lst) {
             e["children"] = [];
             e["orphan"] = true;
-            e["pub"]["path"] = e["pub"]["path"].replace(/^\/+/, ""); 
+            e["pub"]["path"] = e["pub"]["path"].replace(/^\/+/, "");
             tot++;
         }
-        let byPath = td.toDictionary(lst, e => e["pub"]["path"])        
+        let byPath = td.toDictionary(lst, e => e["pub"]["path"])
         for (let e of lst) {
             let pub = e["pub"]
-            let par = pub["parentpath"] 
+            let par = pub["parentpath"]
             if (par != pub["path"] && par && byPath.hasOwnProperty(par)) {
                 byPath[par]["children"].push(e)
                 e["orphan"] = false;
@@ -125,22 +124,22 @@ export async function initAsync() : Promise<void>
         let res = `tot:${tot}, ch:${totC}\n`
         let num = 0
         let dumpList = (ind: string, ee: {}[]) => {
-            if (num++ > 1000) return; 
+            if (num++ > 1000) return;
             ee.sort((a, b) => td.strcmp(a["id"], b["id"]))
             for (let e of ee) {
                 res += ind + e["pub"]["scriptname"] + " /" + e["pub"]["path"] + "\n"
                 dumpList(ind + "    ", e["children"])
             }
         }
-        dumpList("", lst.filter(e => e["orphan"]))        
+        dumpList("", lst.filter(e => e["orphan"]))
         req.response = res;
     })
-    
-    core.addRoute("GET", "*script", "cardinfo", async (req14: core.ApiRequest) => {
+
+    core.addRoute("GET", "*script", "cardinfo", async(req14: core.ApiRequest) => {
         let jsb1 = await getCardInfoAsync(req14, req14.rootPub);
         req14.response = td.clone(jsb1);
     });
-    core.addRoute("POST", "pointers", "", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "pointers", "", async(req: core.ApiRequest) => {
         await core.canPostAsync(req, "pointer");
         if (req.status == 200) {
             let body = req.body;
@@ -156,7 +155,7 @@ export async function initAsync() : Promise<void>
                 }
                 else {
                     core.checkPermission(req, "root-ptr");
-                    if (req.status == 200 && ! hasPtrPermission(req, ptr1.id)) {
+                    if (req.status == 200 && !hasPtrPermission(req, ptr1.id)) {
                         req.status = httpCode._402PaymentRequired;
                     }
                 }
@@ -196,14 +195,14 @@ export async function initAsync() : Promise<void>
             }
         }
     });
-    core.addRoute("POST", "*pointer", "", async (req1: core.ApiRequest) => {
+    core.addRoute("POST", "*pointer", "", async(req1: core.ApiRequest) => {
         await updatePointerAsync(req1);
     });
     core.addRoute("GET", "*pointer", "history", async(req) => {
         if (!core.checkPermission(req, "root-ptr")) return;
         let fetchResult = await audit.queryPubLogAsync(req);
         fetchResult.items = fetchResult.items.filter(e => e["pub"]["type"] == "update-ptr");
-        
+
         let last = fetchResult.items[fetchResult.items.length - 1]
         if (last && last["pub"]["oldvalue"] && last["pub"]["oldvalue"]["__version"] == 1) {
             let final = td.clone(last);
@@ -214,7 +213,7 @@ export async function initAsync() : Promise<void>
             final["pub"]["time"] = pub["pub"]["time"];
             fetchResult.items.push(final)
         }
-        
+
         fetchResult.items = fetchResult.items.map(it => {
             let pub = it["pub"];
             let ptr = it["pub"]["newvalue"];
@@ -226,18 +225,18 @@ export async function initAsync() : Promise<void>
                 ptr["oldscriptid"] = pub["oldvalue"]["pub"]["scriptid"];
             return ptr;
         });
-        
-        await core.addUsernameEtcAsync(fetchResult);        
+
+        await core.addUsernameEtcAsync(fetchResult);
         fetchResult.items = fetchResult.items.map(jsb => {
             let ptr = PubPointer.createFromJson(jsb["pub"]);
             let ret = ptr.toJson();
             ret["oldscriptid"] = jsb["oldscriptid"];
-            return ret; 
+            return ret;
         })
 
-        req.response = fetchResult.toJson();        
+        req.response = fetchResult.toJson();
     });
-    tdliteDocs.init(async (v: JsonBuilder) => {
+    tdliteDocs.init(async(v: JsonBuilder) => {
         let wp = orEmpty(v["webpath"]);
         if (wp != "") {
             let ptrId = pathToPtr(wp.replace(/^\//g, ""));
@@ -265,17 +264,17 @@ export async function initAsync() : Promise<void>
             v["promo"] = entities.items;
         }
     });
-    core.addRoute("POST", "admin", "reindexpointers", async (req2: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "reindexpointers", async(req2: core.ApiRequest) => {
         core.checkPermission(req2, "operator");
         if (req2.status == 200) {
-            /* async */ pointers.getIndex("all").forAllBatchedAsync("all", 50, async (json) => {
-                await parallel.forJsonAsync(json, async (json1: JsonObject) => {
+            /* async */ pointers.getIndex("all").forAllBatchedAsync("all", 50, async(json) => {
+                await parallel.forJsonAsync(json, async(json1: JsonObject) => {
                 });
             });
             req2.response = ({});
         }
     });
-    
+
     core.addRoute("POST", "pointers", "reindex", async(req: core.ApiRequest) => {
         await reindexStoreAsync(req, pointers, async(ptr) => {
             let refx = await pointers.reindexAsync(ptr["id"], async(entry1: JsonBuilder) => {
@@ -287,12 +286,12 @@ export async function initAsync() : Promise<void>
             });
         });
     });
-    
+
     restify.server().get("/:userid/oauth", async(req, res) => {
         let lang = await handleLanguageAsync(req);
         let uid = req.param("userid")
         let user = await tdliteUsers.getAsync(uid)
-        
+
         if (!user) {
             let tmp = await errorHtmlAsync("User account not found", "No such user: /" + uid, lang)
             res.html(tmp, { status: httpCode._404NotFound })
@@ -303,30 +302,28 @@ export async function initAsync() : Promise<void>
                 name: user.pub.name
             })
             res.html(text)
-        }        
-    })    
+        }
+    })
 }
 
-export function pathToPtr(fn: string) : string
-{
+export function pathToPtr(fn: string): string {
     let s: string;
-    if (! fn) {
+    if (!fn) {
         return "";
     }
     s = "ptr-" + fn.replace(/^\/+/g, "").replace(/[^a-zA-Z0-9@]/g, "-").toLowerCase();
     return s;
 }
 
-async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body: JsonObject) : Promise<void>
-{
+async function setPointerPropsAsync(req: core.ApiRequest, ptr: JsonBuilder, body: JsonObject): Promise<void> {
     let pub = ptr["pub"];
     let empty = new PubPointer().toJson();
     for (let k of Object.keys(empty)) {
-        if ( ! pub.hasOwnProperty(k)) {
+        if (!pub.hasOwnProperty(k)) {
             pub[k] = empty[k];
         }
     }
-    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "htmlartid", "customtick", "path"]);
+    core.setFields(pub, body, ["description", "scriptid", "redirect", "artid", "artcontainer", "releaseid", "htmlartid", "customtick", "path"]);
     pub["path"] = pub["path"].replace(/^\/+/, "");
     pub["parentpath"] = "";
     pub["scriptname"] = "";
@@ -338,7 +335,7 @@ async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body:
     else {
         pub["scriptname"] = sid["pub"]["name"];
         pub["scriptdescription"] = sid["pub"]["description"];
-        await core.pubsContainer.updateAsync(sid["id"], async (entry: JsonBuilder) => {
+        await core.pubsContainer.updateAsync(sid["id"], async(entry: JsonBuilder) => {
             entry["lastPointer"] = pub["id"];
         });
         let entry1 = await tdliteScripts.getScriptTextAsync(sid["id"]);
@@ -379,6 +376,10 @@ async function setPointerPropsAsync(req:core.ApiRequest, ptr: JsonBuilder, body:
     if (sid == null) {
         pub["artid"] = "";
     }
+    sid = await core.getPubAsync(pub["releaseid"], "release");
+    if (sid == null) {
+        pub["releaseid"] = "";
+    }
     let s = orEmpty(pub["redirect"]);
     if (!core.callerHasPermission(req, "post-raw") && ! /^\/[a-zA-Z0-9\/\-@]+$/.test(s)) {
         pub["redirect"] = "";
@@ -402,10 +403,10 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
             req.status = httpCode._402PaymentRequired;
         }
     }
-    
+
     if (!checkPostPointerPermissions(req))
         return;
-    
+
     if (req.status == 200) {
         let bld = await search.updateAndUpsertAsync(core.pubsContainer, req, async(entry: JsonBuilder) => {
             await setPointerPropsAsync(req, entry, req.body);
@@ -419,7 +420,17 @@ async function updatePointerAsync(req: core.ApiRequest): Promise<void> {
     }
 }
 
-async function getHtmlArtAsync(templid: string, lang:string) {
+async function renderMarkdownAsync(artobj: {}, lang: string) {
+    let url = tdliteArt.getBlobUrl(artobj)
+    let resp = await td.createRequest(url).sendAsync();
+    let textObj = resp.content();
+    if (!textObj) textObj = "Art object not found."
+    let vars = tdliteDocs.renderMarkdown(textObj)
+    let templ = await getTemplateTextAsync("templates/docs", lang)
+    return tdliteDocs.injectHtml(templ, vars)
+}
+
+async function getHtmlArtAsync(templid: string, lang: string) {
     let artjs = await core.getPubAsync(templid, "art");
     if (artjs == null) {
         return "Template art missing";
@@ -438,11 +449,10 @@ async function getHtmlArtAsync(templid: string, lang:string) {
 
 }
 
-export async function getTemplateTextAsync(templatename: string, lang: string) : Promise<string>
-{
+export async function getTemplateTextAsync(templatename: string, lang: string): Promise<string> {
     let r: string;
     let id = pathToPtr(templatename.replace(/:.*/g, ""));
-    let entry3 = await core.getPubAsync(id + lang, "pointer"); 
+    let entry3 = await core.getPubAsync(id + lang, "pointer");
     if (entry3 == null && lang != "") {
         entry3 = await core.getPubAsync(id, "pointer");
     }
@@ -493,20 +503,19 @@ export async function getTemplateTextAsync(templatename: string, lang: string) :
     return r;
 }
 
-async function clearPtrCacheAsync(id: string) : Promise<void>
-{
+async function clearPtrCacheAsync(id: string): Promise<void> {
     if (false) {
-        await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + id, async (entry: JsonBuilder) => {
+        await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + id, async(entry: JsonBuilder) => {
             entry["version"] = "outdated";
         });
     }
     for (let chname of deployChannels) {
-        await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id, async (entry1: JsonBuilder) => {
+        await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id, async(entry1: JsonBuilder) => {
             entry1["version"] = "outdated";
         });
-        if ( ! /@\w+$/.test(id)) {
+        if (! /@\w+$/.test(id)) {
             for (let lang of Object.keys(core.serviceSettings.langs)) {
-                await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id + "@" + lang, async (entry2: JsonBuilder) => {
+                await tdliteReleases.cacheRewritten.updateAsync("ptrcache/" + chname + "/" + id + "@" + lang, async(entry2: JsonBuilder) => {
                     entry2["version"] = "outdated";
                 });
             }
@@ -517,14 +526,13 @@ async function clearPtrCacheAsync(id: string) : Promise<void>
     }
 }
 
-function fixupTDHtml(html: string): string
-{
+function fixupTDHtml(html: string): string {
     html = html
         .replace(/^<h1>[^<>]+<\/h1>/g, "")
         .replace(/<h2>/g, "<h2 class=\"beta\">")
         .replace(/(<a class="[^"<>]*" href=")\//g, (f, p) => p + core.self)
         .replace(/<h3>/g, "<h3 class=\"gamma\">");
-    return html; 
+    return html;
 }
 
 async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonBuilder): Promise<void> {
@@ -603,10 +611,9 @@ async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonB
 }
 
 
-async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite:td.Action1<CachedPage>) : Promise<void>
-{
+async function rewriteAndCachePointerAsync(id: string, res: restify.Response, rewrite: td.Action1<CachedPage>): Promise<void> {
     let path = "ptrcache/" + core.myChannel + "/" + id;
-    let cachedPage = <CachedPage> await tdliteReleases.cacheRewritten.getAsync(path);
+    let cachedPage = <CachedPage>await tdliteReleases.cacheRewritten.getAsync(path);
     let ver = await core.getCloudRelidAsync(true);
 
     let event = "ServePtr";
@@ -637,7 +644,7 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
         await rewrite(cachedPage);
 
         if (cachedPage.version == ver) {
-            await tdliteReleases.cacheRewritten.updateAsync(path, async (entry: JsonBuilder) => {
+            await tdliteReleases.cacheRewritten.updateAsync(path, async(entry: JsonBuilder) => {
                 core.copyJson(cachedPage, entry);
             });
         }
@@ -666,7 +673,7 @@ async function rewriteAndCachePointerAsync(id: string, res: restify.Response, re
     else {
         res.redirect(302, redir);
     }
-    
+
     if (cachedPage.customtick)
         logger.tick(cachedPage.customtick)
 }
@@ -680,17 +687,16 @@ async function lookupScreenshotIdAsync(pub: {}) {
     }
     let id = pub["iconArtId"]
     if (id) return pref + id;
-    
+
     let ss = await tdliteArt.getPubScreenshotsAsync(pub["id"], 1)
     if (ss[0]) {
         return pref.replace("thumb1", "pub") + ss[0]["id"]
     }
-    
+
     return "";
 }
 
-async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang:string)
-{    
+async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string) {
     let req = core.buildApiRequest("/api")
     req.rootId = scriptjson["id"];    // this is to make sure we show hidden scripts
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, scriptjson, req);
@@ -700,7 +706,7 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang:string)
     else if (/#docs/i.test(pub["description"]))
         templ = "templates/docscript";
     pub["templatename"] = templ;
-    pub["screenshoturl"] = await lookupScreenshotIdAsync(pub); 
+    pub["screenshoturl"] = await lookupScreenshotIdAsync(pub);
     await renderFinalAsync(pub, v, lang);
 }
 
@@ -715,15 +721,14 @@ interface CachedPage {
     expiration: number;
 }
 
-function legacyKindPrefix(name: string)
-{
+function legacyKindPrefix(name: string) {
     name = name.replace(/^docs\//, "").toLowerCase();
-    
+
     if (tdliteData.tdLegacyKinds.hasOwnProperty(name))
         return null;
 
     let len = Math.min(25, name.length)
-    while (len > 0) {        
+    while (len > 0) {
         let sl = name.slice(0, len);
         if (tdliteData.tdLegacyKinds.hasOwnProperty(sl))
             return sl;
@@ -732,10 +737,10 @@ function legacyKindPrefix(name: string)
     return null;
 }
 
-export async function servePointerAsync(req: restify.Request, res: restify.Response) : Promise<void>
-{
+export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let lang = await handleLanguageAsync(req);
-    let fn = req.url().replace(/\?.*/g, "").replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
+    let urlFile = req.url().replace(/\?.*/g, "")
+    let fn = urlFile.replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
     if (fn == "") {
         fn = "home";
     }
@@ -754,7 +759,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         id = id + templateSuffix;
     }
     id = id + lang;
-    
+
     if (!core.fullTD && req.query()["update"] == "true" && /^[a-z]+$/.test(fn)) {
         let entry = await core.getPubAsync(fn, "script")
         if (entry) {
@@ -764,11 +769,11 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         }
     }
 
-    await rewriteAndCachePointerAsync(id, res, async (v: CachedPage) => {
+    await rewriteAndCachePointerAsync(id, res, async(v: CachedPage) => {
         let pubdata = {};
         let errorAsync = async(msg: string) => {
             await pointerErrorAsync(msg, v, lang)
-        } 
+        }
         v.redirect = "";
         v.text = "";
         v.error = false;
@@ -781,8 +786,8 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         }
         if (existing)
             v.customtick = existing["pub"]["customtick"]
-        
-        if (existing == null) {          
+
+        if (existing == null) {
             if (td.startsWith(fn, "u/")) {
                 v.redirect = fn.replace(/^u\//g, "/usercontent/");
             }
@@ -792,7 +797,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             else if (core.fullTD && fn.startsWith("docs/") && legacyKindPrefix(fn)) {
                 let pref = legacyKindPrefix(fn);
                 v.redirect = "/docs/" + pref + "#" + fn.slice(5 + pref.length)
-            }    
+            }
             else if (td.startsWith(fn, "preview/")) {
                 await renderScriptAsync(fn.replace(/^preview\//g, ""), v, pubdata);
                 await renderFinalAsync(pubdata, v, lang);
@@ -802,12 +807,12 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 if (entry == null || withDefault(entry["kind"], "reserved") == "reserved") {
                     await errorAsync("No such publication");
                 }
-                else {                    
+                else {
                     if (core.fullTD && entry["kind"] == "script") {
                         await renderScriptPageAsync(entry, v, lang)
                     } else {
                         v.redirect = "/app/#pub:" + entry["id"];
-                    }    
+                    }
                 }
             }
             else {
@@ -823,17 +828,23 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 if (!artobj) {
                     await errorAsync("No such art: /" + ptr.artid)
                 } else {
-                    v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
+                    if (artobj["contentType"] == "text/markdown") {
+                        v.text = await renderMarkdownAsync(artobj, lang)
+                    } else {
+                        v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
+                    }
                 }
             } else if (ptr.htmlartid) {
                 v.text = await getHtmlArtAsync(ptr.htmlartid, lang);
                 if (/-txt$/.test(ptr.id)) {
                     v.contentType = "text/plain; charset=utf-8"
                 }
+            } else if (ptr.releaseid) {
+                v.text = await tdliteReleases.getRewrittenIndexAsync(ptr.path, ptr.releaseid)
             } else {
                 let scriptid = ptr.scriptid;
                 await renderScriptAsync(ptr.scriptid, v, pubdata);
-                
+
                 let path = ptr.parentpath;
                 let breadcrumb = ptr.breadcrumbtitle;
                 let sep = "&nbsp;&nbsp;»&nbsp; ";
@@ -848,7 +859,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 }
                 breadcrumb = "<a href=\"/home\">Home</a>" + sep + breadcrumb;
                 pubdata["breadcrumb"] = breadcrumb;
-                
+
                 await renderFinalAsync(pubdata, v, lang);
             }
         }
@@ -878,13 +889,12 @@ async function renderFinalAsync(pubdata: {}, v: CachedPage, lang: string) {
     v.text = await tdliteDocs.formatAsync(templText, pubdata);
 }
 
-async function errorHtmlAsync(header: string, info: string, lang:string)
-{
+async function errorHtmlAsync(header: string, info: string, lang: string) {
     let pubdata = {
         name: header,
         body: core.htmlQuote(info)
     }
-    
+
     let text = await simplePointerCacheAsync("error-template", lang);
     if (text.length > 100) {
         return await tdliteDocs.formatAsync(text, pubdata);
@@ -905,8 +915,7 @@ async function pointerErrorAsync(msg: string, v: CachedPage, lang: string) {
     v.text = await errorHtmlAsync(header, "Error message: " + msg, lang);
 }
 
-function hasPtrPermission(req: core.ApiRequest, currptr: string) : boolean
-{
+function hasPtrPermission(req: core.ApiRequest, currptr: string): boolean {
     currptr = currptr.replace(/@..$/g, "");
     while (currptr != "") {
         if (core.callerHasPermission(req, "write-" + currptr)) {
@@ -926,8 +935,7 @@ function hasPtrPermission(req: core.ApiRequest, currptr: string) : boolean
 }
 
 
-export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject) : Promise<JsonBuilder>
-{
+export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject): Promise<JsonBuilder> {
     let jsb2: JsonBuilder;
     let js3 = await core.resolveOnePubAsync(tdliteScripts.scripts, pubJson, req);
     if (js3 == null) {
@@ -953,18 +961,18 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
         jsb["thumbnail"] = core.currClientConfig.primaryCdnUrl + "/thumb1/" + artid;
     }
     if (scr.editor == "blockly") {
-        td.jsonCopyFrom(jsb, ({ 
-  "editorname": "Block Editor", 
-  "editor": "blocks",
-  "editorhtml": "Microsoft Block Editor"
-}));
+        td.jsonCopyFrom(jsb, ({
+            "editorname": "Block Editor",
+            "editor": "blocks",
+            "editorhtml": "Microsoft Block Editor"
+        }));
     }
     else {
-        td.jsonCopyFrom(jsb, ({ 
-  "editorname": "Touch Develop", 
-  "editor": "touchdevelop",
-  "editorhtml": "Microsoft Touch Develop"
-}));
+        td.jsonCopyFrom(jsb, ({
+            "editorname": "Touch Develop",
+            "editor": "touchdevelop",
+            "editorhtml": "Microsoft Touch Develop"
+        }));
     }
     jsb["timems"] = scr.time * 1000;
     jsb["realid"] = scr.id;
@@ -974,10 +982,9 @@ export async function getCardInfoAsync(req: core.ApiRequest, pubJson: JsonObject
 }
 
 
-export async function handleLanguageAsync(req: restify.Request) : Promise<string>
-{
+export async function handleLanguageAsync(req: restify.Request): Promise<string> {
     if (!req) return "";
-    
+
     await core.refreshSettingsAsync();
     let lang = core.serviceSettings.defaultLang;
     for (let s of orEmpty(req.header("Accept-Language")).split(",")) {
@@ -1000,8 +1007,7 @@ export async function handleLanguageAsync(req: restify.Request) : Promise<string
     return lang;
 }
 
-export async function simplePointerCacheAsync(urlPath: string, lang: string) : Promise<string>
-{
+export async function simplePointerCacheAsync(urlPath: string, lang: string): Promise<string> {
     let versionMarker = "simple3";
     urlPath = urlPath + templateSuffix;
     let id = pathToPtr(urlPath);
@@ -1013,7 +1019,7 @@ export async function simplePointerCacheAsync(urlPath: string, lang: string) : P
         let r = await getTemplateTextAsync(urlPath, lang);
         jsb2["text"] = orEmpty(r);
         entry2 = td.clone(jsb2);
-        await tdliteReleases.cacheRewritten.updateAsync(path, async (entry: JsonBuilder) => {
+        await tdliteReleases.cacheRewritten.updateAsync(path, async(entry: JsonBuilder) => {
             core.copyJson(entry2, entry);
         });
     }

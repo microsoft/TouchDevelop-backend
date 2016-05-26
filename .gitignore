@@ -4,7 +4,7 @@ typings/
 built/
 remote-*
 storage-*
-
 web/_site/
 templater.sh
 web/_temp
+dockerbuild/config.json

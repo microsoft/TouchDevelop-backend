@@ -179,7 +179,7 @@ export async function resolveScriptsAsync(entities: indexedStore.FetchResult, re
         if (updateObj == null) {
             updateObj = ({});
         }
-        if (updateObj.hasOwnProperty("scriptTime")) {
+        if (updateObj.hasOwnProperty("scriptTime") && updateObj["scriptTime"] >= script.time) {
             script.updateid = updateObj["scriptId"];
             script.updatetime = updateObj["scriptTime"];
         }

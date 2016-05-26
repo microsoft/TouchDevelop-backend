@@ -45,14 +45,14 @@ interface PicSize {
     id: number;
     type: string;
     fbtype?: string;
-    
+
     width: number;
     height: number;
     resizeStrategy: string;
     quality: number;
 }
 
-var picSizes:PicSize[] = [
+var picSizes: PicSize[] = [
     {
         type: "original",
         fbtype: "large",
@@ -127,14 +127,13 @@ export interface IUser {
     termsversion: string;
     migrationtoken: string;
     importworkspace: string; // set to non-empty if we're still importing workspace for this user from the legacy system
-    lastNotificationId: string;    
+    lastNotificationId: string;
     notifications: number;
     numAbusesByUser: number;
     numReports: number;
 }
 
-export interface IPubUser
-{
+export interface IPubUser {
     name: string;
     haspicture: boolean;
     time: number;
@@ -145,12 +144,11 @@ export interface IPubUser
     subscribers: number;
     score: number;
     isadult: boolean;
-    avatar: string;    
-}    
+    avatar: string;
+}
 
 export class PubUser
-    extends core.IdObject
-{
+    extends core.IdObject {
     @td.json public name: string = "";
     @td.json public haspicture: boolean = false;
     @td.json public time: number = 0;
@@ -162,12 +160,11 @@ export class PubUser
     @td.json public score: number = 0;
     @td.json public isadult: boolean = false;
     @td.json public avatar: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubUser(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubUser(); r.fromJson(o); return r; }
 }
 
 export class PubUserSettings
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public nickname: string = "";
     @td.json public aboutme: string = "";
     @td.json public website: string = "";
@@ -197,11 +194,10 @@ export class PubUserSettings
     @td.json public userid: string = "";
     @td.json public avatar: string = "";
     @td.json public previousemail: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubUserSettings(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubUserSettings(); r.fromJson(o); return r; }
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     await nodemailer.initAsync();
     if (core.hasSetting("SENDGRID_API_KEY")) {
         useSendgrid = true;
@@ -211,7 +207,7 @@ export async function initAsync() : Promise<void>
     passcodesContainer = await cachedStore.createContainerAsync("passcodes", {
         noCache: true
     });
-    
+
     userpicContainer = await core.blobService.createContainerIfNotExistsAsync("pic", "hidden");
 
     users = await indexedStore.createStoreAsync(core.pubsContainer, "user");
@@ -220,17 +216,17 @@ export async function initAsync() : Promise<void>
         deleteWithAuthor: false,
         importOne: importUserAsync
     })
-    await core.setResolveAsync(users, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(users, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         resolveUsers(fetchResult, apiRequest);
     });
     await users.createIndexAsync("seconadaryid", entry => orEmpty(entry["secondaryid"]));
-    core.addRoute("GET", "secondaryid", "*", async (req: core.ApiRequest) => {
+    core.addRoute("GET", "secondaryid", "*", async(req: core.ApiRequest) => {
         core.checkPermission(req, "user-mgmt");
         if (req.status == 200) {
             await core.anyListAsync(users, req, "secondaryid", req.verb);
         }
     });
-    
+
     if (core.encrypt("foobar", emailKeyid) == "foobar") {
         await users.createIndexAsync("email", entry => orEmpty(entry["settings"] ? entry["settings"]["email"] : "").toLowerCase());
         await users.createIndexAsync("previousemail", entry => orEmpty(entry["settings"] ? entry["settings"]["previousemail"] : "").toLowerCase());
@@ -249,7 +245,7 @@ export async function initAsync() : Promise<void>
     }
     
     // ### all
-    core.addRoute("POST", "*user", "permissions", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "permissions", async(req: core.ApiRequest) => {
         core.checkMgmtPermission(req, "user-mgmt");
         if (req.status == 200) {
             let perm = td.toString(req.body["permissions"]);
@@ -269,7 +265,7 @@ export async function initAsync() : Promise<void>
                         data: perm
                     });
                 }
-                await updateAsync(req.rootId, async (entry: IUser) => {
+                await updateAsync(req.rootId, async(entry: IUser) => {
                     entry.permissions = perm;
                     await sendPermissionNotificationAsync(req, entry);
                 });
@@ -279,7 +275,7 @@ export async function initAsync() : Promise<void>
                 await audit.logAsync(req, "set-credit", {
                     data: credit.toString()
                 });
-                await updateAsync(req.rootId, async (entry: IUser) => {
+                await updateAsync(req.rootId, async(entry: IUser) => {
                     entry.credit = credit;
                     entry.totalcredit = credit;
                 });
@@ -296,7 +292,7 @@ export async function initAsync() : Promise<void>
             req.response = {};
         }
     });
-    core.addRoute("GET", "*user", "permissions", async (req: core.ApiRequest) => {
+    core.addRoute("GET", "*user", "permissions", async(req: core.ApiRequest) => {
         core.checkMgmtPermission(req, "user-mgmt");
         if (req.status == 200) {
             let jsb = {};
@@ -311,7 +307,7 @@ export async function initAsync() : Promise<void>
         }
     });
     // This is for test users for load testing nd doe **system accounts**
-    core.addRoute("POST", "users", "", async (req4: core.ApiRequest) => {
+    core.addRoute("POST", "users", "", async(req4: core.ApiRequest) => {
         core.checkPermission(req4, "root");
         if (req4.status == 200) {
             let opts = req4.body;
@@ -319,15 +315,15 @@ export async function initAsync() : Promise<void>
             pubUser.name = withDefault(opts["name"], "Dummy" + td.randomInt(100000));
             pubUser.about = withDefault(opts["about"], "");
             pubUser.time = await core.nowSecondsAsync();
-            let jsb1: IUser = <any>{};            
-            jsb1.pub = <IPubUser> pubUser.toJson();
-            jsb1.settings = {};            
+            let jsb1: IUser = <any>{};
+            jsb1.pub = <IPubUser>pubUser.toJson();
+            jsb1.settings = {};
             jsb1.permissions = ",preview,";
             jsb1.secondaryid = cachedStore.freshShortId(12);
             await core.generateIdAsync(jsb1, 4);
             await users.insertAsync(jsb1);
             let pass2 = wordPassword.generate();
-            req4.rootId = jsb1.id;            
+            req4.rootId = jsb1.id;
             req4.rootPub = td.clone(jsb1);
             await setPasswordAsync(req4, pass2, "");
             let jsb3 = td.clone(await core.resolveOnePubAsync(users, req4.rootPub, req4));
@@ -335,7 +331,7 @@ export async function initAsync() : Promise<void>
             req4.response = td.clone(jsb3);
         }
     });
-    core.addRoute("POST", "*user", "addauth", async (req5: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "addauth", async(req5: core.ApiRequest) => {
         let tokenJs = req5.userinfo.token;
         if (orEmpty(req5.body["key"]) != core.tokenSecret) {
             req5.status = httpCode._403Forbidden;
@@ -346,7 +342,7 @@ export async function initAsync() : Promise<void>
         else {
             let s2 = tokenJs.reason;
             if (td.startsWith(s2, "id/")) {
-                await passcodesContainer.updateAsync(s2, async (entry3: JsonBuilder) => {
+                await passcodesContainer.updateAsync(s2, async(entry3: JsonBuilder) => {
                     entry3["userid"] = req5.rootId;
                 });
                 req5.response = ({});
@@ -356,7 +352,7 @@ export async function initAsync() : Promise<void>
             }
         }
     });
-    core.addRoute("POST", "*user", "swapauth", async (req: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "swapauth", async(req: core.ApiRequest) => {
         core.checkPermission(req, "root");
         if (req.status != 200) {
             return;
@@ -381,18 +377,18 @@ export async function initAsync() : Promise<void>
         }
         if (rootUser.altLogins || otherUser.altLogins) {
             req.status = httpCode._412PreconditionFailed;
-            return;            
+            return;
         }
-        await passcodesContainer.updateAsync(rootPassId, async (entry4: JsonBuilder) => {
+        await passcodesContainer.updateAsync(rootPassId, async(entry4: JsonBuilder) => {
             entry4["userid"] = otherUser.id;
         });
-        await passcodesContainer.updateAsync(otherPassId, async (entry5: JsonBuilder) => {
+        await passcodesContainer.updateAsync(otherPassId, async(entry5: JsonBuilder) => {
             entry5["userid"] = rootUser.id;
         });
-        await updateAsync(rootUser.id, async (entry6) => {
+        await updateAsync(rootUser.id, async(entry6) => {
             entry6.login = otherPassId;
         });
-        await updateAsync(otherUser["id"], async (entry7) => {
+        await updateAsync(otherUser["id"], async(entry7) => {
             entry7.login = rootPassId;
         });
         req.response = {
@@ -400,15 +396,15 @@ export async function initAsync() : Promise<void>
             oldotherpass: otherPass
         };
     });
-    core.addRoute("GET", "*user", "resetpassword", async (req9: core.ApiRequest) => {
+    core.addRoute("GET", "*user", "resetpassword", async(req9: core.ApiRequest) => {
         await core.checkFacilitatorPermissionAsync(req9, req9.rootId);
         if (req9.status == 200) {
             req9.response = {
-                passwords: td.range(0, 10).map<string>(elt => wordPassword.generate()) 
+                passwords: td.range(0, 10).map<string>(elt => wordPassword.generate())
             }
         }
     });
-    core.addRoute("POST", "*user", "resetpassword", async (req10: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "resetpassword", async(req10: core.ApiRequest) => {
         await core.checkFacilitatorPermissionAsync(req10, req10.rootId);
         if (req10.status == 200) {
             let pass = orEmpty(req10.body["password"]);
@@ -416,7 +412,7 @@ export async function initAsync() : Promise<void>
             if (pass.length < 10) {
                 req10.status = httpCode._412PreconditionFailed;
             }
-            else if ( ! td.startsWith(prevPass, "code/")) {
+            else if (!td.startsWith(prevPass, "code/")) {
                 req10.status = httpCode._405MethodNotAllowed;
             }
             else {
@@ -424,28 +420,28 @@ export async function initAsync() : Promise<void>
             }
         }
     });
-    core.addRoute("POST", "updatecodes", "", async (req11: core.ApiRequest) => {
+    core.addRoute("POST", "updatecodes", "", async(req11: core.ApiRequest) => {
         core.checkPermission(req11, "root");
         if (req11.status != 200) {
             return;
         }
         let codes = req11.body["codes"];
-        await parallel.forBatchedAsync(codes.length, 50, async (x1: number) => {
+        await parallel.forBatchedAsync(codes.length, 50, async(x1: number) => {
             let s5 = td.toString(codes[x1]);
             let normalized = s5
             if (!/^code\//.test(normalized)) {
                 normalized = core.normalizeAndHash(normalized)
             }
-            await passcodesContainer.updateAsync(normalized, async (entry8: JsonBuilder) => {
+            await passcodesContainer.updateAsync(normalized, async(entry8: JsonBuilder) => {
                 assert(td.stringContains(entry8["permissions"], ","), "");
                 entry8["permissions"] = req11.body["permissions"];
             });
         }
-        , async () => {
-        });
+            , async() => {
+            });
         req11.response = ({});
     });
-    core.addRoute("POST", "generatecodes", "", async (req12: core.ApiRequest) => {
+    core.addRoute("POST", "generatecodes", "", async(req12: core.ApiRequest) => {
         let perm1 = core.normalizePermissions(td.toString(req12.body["permissions"]));
         let grps = orEmpty(req12.body["groups"]);
         let addperm = "";
@@ -470,13 +466,13 @@ export async function initAsync() : Promise<void>
                 data: numCodes + "x" + credit1 + perm1,
                 newvalue: req12.body
             });
-            await parallel.forAsync(numCodes, async (x2: number) => {
+            await parallel.forAsync(numCodes, async(x2: number) => {
                 let id = cachedStore.freshShortId(12);
                 if (req12.body.hasOwnProperty("code")) {
                     id = td.toString(req12.body["code"]);
                 }
                 let s3 = core.normalizeAndHash(id);
-                await passcodesContainer.updateAsync(s3, async (entry9: JsonBuilder) => {
+                await passcodesContainer.updateAsync(s3, async(entry9: JsonBuilder) => {
                     entry9["kind"] = "activationcode";
                     entry9["userid"] = req12.userid;
                     if (perm1 != "") {
@@ -498,8 +494,8 @@ export async function initAsync() : Promise<void>
             req12.response = fetchResult1.toJson();
         }
     });
-    
-    core.addRoute("POST", "*user", "settings", async (req4: core.ApiRequest) => {
+
+    core.addRoute("POST", "*user", "settings", async(req4: core.ApiRequest) => {
         let logcat = "admin-settings";
         let updateOwn = false;
         if (req4.rootId == req4.userid) {
@@ -521,7 +517,7 @@ export async function initAsync() : Promise<void>
         }
         if (req4.status == 200) {
             let bld = await users.reindexAsync(req4.rootId, async(entry: IUser) => {
-                let sett = await buildSettingsAsync(entry);                
+                let sett = await buildSettingsAsync(entry);
                 let newEmail = td.toString(req4.body["email"]);
                 if (newEmail != null) {
                     if (updateOwn) {
@@ -537,7 +533,7 @@ export async function initAsync() : Promise<void>
                                 "      " + core.self + "verify/" + req4.rootId + "/" + id + "\n\n" +
                                 "Thanks!\n";
                             /* async */ nodemailer.sendAsync(newEmail, core.serviceSettings.emailFrom,
-                                    "email verification on " + core.myHost, txt)
+                                "email verification on " + core.myHost, txt)
                                 .then(() => { }, e => {
                                     logger.info(`nodemailer send failed: ${newEmail}: ${e.message}`)
                                 })
@@ -550,11 +546,11 @@ export async function initAsync() : Promise<void>
                         entry.emailcode = "";
                     }
                 }
-                
-                let settings = sett.toJson();                
-                core.setFields(settings, req4.body, ["aboutme", "culture", "editorMode", "emailfrequency", "emailnewsletter2", 
-                    "gender", "howfound", "location", "nickname", "notifications", "notifications2", "occupation", "picture", 
-                    "programmingknowledge", "realname", "school", "twitterhandle", "wallpaper", 
+
+                let settings = sett.toJson();
+                core.setFields(settings, req4.body, ["aboutme", "culture", "editorMode", "emailfrequency", "emailnewsletter2",
+                    "gender", "howfound", "location", "nickname", "notifications", "notifications2", "occupation", "picture",
+                    "programmingknowledge", "realname", "school", "twitterhandle", "wallpaper",
                     "website", "yearofbirth", "avatar"]);
                 applyUserSettings(entry, settings);
                 if (req4.body["picturelinkedtofacebook"]) {
@@ -565,31 +561,45 @@ export async function initAsync() : Promise<void>
                 }
                 req4.response = settings;
             });
-            await search.scanAndSearchAsync(bld);            
+            await search.scanAndSearchAsync(bld);
             await audit.logAsync(req4, logcat, {
                 oldvalue: req4.rootPub,
                 newvalue: td.clone(bld)
             });
         }
     });
-    core.addRoute("GET", "*user", "settings", async (req5: core.ApiRequest) => {
-        if (req5.rootId == req5.userid) {
+    core.addRoute("GET", "*user", "settings", async(req: core.ApiRequest) => {
+        if (req.rootId == req.userid) {
         }
         else {
-            await core.checkFacilitatorPermissionAsync(req5, req5.rootId);
+            await core.checkFacilitatorPermissionAsync(req, req.rootId);
         }
-        if (req5.status == 200) {
-            if (req5.userid != req5.rootId) {
-                await audit.logAsync(req5, "view-settings");
+
+        if (req.status == 200) {
+            let fmt = orEmpty(req.queryOptions["format"])
+            let noPrivate = fmt == "nonsensitive" || (fmt == "short" && /\/me\//.test(req.origUrl))
+            let noOptions = fmt == "short" || fmt == "sensitive" || noPrivate
+            if (!noPrivate &&
+                core.serviceSettings.sensitiveTokenExpiration &&
+                await core.nowSecondsAsync() - req.userinfo.token.time > core.serviceSettings.sensitiveTokenExpiration) {
+                if (fmt == "sensitive")
+                    req.status = 452;
+                else
+                    req.status = 401;
+                return;
             }
-            let jsb = (await buildSettingsAsync(req5.rootUser())).toJson();
-            if (orEmpty(req5.queryOptions["format"]) != "short") {
+
+            if (req.userid != req.rootId) {
+                await audit.logAsync(req, "view-settings");
+            }
+            let jsb = (await buildSettingsAsync(req.rootUser(), noPrivate)).toJson();
+            if (!noOptions) {
                 core.copyJson(settingsOptionsJson, jsb);
             }
-            req5.response = jsb;
+            req.response = jsb;
         }
     });
-    
+
     core.addRoute("POST", "*user", "picture", async(req) => {
         core.meOnly(req);
         if (req.status != 200) return;
@@ -602,7 +612,7 @@ export async function initAsync() : Promise<void>
             req.status = httpCode._413RequestEntityTooLarge;
             return;
         }
-        let picid = req.rootUser().id + "-" + td.createRandomId(6).toLowerCase();        
+        let picid = req.rootUser().id + "-" + td.createRandomId(6).toLowerCase();
         await userpicContainer.createBlockBlobFromBufferAsync(picid + "-0.jpg", buf, {
             contentType: "image/jpeg",
             cacheControl: "public, max-age=900"
@@ -633,15 +643,15 @@ export async function initAsync() : Promise<void>
             }
         });
         if (req.status != 200) return;
-        
+
         await updateAsync(req.rootId, async(v) => {
             v.picturePrefix = "pf:" + picid
         })
-        
+
         req.response = {}
-        
+
     }, { noSizeCheck: true })
-    
+
     core.addRoute("DELETE", "*user", "picture", async(req) => {
         core.meOnly(req);
         if (req.status != 200) return;
@@ -650,7 +660,7 @@ export async function initAsync() : Promise<void>
         })
         req.response = {}
     })
-    
+
     core.addRoute("GET", "*user", "picture", async(req) => {
         let u = req.rootUser()
         let type = core.withDefault(req.queryOptions["type"], "original").toLowerCase()
@@ -662,7 +672,7 @@ export async function initAsync() : Promise<void>
         if (/^fb:/.test(pref))
             url = "https://graph.facebook.com/v2.5/" + pref.slice(3) + "/picture?type=" + (desc.fbtype || desc.type)
         else if (/^pf:/.test(pref))
-            url = core.currClientConfig.primaryCdnUrl + "/pic/" + pref.slice(3) + "-" + desc.id + ".jpg"        
+            url = core.currClientConfig.primaryCdnUrl + "/pic/" + pref.slice(3) + "-" + desc.id + ".jpg"
         req.status = httpCode._302MovedTemporarily;
         req.headers = {
             "location": url
@@ -674,7 +684,7 @@ export async function initAsync() : Promise<void>
         let u = req.rootUser();
         if (!u.login) {
             req.status = httpCode._412PreconditionFailed;
-            return;            
+            return;
         }
         let logins = (u.altLogins || [])
         let inclPrimary = !!req.queryOptions["primary"];
@@ -684,7 +694,7 @@ export async function initAsync() : Promise<void>
             await passcodesContainer.updateAsync(login, async(v) => {
                 v["userid"] = "";
             })
-        }    
+        }
         await updateAsync(req.rootId, async(v) => {
             if (inclPrimary)
                 delete v.login;
@@ -692,11 +702,11 @@ export async function initAsync() : Promise<void>
         })
         req.response = {};
     });
-    
+
     core.addRoute("GET", "users", "admin", async(req: core.ApiRequest) => {
         if (!core.checkPermission(req, "operator,user-mgmt")) return;
-        let lst = await users.getIndex("all").fetchAsync("all", req.queryOptions);        
-        lst.items = lst.items.filter((u: IUser) => core.isAlarming(u.permissions) && !!u.login);        
+        let lst = await users.getIndex("all").fetchAsync("all", req.queryOptions);
+        lst.items = lst.items.filter((u: IUser) => core.isAlarming(u.permissions) && !!u.login);
         let dict = td.toDictionary(lst.items, e => td.toString(e["id"]))
         await core.resolveAsync(users, lst, req);
         for (let it of lst.items) {
@@ -724,8 +734,7 @@ export function applyUserSettings(userjson: IUser, settings: {}) {
     userjson.pub.avatar = sett.avatar;
 }
 
-export function normalizeUser(v: IUser)
-{
+export function normalizeUser(v: IUser) {
     if (!v || v.kind != "user") return
     if (!v.groups) v.groups = {};
     if (!v.owngroups) v.owngroups = {};
@@ -736,26 +745,23 @@ export function normalizeUser(v: IUser)
     v.notifications = core.orZero(v.notifications);
 }
 
-export async function updateAsync(id:string, f:(v:IUser) => Promise<void>)
-{
+export async function updateAsync(id: string, f: (v: IUser) => Promise<void>) {
     return <IUser>await core.pubsContainer.updateAsync(id, async(v: IUser) => {
         normalizeUser(v);
-        await f(v);  
+        await f(v);
     })
 }
 
-export async function getAsync(id:string)
-{
+export async function getAsync(id: string) {
     let r = <IUser>await core.getPubAsync(id, "user");
     normalizeUser(r)
     return r
 }
 
-export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRequest) : void
-{
+export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRequest): void {
     let coll = (<PubUser[]>[]);
     if (orFalse(req.queryOptions["imported"])) {
-        entities.items = td.arrayToJson(asArray(entities.items).filter(elt => ! elt["login"]));
+        entities.items = td.arrayToJson(asArray(entities.items).filter(elt => !elt["login"]));
     }
     for (let jsb0 of entities.items) {
         let jsb = <IUser>jsb0;
@@ -764,7 +770,7 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
         user.fromJson(jsb.pub);
         user.id = jsb.id;
         user.kind = jsb.kind;
-        if ( ! core.fullTD) {
+        if (!core.fullTD) {
             user.time = 0;
         }
         user.isadult = core.hasPermission(jsb, "adult");
@@ -773,10 +779,9 @@ export function resolveUsers(entities: indexedStore.FetchResult, req: core.ApiRe
     entities.items = td.arrayToJson(coll);
 }
 
-function getFacebookId(u: IUser)
-{
+function getFacebookId(u: IUser) {
     if (!core.fullTD) return null
-    
+
     let logins = [u.login]
     if (u.altLogins)
         logins = logins.concat(u.altLogins);
@@ -787,8 +792,7 @@ function getFacebookId(u: IUser)
     return null
 }
 
-export async function buildSettingsAsync(userJson: IUser) : Promise<PubUserSettings>
-{
+export async function buildSettingsAsync(userJson: IUser, noPrivate = false): Promise<PubUserSettings> {
     let settings = new PubUserSettings();
     let user = new PubUser();
     user.fromJson(userJson.pub);
@@ -798,7 +802,10 @@ export async function buildSettingsAsync(userJson: IUser) : Promise<PubUserSetti
         for (let kk of Object.keys(jsb)) {
             let vv = jsb[kk];
             if (td.startsWith(orEmpty(vv), "EnC$")) {
-                jsb[kk] = core.decrypt(vv);
+                if (noPrivate)
+                    jsb[kk] = "";
+                else
+                    jsb[kk] = core.decrypt(vv);
             }
         }
         settings.fromJson(td.clone(jsb));
@@ -825,20 +832,18 @@ export async function buildSettingsAsync(userJson: IUser) : Promise<PubUserSetti
     return settings;
 }
 
-export interface IRedirectAndCookie
-{
-    url:string;
-    cookie:string;
+export interface IRedirectAndCookie {
+    url: string;
+    cookie: string;
 }
 
-async function setPasswordAsync(req: core.ApiRequest, pass: string, prevPass: string) : Promise<void>
-{
+async function setPasswordAsync(req: core.ApiRequest, pass: string, prevPass: string): Promise<void> {
     pass = core.normalizeAndHash(pass);
-    if (! prevPass) {
+    if (!prevPass) {
         prevPass = pass;
     }
     let ok = false;
-    await passcodesContainer.updateAsync(pass, async (entry: JsonBuilder) => {
+    await passcodesContainer.updateAsync(pass, async(entry: JsonBuilder) => {
         let kind = orEmpty(entry["kind"]);
         if (kind == "" || kind == "reserved") {
             entry["kind"] = "userpointer";
@@ -850,11 +855,11 @@ async function setPasswordAsync(req: core.ApiRequest, pass: string, prevPass: st
         }
     });
     if (ok) {
-        await updateAsync(req.rootId, async (entry1) => {
+        await updateAsync(req.rootId, async(entry1) => {
             entry1.login = pass;
         });
         if (prevPass != pass) {
-            await passcodesContainer.updateAsync(prevPass, async (entry2: JsonBuilder) => {
+            await passcodesContainer.updateAsync(prevPass, async(entry2: JsonBuilder) => {
                 entry2["kind"] = "reserved";
             });
         }
@@ -865,8 +870,7 @@ async function setPasswordAsync(req: core.ApiRequest, pass: string, prevPass: st
     }
 }
 
-async function sendPermissionNotificationAsync(req: core.ApiRequest, r: IUser) : Promise<void>
-{
+async function sendPermissionNotificationAsync(req: core.ApiRequest, r: IUser): Promise<void> {
     await core.refreshSettingsAsync();
     if (core.isAlarming(r.permissions)) {
         if (!r.settings)
@@ -879,15 +883,14 @@ async function sendPermissionNotificationAsync(req: core.ApiRequest, r: IUser) :
             body = "Permissions set by: " + entry2.pub.name + " " + core.self + req.userid;
         }
         body = body + "\n\nTarget user: " + core.self + r.id;
-        await parallel.forJsonAsync(core.serviceSettings.alarmingEmails, async (json: JsonObject) => {
+        await parallel.forJsonAsync(core.serviceSettings.alarmingEmails, async(json: JsonObject) => {
             let email = td.toString(json);
             await sendgrid.sendAsync(email, "noreply@touchdevelop.com", subj, body);
         });
     }
 }
 
-async function importUserAsync(req: core.ApiRequest, body: JsonObject) : Promise<void>
-{
+async function importUserAsync(req: core.ApiRequest, body: JsonObject): Promise<void> {
     let user = new PubUser();
     user.fromJson(body);
     user.url = "";
@@ -898,24 +901,23 @@ async function importUserAsync(req: core.ApiRequest, body: JsonObject) : Promise
     user.score = 0;
     user.haspicture = false;
 
-    let jsb:IUser = <any> {};
+    let jsb: IUser = <any>{};
     jsb.pub = <IPubUser>user.toJson();
     jsb.id = user.id;
     jsb.secondaryid = cachedStore.freshShortId(12);
-    await users.insertAsync(jsb);    
+    await users.insertAsync(jsb);
     await tdliteLegacy.importSettingsAsync(jsb);
 }
 
-export async function createNewUserAsync(username: string, email: string, profileId: string, perms: string, realname: string, awaiting: boolean) : Promise<IUser>
-{
-    let userjs:IUser = <any>{};
+export async function createNewUserAsync(username: string, email: string, profileId: string, perms: string, realname: string, awaiting: boolean): Promise<IUser> {
+    let userjs: IUser = <any>{};
     let pubUser = new PubUser();
     pubUser.name = username;
     let settings = new PubUserSettings();
     settings.email = core.encrypt(email, emailKeyid);
     settings.realname = core.encrypt(realname, emailKeyid);
     settings.emailverified = orEmpty(settings.email) != "";
-    userjs.pub = <IPubUser> pubUser.toJson();
+    userjs.pub = <IPubUser>pubUser.toJson();
     userjs.settings = settings.toJson();
     userjs.login = profileId;
     userjs.permissions = perms;
@@ -927,12 +929,12 @@ export async function createNewUserAsync(username: string, email: string, profil
     // enable picture by default    
     let fbid = getFacebookId(userjs)
     if (fbid) userjs.picturePrefix = "fb:" + fbid;
-    
+
     let dictionary = core.setBuilderIfMissing(userjs, "groups");
     let dictionary2 = core.setBuilderIfMissing(userjs, "owngroups");
     await core.generateIdAsync(userjs, core.fullTD ? 4 : 8);
     await users.insertAsync(userjs);
-    await passcodesContainer.updateAsync(profileId, async (entry: JsonBuilder) => {
+    await passcodesContainer.updateAsync(profileId, async(entry: JsonBuilder) => {
         entry["kind"] = "userpointer";
         entry["userid"] = userjs["id"];
     });
@@ -970,8 +972,7 @@ export async function setProfileIdFromLegacyAsync(uid: string, profileId: string
     return true;
 }
 
-export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passId: string, auditReq: core.ApiRequest) : Promise<void>
-{
+export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passId: string, auditReq: core.ApiRequest): Promise<void> {
     let userid = userjson.id;
     let credit = codeObj["credit"];
     let singleCredit = codeObj["singlecredit"];
@@ -982,16 +983,16 @@ export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passI
     await updateAsync(userid, async(entry: IUser) => {
         entry.credit += credit;
         entry.totalcredit += credit;
-        if ( ! core.hasPermission(entry, perm)) {
+        if (!core.hasPermission(entry, perm)) {
             let existing = core.normalizePermissions(orEmpty(entry.permissions));
             entry.permissions = existing + "," + perm;
         }
-        if (! entry.firstcode) {
+        if (!entry.firstcode) {
             entry.firstcode = passId;
         }
         await sendPermissionNotificationAsync(core.emptyRequest, entry);
     });
-    await passcodesContainer.updateAsync(passId, async (entry1: JsonBuilder) => {
+    await passcodesContainer.updateAsync(passId, async(entry1: JsonBuilder) => {
         entry1["credit"] = entry1["credit"] - credit;
     });
     await audit.logAsync(auditReq, "apply-code", {
@@ -1011,8 +1012,7 @@ export async function applyCodeAsync(userjson: IUser, codeObj: JsonObject, passI
     }
 }
 
-export async function handleEmailVerificationAsync(req: restify.Request, res: restify.Response) : Promise<void>
-{
+export async function handleEmailVerificationAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let lang = await tdlitePointers.handleLanguageAsync(req);
     let coll = (/^\/verify\/([a-z]+)\/([a-z]+)/.exec(req.url()) || []);
     let userJs = await getAsync(coll[1]);
@@ -1025,7 +1025,7 @@ export async function handleEmailVerificationAsync(req: restify.Request, res: re
     }
     else {
         msg = core.translateMessage("Thank you, your email was updated.", lang);
-        await updateAsync(userJs.id, async (entry) => {
+        await updateAsync(userJs.id, async(entry) => {
             let jsb = entry["settings"];
             jsb["emailverified"] = true;
             jsb["previousemail"] = "";

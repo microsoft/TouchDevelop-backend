@@ -107,6 +107,7 @@ export var artContentTypes: td.SMap<string> =
       "text/plain": "txt",
       "application/pdf": "pdf",
       "video/mp4": "mp4",
+      "text/markdown": "md",      
       "application/x-zip-compressed": "zip",
       "application/x-msdownload": "exe",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",

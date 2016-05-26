@@ -11,6 +11,7 @@ import * as zlib from 'zlib';
 import * as restify from './restify';
 import * as parallel from './parallel';
 import * as tdliteData from './tdlite-data';
+import * as tdliteDocs from './tdlite-docs';
 
 var uploadCache: td.SMap<string> = {};
 var uploadPromises: td.SMap<Promise<string>> = {};
@@ -133,7 +134,7 @@ async function uploadArtAsync(fn: string): Promise<string> {
     req.setMethod("post")
     let resp = await req.sendAsync();
     if (resp.statusCode() != 200) {
-        error("bad status code: " + resp.toString())
+        error("bad status code: " + resp.toString() + " / fn: " + fn)
         return ""
     }
 
@@ -211,19 +212,30 @@ async function uploadFileAsync(fn: string) {
         let m = /\/pub\/([a-z]+)/.exec(bloburl)
         let id = m[1]
         let path = fn.replace(/\.html$/, "")
+        let field = "artid"
+        if (path != fn)
+            field = "htmlartid"
+        else
+            path = fn.replace(/\.md$/, "")
         let curr = await getPtrAsync(path);
 
-        if (curr && curr["htmlartid"] == id) {
+        if (curr && curr[field] == id) {
             console.log(`${fn}: already set to ${id}`)
             return
         }
 
         let req = mkReq("pointers")
         req.setMethod("post")
-        req.setContentAsJson({
+        let data = {
             path: path,
-            htmlartid: id
-        })
+            htmlartid: "",
+            artid: "",
+            scriptid: "",
+            releaseid: "",
+            redirect: ""
+        }
+        data[field] = id
+        req.setContentAsJson(data);
         let resp = await req.sendAsync();
         console.log(`${fn}: ${id} -> ${resp.statusCode() }`)
     }
@@ -276,12 +288,21 @@ async function serveAsync() {
         if (/^(\/[\w][\w\.\-]+)+$/.test(fn)) {
             if (fs.existsSync("web" + fn + ".html"))
                 fn += ".html"
+            else if (fs.existsSync("web" + fn + ".md"))
+                fn += ".md"
             if (fs.existsSync("web" + fn)) {
                 if (/^\/static\//.test(fn)) {
                     res.sendBuffer(fs.readFileSync("web" + fn),
                         mimeType(fn) || "application/octet-stream", {});
                 } else {
-                    let tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
+                    let tmp = ""
+                    if (/\.md$/.test(fn)) {
+                        let vars = tdliteDocs.renderMarkdown(fs.readFileSync("web" + fn, "utf8"))
+                        let templ = nunjucks.render("templates/docs.html", { somevar: 1 })
+                        tmp = tdliteDocs.injectHtml(templ, vars)
+                    } else {
+                        tmp = nunjucks.render(fn.replace(/^\/+/, ""), { somevar: 1 })
+                    }    
                     res.html(tmp)
                 }
             } else {
