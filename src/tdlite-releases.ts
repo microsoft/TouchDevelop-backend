@@ -637,6 +637,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     let cfgStr = JSON.stringify(ccfg, null, 4)
     ccfg["cfg"] = cfgStr
     ccfg["manifest"] = manifest ? `manifest="${manifest}"` : ""
+    ccfg["targetname"] = baseRel.name;
 
     text = text.replace(/@(\w+)@/g, (f, id) => {
         if (ccfg.hasOwnProperty(id)) return ccfg[id]
