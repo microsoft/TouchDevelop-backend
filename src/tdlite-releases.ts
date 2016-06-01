@@ -631,6 +631,8 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
         targetRelId: prel.id,
         targetCdnUrl: appCdn + prel.id + "/c/",
         targetId: prel.target,
+        runUrl: relprefix + "run",
+        docsUrl: relprefix + "docs",
         simUrl: `https://trg-${prel.target}.${simdom}${relprefix}simulator`
     }
 
