@@ -1007,6 +1007,7 @@ function legacyKindPrefix(name: string) {
 var subFiles = {
     embed: "embed.js",
     run: "run.html",
+    docs: "docs.html",
     manifest: "release.manifest",
     worker: "worker.js",
     tdworker: "tdworker.js",

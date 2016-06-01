@@ -169,7 +169,7 @@ export async function initAsync(): Promise<void> {
             let key = "rel-" + rel.releaseid;
 
             if (rel.baserelease && !rel.type) {
-                let files = ["index.html", "worker.js", "embed.js", "run.html", "release.manifest"]
+                let files = ["index.html", "worker.js", "embed.js", "run.html", "docs.html", "release.manifest"]
                 let cdnUrl = core.currClientConfig.primaryCdnUrl + "/app/" + rel.baserelease + "/c/"
                 for (let fn of files) {
                     let res = await appContainer.getBlobToTextAsync(rel.baserelease + "/" + fn)
