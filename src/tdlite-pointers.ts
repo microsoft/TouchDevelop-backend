@@ -1045,12 +1045,16 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
     let baseDir = fn.replace(/[\/-].*/, "")
     let redirDomain = domainOfTarget(baseDir)
+    let host = (req.header("host") || "").toLowerCase()
+    let redirs = core.serviceSettings.redirDomains
+    if (!redirDomain && redirs.hasOwnProperty(host)) {
+        redirDomain = redirs[host]
+    }
     if (redirDomain) {
         res.redirect(httpCode._301MovedPermanently, "https://" + redirDomain + "/" + req.url().slice(baseDir.length + 2))
         return
     }
 
-    let host = (req.header("host") || "").toLowerCase()
     let vhostDirName = ""
     let hasVhosts = false
     let simulatorDomain = ""

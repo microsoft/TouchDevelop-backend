@@ -110,6 +110,7 @@ export class ServiceSettings
     @td.json public envrewrite: JsonObject;
     @td.json public blockedAuth: string[];
     @td.json public domains: td.SMap<string> = {};
+    @td.json public redirDomains: td.SMap<string> = {};
     @td.json public targetsDomain: string;
     static createFromJson(o: JsonObject) { let r = new ServiceSettings(); r.fromJson(o); return r; }
 }
@@ -1603,7 +1604,8 @@ export async function refreshSettingsAsync(): Promise<void> {
         "envrewrite": {},
         "alarmingEmails": [],
         "blockedAuth": [],
-        "domains": {}
+        "domains": {},
+        redirDomains: {}
     };
     td.jsonCopyFrom(jsb, entry2);
     serviceSettings = ServiceSettings.createFromJson(td.clone(jsb));
