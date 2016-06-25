@@ -383,17 +383,18 @@ export async function initAsync(): Promise<void> {
             w = Math.floor(w)
             h = Math.floor(h)
 
+            let self = targetSelf(target)
             req.response = {
                 "version": "1.0",
                 "type": "rich",
                 "provider_name": "PXT/" + target,
-                "provider_url": core.self,
+                "provider_url": self,
                 "width": w,
                 "height": h,
                 "title": scr["pub"]["name"],
                 // "author_name": "...", // TODO
-                "author_url": core.self + scr["pub"]["userid"],
-                "html": `<iframe width="${w}" height="${h}" src="${core.self}${scr["id"]}/embed" frameborder="0"></iframe>`
+                "author_url": self + scr["pub"]["userid"],
+                "html": `<iframe width="${w}" height="${h}" src="${self}${scr["id"]}/embed" frameborder="0"></iframe>`
             }
 
             if (fmt == "xml") {
@@ -959,10 +960,11 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
             pub["byuser"] = core.translateMessage("by", lang) + " " + pub["username"]
         }
 
+        let self = targetSelf(targetName)
         pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
-        pub["oembedurl"] = `${core.self}api/oembed?url=${encodeURIComponent(core.self + req.rootId)}`
+        pub["oembedurl"] = `${self}api/oembed?url=${encodeURIComponent(self + req.rootId)}`
         pub["title"] = pub["name"]
-        
+
         let templTxt = await getTemplateTextAsync(templ, lang)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
@@ -1022,6 +1024,11 @@ function domainOfTarget(trg: string) {
         if (trg == path) return domain;
     }
     return null
+}
+
+function targetSelf(trg: string) {
+    let d = domainOfTarget(trg) || core.myHost
+    return "https://" + d + "/"
 }
 
 function splitLang(path: string) {
