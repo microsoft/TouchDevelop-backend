@@ -112,6 +112,7 @@ export class ServiceSettings
     @td.json public domains: td.SMap<string> = {};
     @td.json public redirDomains: td.SMap<string> = {};
     @td.json public targetsDomain: string;
+    @td.json public embedLogo: string;
     static createFromJson(o: JsonObject) { let r = new ServiceSettings(); r.fromJson(o); return r; }
 }
 

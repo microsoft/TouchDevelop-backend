@@ -630,7 +630,13 @@ async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string[], 
         })
     breadcrumb.reverse()
 
-    return tdliteDocs.renderMarkdown(templ, textObj, theme, {}, breadcrumb)
+    let pubinfo = {
+        title: artobj["pub"]["scriptname"],
+        description: artobj["pub"]["scriptdescription"]
+    }
+    fixupPubForRender(pubinfo, theme)
+
+    return tdliteDocs.renderMarkdown(templ, textObj, theme, pubinfo, breadcrumb)
 }
 
 async function getArtTextAsync(artobj: {}) {
@@ -937,6 +943,13 @@ async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string
     v.text = tdliteDocs.renderMarkdown(templTxt, "", theme, pub)
 }
 
+function fixupPubForRender(pub: {}, theme: any) {
+    if (!pub["description"])
+        pub["description"] = theme.title || "N/A"
+    if (!pub["image"])
+        pub["image"] = theme.embedLogo || core.serviceSettings.embedLogo || "[embedLogo not set in /api/config/settings]"
+}
+
 async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string[]) {
     let req = core.buildApiRequest("/api")
     req.rootId = scriptjson["id"];    // this is to make sure we show hidden scripts
@@ -964,7 +977,7 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
         pub["oembedurl"] = `${self}api/oembed?url=${encodeURIComponent(self + req.rootId)}`
         pub["title"] = pub["name"]
-
+        fixupPubForRender(pub, theme)
         let templTxt = await getTemplateTextAsync(templ, lang)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
