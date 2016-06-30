@@ -631,8 +631,8 @@ async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string[], 
     breadcrumb.reverse()
 
     let pubinfo = {
-        title: artobj["pub"]["scriptname"],
-        description: artobj["pub"]["scriptdescription"]
+        title: ptr.scriptname,
+        description: ptr.scriptdescription
     }
     fixupPubForRender(pubinfo, theme)
 
@@ -947,7 +947,17 @@ function fixupPubForRender(pub: {}, theme: any) {
     if (!pub["description"])
         pub["description"] = theme.title || "N/A"
     if (!pub["image"])
-        pub["image"] = theme.embedLogo || core.serviceSettings.embedLogo || "[embedLogo not set in /api/config/settings]"
+        pub["image"] = theme.cardLogo || core.serviceSettings.cardLogo || "[cardLogo not set in /api/config/settings]"
+    let skipProps = {
+        name: 1,
+        title: 1,
+    }
+    for (let k of Object.keys(theme)) {
+        if (skipProps[k]) continue
+        let v = theme[k]
+        if (typeof v == "string" && pub[k] == undefined)
+            pub[k] = v
+    }
 }
 
 async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string[]) {
