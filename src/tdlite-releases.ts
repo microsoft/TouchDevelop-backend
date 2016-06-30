@@ -148,6 +148,9 @@ export async function initAsync(): Promise<void> {
             if (!core.isValidTargetName(rel.target)) rel.target = ""
             rel.type = orEmpty(req.body["type"]) && baseRel ? "target" : ""
 
+            if (!baseid && req.body["type"] === "fulltarget")
+                rel.type = "fulltarget"
+
             if (core.pxt) {
                 rel.releaseid = ""
             } else {
@@ -577,6 +580,7 @@ function getSimUrl(trg: string, relid: string) {
     return `https://trg-${trg}.${dom}/sim/${relid}`
 }
 
+// The one used for PXT.IO releases
 export async function getRewrittenIndexAsync(relprefix: string, id: string, srcFile: string) {
     let sanitize = (s: string) => s.replace(/[^\w \.\-\/]/g, "_")
 
@@ -600,7 +604,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
 
     let baserelid = prel.releaseid
 
-    let baseRelJson = await core.getPubAsync(prel.baserelease, "release")
+    let baseRelJson = prel.type == "fulltarget" ? relpub : await core.getPubAsync(prel.baserelease, "release")
     if (!baseRelJson)
         return "Base release deleted: " + prel.baserelease
     let baseRel = PubRelease.createFromJson(baseRelJson["pub"])
@@ -616,7 +620,6 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     let domain = core.serviceSettings.domains[prel.target] || core.myHost
 
     let simCdn = core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/"
-    let trgCdn = + baserelid + "/c/"
 
     let simdom = core.serviceSettings.targetsDomain
     let appCdn = core.currClientConfig.primaryCdnUrl + "/app/"
