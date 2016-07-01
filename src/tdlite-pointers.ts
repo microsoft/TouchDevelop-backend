@@ -946,8 +946,6 @@ async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string
 function fixupPubForRender(pub: {}, theme: any) {
     if (!pub["description"])
         pub["description"] = theme.title || "N/A"
-    if (!pub["image"])
-        pub["image"] = theme.cardLogo || core.serviceSettings.cardLogo || "[cardLogo not set in /api/config/settings]"
     let skipProps = {
         name: 1,
         title: 1,
