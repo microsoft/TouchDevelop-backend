@@ -476,6 +476,7 @@ var ts;
                         case "woff": return "application/font-woff";
                         case "woff2": return "application/font-woff2";
                         case "md": return "text/markdown";
+                        case "xml": return "application/xml";
                         default: return "application/octet-stream";
                     }
                 else
@@ -495,7 +496,18 @@ var ts;
             Util.guidGen = guidGen;
             var _localizeLang = "en";
             var _localizeStrings = {};
-            function _localize(s, account) {
+            /**
+             * Returns current user language iSO-code. Default is `en`.
+             */
+            function userLanguage() {
+                return _localizeLang;
+            }
+            Util.userLanguage = userLanguage;
+            function userLanguageRtl() {
+                return /^ar|iw/i.test(_localizeLang);
+            }
+            Util.userLanguageRtl = userLanguageRtl;
+            function _localize(s) {
                 return _localizeStrings[s] || s;
             }
             Util._localize = _localize;
@@ -606,7 +618,7 @@ var ts;
             Util.fmt = fmt;
             var sForPlural = true;
             function lf_va(format, args) {
-                var lfmt = Util._localize(format, true);
+                var lfmt = Util._localize(format);
                 if (!sForPlural && lfmt != format && /\d:s\}/.test(lfmt)) {
                     lfmt = lfmt.replace(/\{\d+:s\}/g, "");
                 }
@@ -885,6 +897,7 @@ var pxt;
                 cmd: "### @youtube $1"
             },
         ];
+        docs.requireMarked = function () { return require("marked"); };
         function renderMarkdown(template, src, theme, pubinfo, breadcrumb) {
             if (theme === void 0) { theme = {}; }
             if (pubinfo === void 0) { pubinfo = null; }
@@ -913,6 +926,11 @@ var pxt;
             var error = function (s) {
                 return ("<div class='ui negative message'>" + htmlQuote(s) + "</div>");
             };
+            template = template
+                .replace(/<!--\s*@include\s+(\S+)\s*-->/g, function (full, fn) {
+                var cont = (theme.htmlDocIncludes || {})[fn] || "";
+                return "<!-- include " + fn + " -->\n" + cont + "\n<!-- end include -->\n";
+            });
             template = template.replace(/<aside\s+([^<>]+)>([^]*?)<\/aside>/g, function (full, attrsStr, body) {
                 var attrs = parseHtmlAttrs(attrsStr);
                 var name = attrs["data-name"] || attrs["id"];
@@ -936,10 +954,10 @@ var pxt;
                 return "<!-- macro " + name + " -->";
             });
             if (!marked) {
-                marked = require("marked");
+                marked = docs.requireMarked();
                 var renderer = new marked.Renderer();
                 renderer.image = function (href, title, text) {
-                    var out = '<img class="ui centered image" src="' + href + '" alt="' + text + '"';
+                    var out = '<img class="ui image" src="' + href + '" alt="' + text + '"';
                     if (title) {
                         out += ' title="' + title + '"';
                     }
@@ -1088,6 +1106,8 @@ var pxt;
         docs.renderMarkdown = renderMarkdown;
         function injectHtml(template, vars, quoted) {
             if (quoted === void 0) { quoted = []; }
+            if (!template)
+                return '';
             return template.replace(/@(\w+)@/g, function (f, key) {
                 var res = U.lookup(vars, key) || "";
                 res += ""; // make sure it's a string
@@ -1101,4 +1121,3 @@ var pxt;
 })(pxt || (pxt = {}));
 /// <reference path="../pxtlib/docsrender.ts"/>
 global.pxt = pxt;
-//# sourceMappingURL=backendutils.js.map
