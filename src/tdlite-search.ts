@@ -132,6 +132,8 @@ export async function scanAndSearchAsync(obj: JsonBuilder, options_: IScanAndSea
         let userjson = await tdliteUsers.getAsync(pub["userid"]);
         await tdliteAbuse.scanAndPostAsync(pub["id"], text, desc, userjson);
 
+        /* async */ tdliteAbuse.cvsScanAsync(pub, desc + " " + text, pub["pictureurl"])
+
         if (acsCallbackUrl) {
             text = desc + " " + text;
             /* async */ acs.validateTextAsync(pub["id"], text, acsCallbackUrl);

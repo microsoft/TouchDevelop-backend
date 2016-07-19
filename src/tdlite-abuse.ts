@@ -8,7 +8,7 @@ import * as assert from 'assert';
 type JsonObject = td.JsonObject;
 type JsonBuilder = td.JsonBuilder;
 
-
+import * as restify from "./restify"
 import * as parallel from "./parallel"
 import * as indexedStore from "./indexed-store"
 import * as core from "./tdlite-core"
@@ -161,6 +161,41 @@ export async function initAsync() : Promise<void>
         })
     });
 
+    restify.server().post("/api/takedown", async (req, res) => {
+        let id = orEmpty(req.query()["id"])
+        let key = orEmpty(req.query()["key"])
+        let apireq = core.buildApiRequest("/api/" + id + "/takedown");
+        let pub = await core.pubsContainer.getAsync(id);
+        apireq.rootPub = pub
+
+        if (!core.isGoodEntry(pub) || takedownKey(id) != key) {
+            res.sendError(404, "No such item")
+        } else {
+            let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
+            await core.setReqUserIdAsync(apireq, uid);
+            apireq.body = {};
+            apireq.rootId = id;
+            await audit.logAsync(apireq, "takedown", {
+                oldvalue: await audit.auditDeleteValueAsync(apireq.rootPub)
+            });
+            await deletePubRecAsync(pub)
+            res.json({})
+        }
+    })
+
+    restify.server().post("/api/cvscallback", async (req, res) => {
+        let body = req.bodyAsJson()
+        if (Buffer.isBuffer(body))
+            body = JSON.parse((body as any).toString("utf8"))
+        let id = orEmpty(req.query()["id"])
+        let key = orEmpty(req.query()["key"])
+
+        let isValid = key == takedownKey("cb:" + id)
+
+        logger.debug("CVS callback: valid=" + isValid + " - " + JSON.stringify(body, null, 1))
+        res.json({})
+    })
+
     core.addRoute("POST", "*abusereport", "", async (req: core.ApiRequest) => {
         let pub = req.rootPub["pub"];
         // any-facilitator is good enough to update any abuse report, even about users on higher level
@@ -300,6 +335,83 @@ async function deletePubRecAsync(delEntry: JsonObject) : Promise<void>
 
         }
     }
+}
+
+function takedownKey(id: string) {
+    return core.sha256(core.tokenSecret + ":takedown:" + id)
+}
+
+export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
+    let tok = td.serverSetting("CVS_TOKEN", true)
+    if (!tok) return
+    if (pub["kind"] == "user")
+        return // no automatic deletion of user accounts
+    let id: string = pub["id"]
+    let data = []
+    let takedown = core.self + "api/takedown?id=" + id + "&key=" + takedownKey(id)
+    let callback = core.self + "api/cvscallback?id=" + id + "&key=" + takedownKey("cb:" + id)
+
+    if (picurl) {
+        data.push({
+            "type": "content-item",
+            "attributes": {
+                "external-id": "pic:" + id,
+                "content-type": "image",
+                "representation": "URL",
+                "takedown-url": takedown,
+                "value": picurl
+            }
+        })
+    }
+
+    if (text) {
+        data.push({
+            "type": "content-item",
+            "attributes": {
+                "external-id": "text:" + id,
+                "content-type": "text",
+                "representation": "inline",
+                "takedown-url": takedown,
+                "value": text
+            }
+        })
+    }
+
+    if (!data.length)
+        return
+
+    let req = td.createRequest("https://cvsnaprod.azure-api.net/cv/ppe/api/content-items?api-version=2015-06-30")
+    req.setHeader("Ocp-Apim-Subscription-Key", tok)
+    req.setMethod("POST")
+    req.setContentAsJson({
+        "meta": {
+            "processing-configuration": {
+                "job-configuration": {
+                    "is-synchronous": false,
+                    "review-preference": "enable",
+                    "callback-endpoint": callback
+                },
+                "text-scan-configuration": {
+                    "tier": [0, 1],
+                    "languages": ["eng"],
+                    "extract-url": true,
+                    "check-whole-word": true
+                },
+                "image-scan-configuration": {
+                    "enable-image-classification": true,
+                    "enable-ocr": true
+                }
+            }
+        },
+        "data": data
+    })
+    req.setContentType("application/vnd.api+json")
+    let resp = await req.sendAsync()
+    if (resp.statusCode() != 201) {
+        logger.error("Bad CVS code: " + resp.statusCode() + ": " + resp.content())
+    }
+    logger.debug("CVS code: " + resp.statusCode())
+    //logger.debug("CVS response: " + JSON.stringify(resp.contentAsJson(), null, 1))
 }
 
 async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promise<void>
