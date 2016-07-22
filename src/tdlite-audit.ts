@@ -85,7 +85,7 @@ export async function logAsync(req: core.ApiRequest, type: string, options_0: IP
         msg.tokenid = core.sha256(tdliteLogin.tokenString(req.userinfo.token)).substr(0, 10);
     }
     msg.type = type;
-    msg.ip = core.fullTD ? "n/a" : core.encrypt(req.userinfo.ip, "AUDIT");
+    msg.ip = core.encrypt(req.userinfo.ip, "AUDIT");
     //    msg.oldvalue = core.encryptJson(msg.oldvalue, "AUDIT");
     //    msg.newvalue = core.encryptJson(msg.newvalue, "AUDIT");
     let jsb = {};
