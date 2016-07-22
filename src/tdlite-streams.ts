@@ -51,6 +51,8 @@ export interface StreamInfo {
 }
 
 export async function initAsync(): Promise<void> {
+    if (!core.hasSetting("STREAMS_ACCOUNT"))
+        return
     let tableClient = await core.specTableClientAsync("STREAMS");
     let blobService = azureBlobStorage.createBlobService({
         storageAccount: td.serverSetting("STREAMS_ACCOUNT"),
@@ -60,8 +62,8 @@ export async function initAsync(): Promise<void> {
         blobService: blobService,
         noCache: true
     });
-    
-    function userMeta(info:StreamInfo) {
+
+    function userMeta(info: StreamInfo) {
         return {
             fields: td.values(info.fields),
             rows: info.rows,
