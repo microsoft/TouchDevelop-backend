@@ -400,6 +400,10 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
                 "image-scan-configuration": {
                     "enable-image-classification": true,
                     "enable-ocr": true
+                },
+                "url-scan-configuration": {
+                    "enable-ping": false,
+                    "check-host": false
                 }
             }
         },
