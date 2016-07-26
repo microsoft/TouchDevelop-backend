@@ -8,7 +8,7 @@ docs: all
 	
 # requires TD_UPLOAD_KEY
 upload:
-	node built/templater.js push
+	if [ "X$$TRAVIS_BRANCH" = "Xmaster" ] ; then node built/templater.js push ; fi
 
 pxt:
 	make -C ../pxt
