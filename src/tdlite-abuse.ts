@@ -394,7 +394,7 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
                 "text-scan-configuration": {
                     "tier": [0, 1],
                     "languages": ["eng"],
-                    "extract-url": true,
+                    "extract-url": false,
                     "check-whole-word": true
                 },
                 "image-scan-configuration": {
