@@ -110,6 +110,7 @@ export async function initAsync() : Promise<void>
             group.isrestricted = true;
             let jsb1 = {};
             jsb1["pub"] = group.toJson();
+            req.setCreatorInfo(jsb1)
             await core.generateIdAsync(jsb1, 8);
             await groups.insertAsync(jsb1);
             await audit.logAsync(req, "create-group", {

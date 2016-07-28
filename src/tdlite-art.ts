@@ -324,6 +324,7 @@ async function postScreenshotAsync(req: core.ApiRequest): Promise<void> {
 }
 
 async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder): Promise<void> {
+    req.setCreatorInfo(jsb)
     let contentType = orEmpty(req.body["contentType"]);
     fixArtProps(contentType, jsb);
     let ext = jsb["ext"];

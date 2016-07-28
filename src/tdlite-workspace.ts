@@ -591,6 +591,7 @@ async function publishScriptAsync(req: core.ApiRequest): Promise<void> {
         let jsb = {};
         jsb["currentBlob"] = pubVersion.baseSnapshot;
         jsb["isFork"] = isFork;
+        req.setCreatorInfo(jsb)
         await tdliteScripts.publishScriptCoreAsync(pubScript, jsb, body["script"], req);
         // 
         let slotBuilder = td.clone(slotJson);

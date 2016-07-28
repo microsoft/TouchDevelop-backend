@@ -440,6 +440,7 @@ async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promis
         jsb["pub"] = report.toJson();
         if (acsInfo)
             jsb["acsInfo"] = acsInfo;
+        req.setCreatorInfo(jsb)
         await core.generateIdAsync(jsb, 10);
         await abuseReports.insertAsync(jsb);
         await core.pubsContainer.updateAsync(report.publicationid, async (entry: JsonBuilder) => {

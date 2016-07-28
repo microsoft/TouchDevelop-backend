@@ -469,6 +469,7 @@ export async function initAsync(): Promise<void> {
                 jsb["id"] = forceid;
             }
             jsb["isFork"] = isFork;
+            req.setCreatorInfo(jsb)
             await publishScriptCoreAsync(scr, jsb, td.toString(req.body["text"]), req);
             await core.returnOnePubAsync(scripts, td.clone(jsb), req);
         }

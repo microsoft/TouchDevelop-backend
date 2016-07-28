@@ -180,6 +180,10 @@ export class ApiRequest {
             return null;
         }
     }
+
+    public setCreatorInfo(jsb: {}) {
+        jsb["creatorIp"] = this.userinfo.ip
+    }
 }
 
 export interface DecoratedStore {

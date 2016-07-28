@@ -189,6 +189,7 @@ export async function initAsync(): Promise<void> {
                     let jsb1 = {};
                     jsb1["id"] = ptr1.id;
                     jsb1["pub"] = ptr1.toJson();
+                    req.setCreatorInfo(jsb1)
                     await setPointerPropsAsync(req, jsb1, body);
                     await pointers.insertAsync(jsb1);
                     await notifications.storeAsync(req, jsb1, "");

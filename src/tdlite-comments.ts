@@ -117,6 +117,7 @@ async function postCommentAsync(req: core.ApiRequest) : Promise<void>
         }
         let jsb = {};
         jsb["pub"] = comment.toJson();
+        req.setCreatorInfo(jsb)
         await core.generateIdAsync(jsb, 10);
         await comments.insertAsync(jsb);
         await updateCommentCountersAsync(comment);

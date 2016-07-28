@@ -57,6 +57,7 @@ export async function initAsync() : Promise<void>
             lst.userplatform = core.getUserPlatforms(req);
             let jsb1 = {};
             jsb1["pub"] = lst.toJson();
+            req.setCreatorInfo(jsb1)
             await core.generateIdAsync(jsb1, 8);
             await channels.insertAsync(jsb1);
             await notifications.storeAsync(req, jsb1, "");
