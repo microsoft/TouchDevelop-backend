@@ -19,6 +19,7 @@ import * as tdliteReviews from "./tdlite-reviews"
 import * as tdliteUsers from "./tdlite-users"
 import * as tdliteComments from "./tdlite-comments"
 import * as tdlitePointers from "./tdlite-pointers"
+import * as tdliteSearch from "./tdlite-search"
 
 var withDefault = core.withDefault;
 var orEmpty = td.orEmpty;
@@ -379,7 +380,7 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
     let req = td.createRequest("https://cvsnaprod.azure-api.net/cv/ppe/api/content-items?api-version=2015-06-30")
     req.setHeader("Ocp-Apim-Subscription-Key", tok)
     req.setMethod("POST")
-    req.setContentAsJson({
+    let content = {
         "meta": {
             "processing-configuration": {
                 "job-configuration": {
@@ -404,7 +405,11 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
             }
         },
         "data": data
-    })
+    }
+
+    logger.debug("CVS CVSreq: " + JSON.stringify(content, null, 1))
+
+    req.setContentAsJson(content)
     req.setContentType("application/vnd.api+json")
     let resp = await req.sendAsync()
     if (resp.statusCode() != 201) {
@@ -412,6 +417,63 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
     }
     logger.debug("CVS code: " + resp.statusCode())
     //logger.debug("CVS response: " + JSON.stringify(resp.contentAsJson(), null, 1))
+}
+
+
+async function postAvertReportAsync(req: core.ApiRequest): Promise<void> {
+    let tok = td.serverSetting("AVERT_TOKEN", true)
+    if (!tok) return
+
+    let baseKind = req.rootPub["kind"];
+    if (!canHaveAbuseReport(baseKind)) {
+        req.status = httpCode._412PreconditionFailed;
+        return
+    }
+
+    let pub = req.rootPub
+    if (pub["kind"] == "user")
+        return // no automatic deletion of user accounts
+    let id: string = pub["id"]
+    let data = []
+    let takedown = core.self + "api/takedown?id=" + id + "&key=" + takedownKey(id)
+    let callback = core.self + "api/cvscallback?avert=1&id=" + id + "&key=" + takedownKey("cb:" + id)
+
+    let info = await tdliteSearch.extractTextAsync(req.rootPub)
+
+    let dataObject = {
+        "ExternalId": "text:" + id,
+        "ContentRepresentation": "Inline",
+        "ContentType": "Text",
+        "Value": info.fullText,
+        "TakedownUrl": takedown,
+        "ReportInfo": {
+            "ReportedContentCreationEventIPAddress": core.decrypt(req.rootPub["creatorIp"]) || undefined,
+            "ReportedContentCreationEventTime": new Date(pub["time"] * 1000).toISOString(),
+            "ReportedContentLanguageIsoCode": "eng",
+            "ReportedContentName": pub["name"],
+            "ReportedUserId": pub["username"] + " /" + pub["userid"],
+            "ReporterIPAddress": req.userinfo.ip,
+            "ReporterSubmissionEventTime": new Date().toISOString()
+        }
+    }
+    data.push(td.clone(dataObject))
+
+    let picurl = pub["pictureurl"]
+    if (picurl) {
+        dataObject.ContentRepresentation = "URL"
+        dataObject.ExternalId = "pic:" + id
+        dataObject.Value = picurl
+        data.push(td.clone(dataObject))
+    }
+
+    let avertReq = {
+        "AbuseCategory": "OffensiveContent",
+        "Notes": withDefault(req.body["text"], ""),
+        "CallbackUrl": callback,
+        "CallbackEmail": "touchdevelop@microsoft.com",
+        "ContentItems": data
+    }
+
 }
 
 async function postAbusereportAsync(req: core.ApiRequest, acsInfo = ""): Promise<void> {

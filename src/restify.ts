@@ -328,6 +328,8 @@ export class Request {
         var fw = this.handle.header('x-forwarded-for')
         if (fw && (process.env['IISNODE_VERSION'] || process.env['TD_WORKER_ID'])) ip = fw
         else ip = this.handle.connection.remoteAddress + ""
+        let m = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip)
+        if (m) return m[1]
         return ip;
     }
 
