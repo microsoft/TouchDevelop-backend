@@ -27,12 +27,11 @@ var logger = core.logger;
 var httpCode = core.httpCode;
 var abuseReports: indexedStore.Store;
 
-var wordRecognizer: {};  
+var wordRecognizer: {};
 var scannerRegexes: td.SMap<RegExp>;
 
 export class PubAbusereport
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public kind: string = "";
     @td.json public time: number = 0;
     @td.json public id: string = "";
@@ -47,13 +46,13 @@ export class PubAbusereport
     @td.json public publicationkind: string = "";
     @td.json public publicationuserid: string = "";
     @td.json public resolution: string = "";
-    
+
     // admin-only
     @td.json public usernumreports = 0;
     @td.json public publicationnumabuses = 0;
     @td.json public publicationusernumabuses = 0;
-    
-    static createFromJson(o:JsonObject) { let r = new PubAbusereport(); r.fromJson(o); return r; }
+
+    static createFromJson(o: JsonObject) { let r = new PubAbusereport(); r.fromJson(o); return r; }
 }
 
 export interface IPubAbusereport {
@@ -74,8 +73,7 @@ export interface IPubAbusereport {
 }
 
 export class CandeleteResponse
-    extends td.JsonRecord
-{
+    extends td.JsonRecord {
     @td.json public publicationkind: string = "";
     @td.json public publicationname: string = "";
     @td.json public publicationuserid: string = "";
@@ -83,7 +81,7 @@ export class CandeleteResponse
     @td.json public candelete: boolean = false;
     @td.json public hasabusereports: boolean = false;
     @td.json public canmanage: boolean = false;
-    static createFromJson(o:JsonObject) { let r = new CandeleteResponse(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new CandeleteResponse(); r.fromJson(o); return r; }
 }
 
 export interface ICandeleteResponse {
@@ -96,13 +94,12 @@ export interface ICandeleteResponse {
     canmanage: boolean;
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     core.registerSettingsCleanup(() => {
-        wordRecognizer = null;  
-        scannerRegexes = null;        
+        wordRecognizer = null;
+        scannerRegexes = null;
     })
-    
+
     abuseReports = await indexedStore.createStoreAsync(core.pubsContainer, "abusereport");
     await core.setResolveAsync(abuseReports, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         let users = <core.IUser[]>(await core.followPubIdsAsync(fetchResult.items, "publicationuserid", ""));
@@ -111,14 +108,14 @@ export async function initAsync() : Promise<void>
         let coll = (<PubAbusereport[]>[]);
         let x = 0;
         for (let jsb of withUsers) {
-            let isFacilitator = core.callerIsFacilitatorOf(apiRequest, users[x]) 
+            let isFacilitator = core.callerIsFacilitatorOf(apiRequest, users[x])
             if (isFacilitator ||
-                jsb["pub"]["userid"] == apiRequest.userid || 
+                jsb["pub"]["userid"] == apiRequest.userid ||
                 core.callerIsFacilitatorOf(apiRequest, jsb["*userid"])) {
                 let report = PubAbusereport.createFromJson(jsb["pub"]);
                 report.text = core.decrypt(report.text);
                 coll.push(report);
-                
+
                 if (isFacilitator) {
                     report.publicationnumabuses = pubs[x] ? pubs[x]["numAbuses"] || 0 : 0
                     report.publicationusernumabuses = users[x] ? users[x]["numAbusesByUser"] || 0 : 0
@@ -129,19 +126,19 @@ export async function initAsync() : Promise<void>
         }
         fetchResult.items = td.arrayToJson(coll);
     }, {
-        byUserid: true,
-        byPublicationid: true
-    });
+            byUserid: true,
+            byPublicationid: true
+        });
     await abuseReports.createIndexAsync("publicationuserid", entry => entry["pub"]["publicationuserid"]);
     core.addRoute("GET", "*user", "abuses", async (req: core.ApiRequest) => {
         await core.anyListAsync(abuseReports, req, "publicationuserid", req.rootId);
     });
-    
-    core.addRoute("POST", "art", "reshield", async(req: core.ApiRequest) => {
+
+    core.addRoute("POST", "art", "reshield", async (req: core.ApiRequest) => {
         let store = indexedStore.storeByKind("art");
-        await tdlitePointers.reindexStoreAsync(req, store, async(e) => {
+        await tdlitePointers.reindexStoreAsync(req, store, async (e) => {
             if (e["arttype"] != "picture") return;
-            
+
             let sh = e["shieldinfo"]
             if (sh) {
                 if (sh["acssafe"] == "1" || sh["webpurifysafe"] == "1") {
@@ -149,15 +146,15 @@ export async function initAsync() : Promise<void>
                 } else if (sh["acssafe"] == "0") {
                     req.response["itemsReindexed"]++;
                     let jobid = sh["acsjobid"] || ""
-                    await postAcsReport(e["id"], "Legacy ACS flag. " + jobid, jobid)                    
+                    await postAcsReport(e["id"], "Legacy ACS flag. " + jobid, jobid)
                 } else {
                     sh = null;
                 }
             }
-            
+
             if (!sh) {
                 // TODO rescan ...
-            }            
+            }
         })
     });
 
@@ -200,7 +197,7 @@ export async function initAsync() : Promise<void>
         let pub = req.rootPub["pub"];
         // any-facilitator is good enough to update any abuse report, even about users on higher level
         if (!core.hasPermission(req.userinfo.json, "any-facilitator"))
-            await core.checkFacilitatorPermissionAsync(req, pub["publicationuserid"]);        
+            await core.checkFacilitatorPermissionAsync(req, pub["publicationuserid"]);
         if (req.status == 200) {
             let res = td.toString(req.body["resolution"]);
             if (res == "deleted") {
@@ -214,7 +211,7 @@ export async function initAsync() : Promise<void>
             else
                 logger.tick("AbuseSet@other");
 
-            await core.pubsContainer.updateAsync(req.rootId, async(entry1: JsonBuilder) => {
+            await core.pubsContainer.updateAsync(req.rootId, async (entry1: JsonBuilder) => {
                 core.setFields(entry1["pub"], req.body, ["resolution"]);
             });
             await core.pubsContainer.updateAsync(pub["publicationid"], async (entry2: JsonBuilder) => {
@@ -224,7 +221,7 @@ export async function initAsync() : Promise<void>
             req.response = ({});
         }
     });
-    core.addRoute("POST", "*pub", "abusereports", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "*pub", "abusereports", async (req: core.ApiRequest) => {
         await core.throttleAsync(req, "pub", 60);
         if (req.status != 200) return;
         if (!req.userid) {
@@ -233,9 +230,9 @@ export async function initAsync() : Promise<void>
                 req.status = httpCode._403Forbidden;
             } else {
                 await core.setReqUserIdAsync(req, uid);
-            }    
+            }
         }
-        if (req.status != 200) return;        
+        if (req.status != 200) return;
         await postAbusereportAsync(req);
     });
     core.addRoute("DELETE", "*user", "", async (req8: core.ApiRequest) => {
@@ -274,7 +271,7 @@ export async function initAsync() : Promise<void>
         resp.publicationname = withDefault(pub1["name"], "/" + req.rootId);
         resp.publicationuserid = getAuthor(pub1);
         resp.candeletekind = canBeAdminDeleted(req.rootPub) || core.hasSpecialDelete(req.rootPub);
-        let reports = await abuseReports.getIndex("publicationid").fetchAsync(req.rootId, ({"count":10}));
+        let reports = await abuseReports.getIndex("publicationid").fetchAsync(req.rootId, ({ "count": 10 }));
         resp.hasabusereports = reports.items.length > 0 || reports.continuation != "";
         if (resp.candeletekind) {
             await checkDeletePermissionAsync(req);
@@ -298,7 +295,7 @@ export async function initAsync() : Promise<void>
                 resp.candelete = false;
                 req.status = 200;
             }
-            
+
             if (core.hasPermission(req.userinfo.json, "any-facilitator"))
                 resp.canmanage = true;
         }
@@ -307,8 +304,7 @@ export async function initAsync() : Promise<void>
 }
 
 
-async function deletePubRecAsync(delEntry: JsonObject) : Promise<void>
-{
+async function deletePubRecAsync(delEntry: JsonObject): Promise<void> {
     if (delEntry["kind"] == "review") {
         let delok3 = await tdliteReviews.deleteReviewAsync(delEntry);
     }
@@ -418,10 +414,9 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
     //logger.debug("CVS response: " + JSON.stringify(resp.contentAsJson(), null, 1))
 }
 
-async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promise<void>
-{
+async function postAbusereportAsync(req: core.ApiRequest, acsInfo = ""): Promise<void> {
     let baseKind = req.rootPub["kind"];
-    if ( ! canHaveAbuseReport(baseKind)) {
+    if (!canHaveAbuseReport(baseKind)) {
         req.status = httpCode._412PreconditionFailed;
     }
     else {
@@ -449,11 +444,11 @@ async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promis
             }
             entry["abuseStatusPosted"] = "active";
             core.bareIncrement(entry, "numAbuses");
-        });        
-        await tdliteUsers.updateAsync(report.publicationuserid, async(entry) => {
+        });
+        await tdliteUsers.updateAsync(report.publicationuserid, async (entry) => {
             entry.numAbusesByUser++;
-        });               
-        await tdliteUsers.updateAsync(report.userid, async(entry) => {
+        });
+        await tdliteUsers.updateAsync(report.userid, async (entry) => {
             entry.numReports++;
         })
         await notifications.storeAsync(req, jsb, "");
@@ -461,8 +456,7 @@ async function postAbusereportAsync(req: core.ApiRequest, acsInfo = "") : Promis
     }
 }
 
-function getAuthor(pub: JsonObject) : string
-{
+function getAuthor(pub: JsonObject): string {
     let author = pub["userid"];
     if (pub["kind"] == "user") {
         author = pub["id"];
@@ -470,13 +464,11 @@ function getAuthor(pub: JsonObject) : string
     return author;
 }
 
-export function canHaveAbuseReport(baseKind: string) : boolean
-{
-    return /^(art|comment|script|screenshot|channel|group|user)$/.test(baseKind);    
+export function canHaveAbuseReport(baseKind: string): boolean {
+    return /^(art|comment|script|screenshot|channel|group|user)$/.test(baseKind);
 }
 
-async function deleteUserAsync(req:core.ApiRequest)
-{
+async function deleteUserAsync(req: core.ApiRequest) {
     await tdliteWorkspace.deleteAllHistoryAsync(req.rootId, req);
 
     for (let pk of core.getPubKinds()) {
@@ -486,7 +478,7 @@ async function deleteUserAsync(req:core.ApiRequest)
     }
 
     // Bugs, releases, etc just stay
-    
+
     let delok = await core.deleteAsync(req.rootPub);
     logger.debug("delete user: " + JSON.stringify(req.rootPub) + " - " + delok);
     await audit.logAsync(req, "delete", {
@@ -494,8 +486,7 @@ async function deleteUserAsync(req:core.ApiRequest)
     });
 }
 
-async function deleteAllByUserAsync(store: indexedStore.Store, id: string, req: core.ApiRequest) : Promise<void>
-{
+async function deleteAllByUserAsync(store: indexedStore.Store, id: string, req: core.ApiRequest): Promise<void> {
     let logDelete = store.kind != "review";
     await store.getIndex("userid").forAllBatchedAsync(id, 50, async (json) => {
         await parallel.forJsonAsync(json, async (json1: JsonObject) => {
@@ -511,8 +502,7 @@ async function deleteAllByUserAsync(store: indexedStore.Store, id: string, req: 
     });
 }
 
-function canBeAdminDeleted(jsonpub: JsonObject) : boolean
-{
+function canBeAdminDeleted(jsonpub: JsonObject): boolean {
     let b: boolean;
     b = /^(art|screenshot|comment|script|group|publist|channel|pointer)$/.test(jsonpub["kind"]);
     return b;
@@ -525,7 +515,7 @@ async function checkDeletePermissionAsync(req: core.ApiRequest): Promise<void> {
         authorid = pub["id"];
     }
     if (authorid == req.userid) return; // ok, my content
-    
+
     if (pub["kind"] == "comment") {
         let rootpub = await tdliteComments.getRootPubAsync(req.rootPub);
         if (rootpub && rootpub["kind"] == "group") {
@@ -537,10 +527,9 @@ async function checkDeletePermissionAsync(req: core.ApiRequest): Promise<void> {
     await core.checkFacilitatorPermissionAsync(req, authorid);
 }
 
-function buildRecognizer(words:string[])
-{
+function buildRecognizer(words: string[]) {
     let root = {}
-    
+
     for (let word of words) {
         word = word.toLowerCase().replace(/\&nbsp;/g, " ");
         let ptr = root
@@ -552,12 +541,11 @@ function buildRecognizer(words:string[])
         }
         ptr["_match"] = 1
     }
-    
+
     return root
 }
 
-function unescapeCode(text: string)
-{
+function unescapeCode(text: string) {
     if (/^</.test(text)) {
         // XML
         text = text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
@@ -579,7 +567,7 @@ function scanCore(tree: {}, str: string) {
         if (!issep(str[i])) continue;
         let ptr = tree;
         for (let j = 1; !!ptr; ++j) {
-            let c = str[i + j];            
+            let c = str[i + j];
             if (!c) break;
             if (ptr["_match"] && issep(c)) {
                 hits.push(str.substr(i + 1, j - 1))
@@ -587,26 +575,26 @@ function scanCore(tree: {}, str: string) {
             ptr = ptr[c];
         }
     }
-    
+
     return hits;
 }
 
 function initScanner() {
     if (wordRecognizer) return;
-    let sett = core.getSettings("scanner") || {} 
+    let sett = core.getSettings("scanner") || {}
     wordRecognizer = buildRecognizer(sett["words"] || [])
     scannerRegexes = {}
     let reg = sett["regexps"] || {}
     for (let rxname of Object.keys(reg)) {
-        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b", "g");        
+        scannerRegexes[rxname] = new RegExp("\\b(" + reg[rxname] + ")\\b", "g");
     }
 }
 
-function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
+function scanText(txt: string, candolinks: boolean, isdesc: boolean) {
     let res = ""
 
     initScanner();
-    
+
     txt = unescapeCode(txt);
 
     let hits = scanCore(wordRecognizer, txt);
@@ -630,7 +618,7 @@ function scanText(txt: string, candolinks: boolean, isdesc:boolean) {
     return res;
 }
 
-export async function postAcsReport(pubid: string, msg: string, acsInfo:string = null, req: core.ApiRequest = null) {
+export async function postAcsReport(pubid: string, msg: string, acsInfo: string = null, req: core.ApiRequest = null) {
     let uid = orEmpty(core.serviceSettings.accounts["acsreport"]);
     if (uid != "") {
         if (!req)
@@ -653,11 +641,10 @@ export async function scanAndPostAsync(pubid: string, body: string, desc: string
     msg += scanText(desc, canemail, true);
     if (msg) {
         await postAcsReport(pubid, msg);
-    }    
+    }
 }
 
-function testscanner()
-{
+function testscanner() {
     let t0 = buildRecognizer(["foo", "b-rhello"]);
     let numerr = 0
     let tst = (s, e) => {
@@ -669,16 +656,16 @@ function testscanner()
         }
         console.log(`${s} => '${r}' ${err}`)
     }
-        
-    tst("hello","")
-    tst("hellofoo","")
+
+    tst("hello", "")
+    tst("hellofoo", "")
     tst("foohello", "")
     tst("Foo", "foo")
     tst("hello foo() bar", "foo")
     tst("hello ()b-rhello() bar", "b-rhello")
     tst("hello ()b-rhelloss() bar", "")
-    
-    
+
+
     /*
     let tt = require('fs').readFileSync("test.txt", "utf8") + " fo.bar@baz.com hello"
     let r = new RegExp("\\b(\\s*\\(?0\\d{4}\\)?\\s*\\d{6}\\s*)|(\\s*\\(?0\\d{3}\\)?\\s*\\d{3}\\s*\\d{4}\\s*)\\b");    

@@ -81,35 +81,35 @@ export async function initAsync(): Promise<void> {
         importOne: importArtAsync,
         specialDeleteAsync: deleteArtAsync,
     })
-    await core.setResolveAsync(arts, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(arts, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await resolveArtAsync(fetchResult, apiRequest);
     }
         , {
             byUserid: true,
             anonSearch: true
         });
-    core.addRoute("POST", "art", "", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "art", "", async (req: core.ApiRequest) => {
         await postArtAsync(req);
     }
         , {
             sizeCheckExcludes: "content"
         });
-    core.addRoute("GET", "*script", "art", async(req1: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "art", async (req1: core.ApiRequest) => {
         // TODO implement /<scriptid>/art
         req1.response = ({ "items": [] });
     });
     await arts.createIndexAsync("filehash", entry => orEmpty(entry["pub"]["filehash"]));
-    core.addRoute("GET", "arthash", "*", async(req2: core.ApiRequest) => {
+    core.addRoute("GET", "arthash", "*", async (req2: core.ApiRequest) => {
         await core.anyListAsync(arts, req2, "filehash", req2.verb);
     });
 
     core.addRoute("POST", "art", "rethumb", rethumbArtsAsync);
 
-    core.addRoute("POST", "art", "reindex", async(req2: core.ApiRequest) => {
+    core.addRoute("POST", "art", "reindex", async (req2: core.ApiRequest) => {
         core.checkPermission(req2, "operator");
         if (req2.status == 200) {
             await tdliteIndex.clearArtIndexAsync();
-            /* async */ arts.getIndex("all").forAllBatchedAsync("all", 100, async(json: JsonObject[]) => {
+            /* async */ arts.getIndex("all").forAllBatchedAsync("all", 100, async (json: JsonObject[]) => {
                 let batch = tdliteIndex.createArtUpdate();
                 for (let js of await core.addUsernameEtcCoreAsync(json)) {
                     let pub = PubArt.createFromJson(td.clone(js["pub"]));
@@ -142,14 +142,14 @@ async function initScreenshotsAsync(): Promise<void> {
         importOne: importScreenshotAsync,
         specialDeleteAsync: deleteArtAsync,
     })
-    await core.setResolveAsync(screenshots, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(screenshots, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await resolveScreenshotAsync(fetchResult, apiRequest);
     }
         , {
             byUserid: true,
             byPublicationid: true
         });
-    core.addRoute("POST", "*pub", "screenshots", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "*pub", "screenshots", async (req: core.ApiRequest) => {
         await core.canPostAsync(req, "screenshot");
         if (req.status == 200) {
             await postScreenshotAsync(req);
@@ -268,7 +268,7 @@ async function resolveScreenshotAsync(entities: indexedStore.FetchResult, req: c
 }
 
 async function updateScreenshotCountersAsync(screenshot: PubScreenshot): Promise<void> {
-    await core.pubsContainer.updateAsync(screenshot.publicationid, async(entry: JsonBuilder) => {
+    await core.pubsContainer.updateAsync(screenshot.publicationid, async (entry: JsonBuilder) => {
         core.increment(entry, "screenshots", 1);
     });
 }
@@ -397,7 +397,7 @@ async function postArtLikeAsync(req: core.ApiRequest, jsb: JsonBuilder): Promise
 
 async function rethumbOneAsync(req: core.ApiRequest, filename: string, contentType: string) {
     let url = artContainer.url() + "/" + filename;
-    await parallel.forAsync(thumbContainers.length, async(i: number) => {
+    await parallel.forAsync(thumbContainers.length, async (i: number) => {
         let thumbContainer = thumbContainers[i];
         let tempThumbUrl = await kraken.optimizePictureUrlAsync(url, {
             width: thumbContainer.size,
@@ -429,10 +429,10 @@ async function rethumbArtsAsync(req: core.ApiRequest) {
     let fr = await arts.fetchFromIdListAsync(req.argument.split(/,/).filter(e => !!e), {});
     await resolveArtAsync(fr, req);
     let msgs = []
-    await parallel.forJsonAsync(fr.items, async(pub) => {
+    await parallel.forJsonAsync(fr.items, async (pub) => {
         let art = PubArt.createFromJson(pub);
         if (art.arttype == "picture") {
-            msgs.push(`rethumb: ${art.id} -> ${JSON.stringify(pub) }`)
+            msgs.push(`rethumb: ${art.id} -> ${JSON.stringify(pub)}`)
             await rethumbOneAsync(req, art.id, art.contenttype);
         }
     }, 5);
@@ -443,7 +443,7 @@ async function rethumbArtsAsync(req: core.ApiRequest) {
 
 async function redownloadScreenshotAsync(js: JsonObject): Promise<void> {
     await redownloadArtAsync(js);
-    await core.pubsContainer.updateAsync(js["id"], async(entry: JsonBuilder) => {
+    await core.pubsContainer.updateAsync(js["id"], async (entry: JsonBuilder) => {
         fixArtProps("image/jpeg", entry);
     });
 }

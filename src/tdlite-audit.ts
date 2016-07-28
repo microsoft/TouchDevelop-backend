@@ -28,8 +28,7 @@ var auditContainerLongTerm: cachedStore.Container;
 var httpCode = core.httpCode;
 
 export class PubAuditLog
-    extends core.IdObject
-{
+    extends core.IdObject {
     @td.json public time: number = 0;
     @td.json public type: string = "";
     @td.json public userid: string = "";
@@ -41,7 +40,7 @@ export class PubAuditLog
     @td.json public newvalue: JsonObject;
     @td.json public ip: string = "";
     @td.json public tokenid: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubAuditLog(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubAuditLog(); r.fromJson(o); return r; }
 }
 
 export interface IPubAuditLog {
@@ -59,8 +58,7 @@ export interface IPubAuditLog {
     tokenid?: string;
 }
 
-export async function logAsync(req: core.ApiRequest, type: string, options_0: IPubAuditLog = {}) : Promise<void>
-{
+export async function logAsync(req: core.ApiRequest, type: string, options_0: IPubAuditLog = {}): Promise<void> {
     let options_ = new PubAuditLog(); options_.load(options_0);
     let msg = options_;
     msg.time = await core.nowSecondsAsync();
@@ -99,33 +97,30 @@ export async function logAsync(req: core.ApiRequest, type: string, options_0: IP
     await cleanLogAsync();
 }
 
-async function cleanLogAsync(): Promise<void>
-{
+async function cleanLogAsync(): Promise<void> {
     if (core.fullTD) return; // no audit aging in full TD
     // only try this in 10% of cases
-    if (td.randomInt(10) == 0) return;    
-    let timestamp = Math.floor(Date.now()/1000 - auditLogMaxAgeDays * 24 * 3600)
+    if (td.randomInt(10) == 0) return;
+    let timestamp = Math.floor(Date.now() / 1000 - auditLogMaxAgeDays * 24 * 3600)
     let pastId = (10000000000 - timestamp) + ".xxxxxxxx";
     let q = auditStore.getIndex("all").table.createQuery();
     q = q.partitionKeyIs("all").and("RowKey", ">=", pastId).top(200);
     let res = await q.fetchAllAsync();
     td.permute(res);
-    res = res.slice(0, 50);    
-    await parallel.forJsonAsync(res, async(ent) => {
+    res = res.slice(0, 50);
+    await parallel.forJsonAsync(res, async (ent) => {
         //let ee = await auditStore.container.getAsync(ent["pub"])
         let tm = 10000000000 - parseInt(ent["RowKey"].replace(/\..*/, ""))
-        core.logger.debug("delete audit entry: " + ent["pub"] + " @ " + new Date(tm*1000));
+        core.logger.debug("delete audit entry: " + ent["pub"] + " @ " + new Date(tm * 1000));
         await auditStore.deleteAsync(ent["pub"]);
     })
 }
 
-export async function queryPubLogAsync(req: core.ApiRequest)
-{
+export async function queryPubLogAsync(req: core.ApiRequest) {
     return await auditStore.getIndex("publicationid").fetchAsync(req.rootId, req.queryOptions);
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     let auditTableClient = await core.specTableClientAsync("AUDIT_BLOB");
     let auditBlobService = azureBlobStorage.createBlobService({
         storageAccount: td.serverSetting("AUDIT_BLOB_ACCOUNT", false),
@@ -137,11 +132,11 @@ export async function initAsync() : Promise<void>
     auditStore = await indexedStore.createStoreAsync(auditContainer, "auditlog", {
         tableClient: auditTableClient
     });
-    
+
     auditContainerLongTerm = await cachedStore.createContainerAsync("auditlong", {
         blobService: auditBlobService
     });
-    
+
     let store = auditStore;
     (<core.DecoratedStore><any>store).myResolve = async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         core.checkPermission(apiRequest, "audit");
@@ -158,7 +153,7 @@ export async function initAsync() : Promise<void>
             fetchResult.items = ([]);
         }
     }
-    ;
+        ;
     await store.createIndexAsync("all", entry => "all");
     core.addRoute("GET", "audit", "", async (req: core.ApiRequest) => {
         core.checkPermission(req, "audit");
@@ -185,19 +180,18 @@ export async function initAsync() : Promise<void>
                 req.status = httpCode._404NotFound;
                 return;
             }
-                
+
             let ent = PubAuditLog.createFromJson(r["pub"]);
             if (ent.type != "delete" || ent.publicationkind != "script") {
                 req.status = httpCode._422UnprocessableEntity;
                 return;
             }
-            req.response = core.decrypt(ent.oldvalue["text"]);            
+            req.response = core.decrypt(ent.oldvalue["text"]);
         }
     });
 }
 
-export async function auditDeleteValueAsync(js: JsonObject) : Promise<JsonObject>
-{
+export async function auditDeleteValueAsync(js: JsonObject): Promise<JsonObject> {
     if (js["kind"] == "script") {
         let entry2 = await tdliteScripts.getScriptTextAsync(js["id"]);
         let jsb2 = td.clone(js);
@@ -207,15 +201,13 @@ export async function auditDeleteValueAsync(js: JsonObject) : Promise<JsonObject
     return js;
 }
 
-export function buildAuditApiRequest(req: restify.Request) : core.ApiRequest
-{
+export function buildAuditApiRequest(req: restify.Request): core.ApiRequest {
     let apiReq = core.buildApiRequest("/api");
     apiReq.userinfo.ip = req.remoteIp();
     return apiReq;
 }
 
-async function auditIndexAsync(field: string) : Promise<void>
-{
+async function auditIndexAsync(field: string): Promise<void> {
     let store = auditStore;
     await store.createIndexAsync(field, entry => entry["pub"][field]);
     core.addRoute("GET", "audit", field, async (req: core.ApiRequest) => {
