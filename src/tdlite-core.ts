@@ -182,7 +182,7 @@ export class ApiRequest {
     }
 
     public setCreatorInfo(jsb: {}) {
-        jsb["creatorIp"] = this.userinfo.ip
+        jsb["creatorIp"] = encrypt(this.userinfo.ip, "AUDIT");
     }
 }
 
