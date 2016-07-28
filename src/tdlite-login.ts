@@ -916,6 +916,7 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
         return;
     }
     let token = withDefault(rreq.header("x-td-access-token"), td.toString(req.queryOptions["access_token"]));
+    req.userinfo.ip = rreq.remoteIp();
     if (token != null && token != "null" && token != "undefined") {
         if (token.length > 100) {
             // this is to prompt migration client-side
@@ -965,7 +966,6 @@ export async function validateTokenAsync(req: core.ApiRequest, rreq: restify.Req
             }
             if (req.status == 200) {
                 req.userinfo.token = token2;
-                req.userinfo.ip = rreq.remoteIp();
                 let uid2 = orEmpty(req.queryOptions["userid"]);
                 if (uid2 != "" && core.hasPermission(req.userinfo.json, "root")) {
                     await core.setReqUserIdAsync(req, uid2);
