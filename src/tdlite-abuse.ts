@@ -377,7 +377,7 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
     if (!data.length)
         return
 
-    let req = td.createRequest("https://cvsnaprod.azure-api.net/cv/ppe/api/content-items?api-version=2015-06-30")
+    let req = td.createRequest("https://cvsnaprod.azure-api.net/cv/api/content-items?api-version=2015-06-30")
     req.setHeader("Ocp-Apim-Subscription-Key", tok)
     req.setMethod("POST")
     let content = {
