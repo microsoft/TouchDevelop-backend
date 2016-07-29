@@ -20,6 +20,7 @@ import * as tdliteIndex from "./tdlite-index"
 import * as tdliteSearch from "./tdlite-search"
 import * as tdliteReleases from "./tdlite-releases"
 import * as tdliteData from "./tdlite-data"
+import * as audit from "./tdlite-audit"
 
 var orFalse = core.orFalse;
 var withDefault = core.withDefault;
@@ -226,6 +227,15 @@ async function postArtAsync(req: core.ApiRequest): Promise<void> {
     }
     if (req.status == 200) {
         await arts.insertAsync(jsb);
+
+        let scr = td.clone(jsb);
+        await audit.logAsync(req, "publish-art", {
+            subjectid: scr["pub"]["userid"],
+            publicationid: scr["id"],
+            publicationkind: "art",
+            newvalue: scr
+        });
+
         await notifications.storeAsync(req, jsb, "");
         await upsertArtAsync(jsb);
         await search.scanAndSearchAsync(jsb, {
@@ -315,6 +325,15 @@ async function postScreenshotAsync(req: core.ApiRequest): Promise<void> {
         await postArtLikeAsync(req, jsb);
         if (req.status == 200) {
             await screenshots.insertAsync(jsb);
+
+            let scr = td.clone(jsb);
+            await audit.logAsync(req, "publish-screenshot", {
+                subjectid: scr["pub"]["userid"],
+                publicationid: scr["id"],
+                publicationkind: "screenshot",
+                newvalue: scr
+            });
+
             await updateScreenshotCountersAsync(screenshot);
             await notifications.storeAsync(req, jsb, "");
             // ### return screenshot
