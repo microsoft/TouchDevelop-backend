@@ -96,6 +96,19 @@ export async function extractTextAsync(obj: {}) {
         }
     }
 
+    if (store.kind == "script" && body[0] == "{") {
+        try {
+            let mp = JSON.parse(body)
+            let txt = ""
+            for (let fn of Object.keys(mp)) {
+                txt += "---- File: " + fn + "------\n"
+                txt += mp[fn]
+            }
+            body = txt
+        } catch (e) {
+        }
+    }
+
     let text = body;
     for (let fldname of ["about", "grade", "school"]) {
         text = text + " " + orEmpty(pub[fldname]);

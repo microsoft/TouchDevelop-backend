@@ -235,6 +235,7 @@ export async function initAsync(): Promise<void> {
         }
         if (req.status != 200) return;
         await postAbusereportAsync(req);
+        await postAvertReportAsync(req);
     });
     core.addRoute("DELETE", "*user", "", async (req8: core.ApiRequest) => {
         await checkDeletePermissionAsync(req8);
@@ -430,15 +431,16 @@ async function postAvertReportAsync(req: core.ApiRequest): Promise<void> {
         return
     }
 
-    let pub = req.rootPub
-    if (pub["kind"] == "user")
+    let rpub = req.rootPub
+    if (rpub["kind"] == "user")
         return // no automatic deletion of user accounts
-    let id: string = pub["id"]
+    let id: string = rpub["id"]
     let data = []
     let takedown = core.self + "api/takedown?id=" + id + "&key=" + takedownKey(id)
     let callback = core.self + "api/cvscallback?avert=1&id=" + id + "&key=" + takedownKey("cb:" + id)
 
     let info = await tdliteSearch.extractTextAsync(req.rootPub)
+    let pub = info.pub
 
     let dataObject = {
         "ExternalId": "text:" + id,
@@ -448,19 +450,21 @@ async function postAvertReportAsync(req: core.ApiRequest): Promise<void> {
         "TakedownUrl": takedown,
         "ReportInfo": {
             "ReportedContentCreationEventIPAddress": core.decrypt(req.rootPub["creatorIp"]) || undefined,
-            "ReportedContentCreationEventTime": new Date(pub["time"] * 1000).toISOString(),
+            // "ReportedContentCreationEventTime": new Date(pub["time"] * 1000).toISOString(),
             "ReportedContentLanguageIsoCode": "eng",
             "ReportedContentName": pub["name"],
             "ReportedUserId": pub["username"] + " /" + pub["userid"],
             "ReporterIPAddress": req.userinfo.ip,
-            "ReporterSubmissionEventTime": new Date().toISOString()
+            // this is in fact expected to be content creation time
+            "ReporterSubmissionEventTime": new Date(pub["time"] * 1000).toISOString(),
         }
     }
     data.push(td.clone(dataObject))
 
     let picurl = pub["pictureurl"]
     if (picurl) {
-        dataObject.ContentRepresentation = "URL"
+        dataObject.ContentRepresentation = "Url"
+        dataObject.ContentType = "Image"
         dataObject.ExternalId = "pic:" + id
         dataObject.Value = picurl
         data.push(td.clone(dataObject))
@@ -474,6 +478,18 @@ async function postAvertReportAsync(req: core.ApiRequest): Promise<void> {
         "ContentItems": data
     }
 
+    let areq = td.createRequest("https://cvsnaprod.azure-api.net/ppe/avert/avert")
+    areq.setHeader("Ocp-Apim-Subscription-Key", tok)
+    areq.setMethod("POST")
+    areq.setContentAsJson(avertReq)
+
+    logger.debug("AVERT req: " + JSON.stringify(avertReq, null, 1))
+
+    let resp = await areq.sendAsync()
+    if (resp.statusCode() != 201) {
+        logger.error("Bad AVERT code: " + resp.statusCode() + ": " + resp.content())
+    }
+    logger.debug("AVERT code: " + resp.statusCode())
 }
 
 async function postAbusereportAsync(req: core.ApiRequest, acsInfo = ""): Promise<void> {
