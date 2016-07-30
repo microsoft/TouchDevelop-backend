@@ -339,7 +339,7 @@ function takedownKey(id: string) {
     return core.sha256(core.tokenSecret + ":takedown:" + id)
 }
 
-export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
+export async function cvsScanAsync(pub: {}, text: string, picurl: string, obj: {}) {
     let tok = td.serverSetting("CVS_TOKEN", true)
     if (!tok) return
     if (pub["kind"] == "user")
@@ -349,30 +349,29 @@ export async function cvsScanAsync(pub: {}, text: string, picurl: string) {
     let takedown = core.self + "api/takedown?id=" + id + "&key=" + takedownKey(id)
     let callback = core.self + "api/cvscallback?id=" + id + "&key=" + takedownKey("cb:" + id)
 
+    let elt = {
+        "type": "content-item",
+        "attributes": {
+            "incident-time": new Date(pub["time"] * 1000).toISOString(),
+            "reportee-address": core.decrypt(obj["creatorIp"]) || undefined,
+            "external-id": "pic:" + id,
+            "content-type": "image",
+            "representation": "URL",
+            "takedown-url": takedown,
+            "value": picurl
+        }
+    }
+
     if (picurl) {
-        data.push({
-            "type": "content-item",
-            "attributes": {
-                "external-id": "pic:" + id,
-                "content-type": "image",
-                "representation": "URL",
-                "takedown-url": takedown,
-                "value": picurl
-            }
-        })
+        data.push(td.clone(elt))
     }
 
     if (text) {
-        data.push({
-            "type": "content-item",
-            "attributes": {
-                "external-id": "text:" + id,
-                "content-type": "text",
-                "representation": "inline",
-                "takedown-url": takedown,
-                "value": text
-            }
-        })
+        elt.attributes["content-type"] = "text"
+        elt.attributes.representation = "inline"
+        elt.attributes.value = text
+        elt.attributes["external-id"] = "text:" + id
+        data.push(elt)
     }
 
     if (!data.length)
