@@ -627,6 +627,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
         relprefix: relprefix,
         workerjs: relprefix + "worker",
         tdworkerjs: relprefix + "tdworker",
+        monacoworkerjs: relprefix + "monacoworker",
         pxtVersion: sanitize(baseRel.pkgversion),
         pxtRelId: baseRel.id,
         pxtCdnUrl: appCdn + baseRel.id + "/c/",
