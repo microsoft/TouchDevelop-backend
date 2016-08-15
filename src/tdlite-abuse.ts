@@ -477,7 +477,7 @@ async function postAvertReportAsync(req: core.ApiRequest): Promise<void> {
         "ContentItems": data
     }
 
-    let areq = td.createRequest("https://cvsnaprod.azure-api.net/ppe/avert/avert")
+    let areq = td.createRequest("https://cvsnaprod.azure-api.net/avert/avert")
     areq.setHeader("Ocp-Apim-Subscription-Key", tok)
     areq.setMethod("POST")
     areq.setContentAsJson(avertReq)
