@@ -1035,6 +1035,7 @@ var subFiles = {
     manifest: "release.manifest",
     worker: "worker.js",
     tdworker: "tdworker.js",
+    monacoworker: "monacoworker.js",
     simulator: "simulator.html",
     simmanifest: "sim.manifest",
     webmanifest: "sim.webmanifest",
