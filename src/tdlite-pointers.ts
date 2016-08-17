@@ -1237,6 +1237,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                 } else {
                     if (artobj["contentType"] == "text/markdown") {
                         v.text = await renderMarkdownAsync(ptr, artobj, langs, vhostDirName)
+                    } else if (artobj["contentType"] == "text/plain" || artobj["contentType"] == "application/xml") {
+                        v.text = await getArtTextAsync(artobj)
+                        v.contentType = artobj["contentType"]
                     } else {
                         v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                     }

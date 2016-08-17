@@ -106,6 +106,47 @@ var ts;
                 }
             }
             Util.jsonCopyFrom = jsonCopyFrom;
+            // { a: { b: 1 }, c: 2} => { "a.b": 1, c: 2 }
+            function jsonFlatten(v) {
+                var res = {};
+                var loop = function (pref, v) {
+                    if (typeof v == "object") {
+                        assert(!Array.isArray(v));
+                        if (pref)
+                            pref += ".";
+                        for (var _i = 0, _a = Object.keys(v); _i < _a.length; _i++) {
+                            var k = _a[_i];
+                            loop(pref + k, v[k]);
+                        }
+                    }
+                    else {
+                        res[pref] = v;
+                    }
+                };
+                loop("", v);
+                return res;
+            }
+            Util.jsonFlatten = jsonFlatten;
+            function jsonUnFlatten(v) {
+                var res = {};
+                for (var _i = 0, _a = Object.keys(v); _i < _a.length; _i++) {
+                    var k = _a[_i];
+                    var ptr = res;
+                    var parts = k.split(".");
+                    for (var i = 0; i < parts.length; ++i) {
+                        var part = parts[i];
+                        if (i == parts.length - 1)
+                            ptr[part] = v[k];
+                        else {
+                            if (typeof ptr[part] != "object")
+                                ptr[part] = {};
+                            ptr = ptr[part];
+                        }
+                    }
+                }
+                return res;
+            }
+            Util.jsonUnFlatten = jsonUnFlatten;
             function strcmp(a, b) {
                 if (a == b)
                     return 0;
@@ -327,6 +368,14 @@ var ts;
                 }
             }
             Util.timeSince = timeSince;
+            function escapeForRegex(str) {
+                return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+            }
+            Util.escapeForRegex = escapeForRegex;
+            function stripUrlProtocol(str) {
+                return str.replace(/.*?:\/\//g, "");
+            }
+            Util.stripUrlProtocol = stripUrlProtocol;
             Util.isNodeJS = false;
             function requestAsync(options) {
                 return Util.httpRequestCoreAsync(options)
@@ -883,21 +932,25 @@ var pxt;
             }));
         }
         docs.html2Quote = html2Quote;
+        //The extra YouTube macros are in case there is a timestamp on the YouTube URL.
+        //TODO: Add equivalent support for youtu.be links
         var links = [
             {
                 rx: /^vimeo\.com\/(\d+)/,
                 cmd: "### @vimeo $1"
             },
             {
-                rx: /^youtu\.be\/(\w+)/,
-                cmd: "### @youtube $1"
-            },
-            {
-                rx: /^www\.youtube\.com\/watch\?v=(\w+)/,
-                cmd: "### @youtube $1"
-            },
+                rx: /^(www\.youtube\.com\/watch\?v=|youtu.be\/)(\w+(\#t=([0-9]+m[0-9]+s|[0-9]+m|[0-9]+s))?)/,
+                cmd: "### @youtube $2"
+            }
         ];
-        docs.requireMarked = function () { return require("marked"); };
+        docs.requireMarked = function () {
+            if (typeof marked !== "undefined")
+                return marked;
+            if (typeof require === "undefined")
+                return undefined;
+            return require("marked");
+        };
         function renderMarkdown(template, src, theme, pubinfo, breadcrumb) {
             if (theme === void 0) { theme = {}; }
             if (pubinfo === void 0) { pubinfo = null; }
@@ -910,7 +963,7 @@ var pxt;
             function parseHtmlAttrs(s) {
                 var attrs = {};
                 while (s.trim()) {
-                    var m = /^\s*([^=\s]+)=("([^"]*)"|'([^']*)'|(\S*))/.exec(s);
+                    var m = /\s*([^=\s]+)=("([^"]*)"|'([^']*)'|(\S*))/.exec(s);
                     if (m) {
                         var v = m[3] || m[4] || m[5] || "";
                         attrs[m[1].toLowerCase()] = v;
@@ -972,10 +1025,22 @@ var pxt;
                     pedantic: false,
                     sanitize: true,
                     smartLists: true,
-                    smartypants: true
+                    smartypants: true,
+                    highlight: function (code, lang) {
+                        try {
+                            var hljs = require('highlight.js');
+                            if (!hljs)
+                                return code;
+                            return hljs.highlightAuto(code, [lang.replace('-ignore', '')]).value;
+                        }
+                        catch (e) {
+                            return code;
+                        }
+                    }
                 });
             }
             ;
+            //Uses the CmdLink definitions to replace links to YouTube and Vimeo (limited at the moment)
             src = src.replace(/^\s*https?:\/\/(\S+)\s*$/mg, function (f, lnk) {
                 var _loop_1 = function(ent) {
                     var m = ent.rx.exec(lnk);
@@ -1042,7 +1107,7 @@ var pxt;
                     params["title"] = html2Quote(titleM[1]);
             }
             if (!params["description"]) {
-                var descM = /<p>(.+?)<\/p>/.exec(html);
+                var descM = /<p>([^]+?)<\/p>/.exec(html);
                 if (descM)
                     params["description"] = html2Quote(descM[1]);
             }
@@ -1060,6 +1125,8 @@ var pxt;
                 registers[nam] = (s || "") + cont;
                 return "<!-- aside -->";
             });
+            // fix up spourious newlines at the end of code blocks
+            html = html.replace(/\n<\/code>/g, "</code>");
             registers["main"] = html;
             var injectBody = function (tmpl, body) {
                 return injectHtml(boxes[tmpl] || "@BODY@", { BODY: body }, ["BODY"]);
