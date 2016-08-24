@@ -366,6 +366,10 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
         if (now - currStatus.starttime < buildTimeout) {
             return;
         }
+        if (!currStatus.success) {
+            // we're restarting the compilation - remove stale status file
+            await compileContainer.deleteBlobAsync(sha + ".json")
+        }
     }
 
     let shouldStart = false;
