@@ -640,7 +640,7 @@ async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string[], 
     return tdliteDocs.renderMarkdown(templ, textObj, theme, pubinfo, breadcrumb)
 }
 
-async function getArtTextAsync(artobj: {}) {
+async function getArtTextAsync(artobj: {}, binary = false) {
     let redisKey = "arttext:" + artobj["id"]
     let existing = await core.redisClient.getAsync(redisKey)
     if (existing != null) {
@@ -648,7 +648,11 @@ async function getArtTextAsync(artobj: {}) {
     }
     let url = tdliteArt.getBlobUrl(artobj)
     let resp = await td.createRequest(url).sendAsync();
-    let textObj = resp.content();
+    let textObj = ""
+    if (binary)
+        textObj = resp.contentAsBuffer().toString("base64")
+    else
+        textObj = resp.content();
     if (textObj != null) {
         await core.redisClient.setpxAsync(redisKey, textObj, 7200 * 1000)
     }
@@ -894,9 +898,14 @@ async function rewriteAndCachePointerAsync(id: string, langs: string[], res: res
         if (status0 == 0) {
             status0 = 200;
         }
-        res.sendText(cachedPage.text, cachedPage.contentType, {
-            status: status0
-        });
+        if (cachedPage.isBinary)
+            res.sendBuffer(new Buffer(cachedPage.text, "base64"), cachedPage.contentType, {
+                status: status0
+            });
+        else
+            res.sendText(cachedPage.text, cachedPage.contentType, {
+                status: status0
+            });
         if (core.orFalse(cachedPage.error)) {
             cat = "error";
         }
@@ -1006,6 +1015,7 @@ interface CachedPage {
     version: string;
     redirect?: string;
     text?: string;
+    isBinary?: boolean; // text is base64 encoded
     error: boolean;
     customtick?: string;
     status: number;
@@ -1240,6 +1250,10 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
                     } else if (artobj["contentType"] == "text/plain" || artobj["contentType"] == "application/xml") {
                         v.text = await getArtTextAsync(artobj)
                         v.contentType = artobj["contentType"]
+                    } else if (artobj["contentType"] == "image/x-icon") {
+                        v.text = await getArtTextAsync(artobj, true)
+                        v.contentType = artobj["contentType"]
+                        v.isBinary = true
                     } else {
                         v.redirect = core.currClientConfig.primaryCdnUrl + "/pub/" + (artobj["filename"] || artobj["id"]);
                     }

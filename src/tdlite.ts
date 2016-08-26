@@ -180,7 +180,7 @@ async function _initAsync() : Promise<void>
                 } else if (url.startsWith("/userapp/")) {
                     await tdliteReleases.serveWebAppAsync(req, res);
                 }
-                else if (url.startsWith("/favicon.ico")) {
+                else if (!core.pxt && url.startsWith("/favicon.ico")) {
                     res.sendBuffer(await tdliteReleases.getFaviconAsync(), "image/x-icon");
                 }
                 else if (url.startsWith("/verify/")) {
