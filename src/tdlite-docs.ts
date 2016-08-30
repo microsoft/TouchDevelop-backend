@@ -21,6 +21,7 @@ export interface BreadcrumbEntry {
 }
 
 export var renderMarkdown: (template: string, src: string, theme: {}, pubinfo?: {}, breadcrumb?: BreadcrumbEntry[]) => string = pxt.docs.renderMarkdown;
+//export var embedUrl: (rootUrl: string, id: string, height?: number)=> string  = pxt.docs.embedUrl;
 
 export async function formatAsync(templ: string, pubdata: JsonBuilder): Promise<string> {
     if (pubdata["time"] != null) {

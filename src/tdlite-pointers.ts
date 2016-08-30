@@ -979,15 +979,16 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         let theme = await getTargetThemeAsync(targetName, lang)
         let readmeMd = ""
 
-        if (pub["userid"] != core.serviceSettings.accounts["anonscript"]) {
-            let textObj = await tdliteScripts.getScriptTextAsync(scriptjson["id"])
-            if (textObj) {
-                try {
-                    let files = JSON.parse(textObj["text"])
-                    readmeMd = files["README.md"] || ""
-                } catch (e) {
-                }
+        let textObj = await tdliteScripts.getScriptTextAsync(scriptjson["id"])
+        if (textObj) {
+            try {
+                let files = JSON.parse(textObj["text"])
+                readmeMd = files["README.md"] || ""
+            } catch (e) {
             }
+        }
+
+        if (pub["userid"] != core.serviceSettings.accounts["anonscript"]) {
             pub["byuser"] = core.translateMessage("by", lang) + " " + pub["username"]
         }
 
@@ -997,6 +998,8 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         pub["title"] = pub["name"]
         fixupPubForRender(pub, theme)
         let templTxt = await getTemplateTextAsync(templ, lang)
+        logger.debug("readmeMd: " + readmeMd)
+        logger.debug("templ: " + templTxt)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
         if (/#stepByStep/i.test(pub["description"]))
