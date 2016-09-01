@@ -441,7 +441,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         }
     }
 
-    if (fn == "simulator.html" || fn == "sim.manifest") {
+    if (fn == "simulator.html" || fn == "sim.manifest" || fn == "siminstructions.html") {
         if (!targetIsMatching) {
             res.sendError(404, "simulator.html only available on trg-..., not on " + targetFromHost);
             return
@@ -617,7 +617,7 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
 
     if (!info.text()) return srcFile + " missing in " + srcRelId
 
-    let domain = core.serviceSettings.domains[prel.target] || core.myHost
+    let domain = tdlitePointers.domainOfTarget(prel.target) || core.myHost
 
     let simCdn = core.currClientConfig.primaryCdnUrl + "/app/" + prel.releaseid + "/c/"
 
@@ -631,12 +631,14 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
         pxtVersion: sanitize(baseRel.pkgversion),
         pxtRelId: baseRel.id,
         pxtCdnUrl: appCdn + baseRel.id + "/c/",
+        targetUrl: "https://" + domain,
         targetVersion: sanitize(prel.pkgversion),
         targetRelId: prel.id,
         targetCdnUrl: appCdn + prel.id + "/c/",
         targetId: prel.target,
         runUrl: relprefix + "run",
         docsUrl: relprefix + "docs",
+        partsUrl: `https://trg-${prel.target}.${simdom}${relprefix}siminstructions`,
         simUrl: `https://trg-${prel.target}.${simdom}${relprefix}simulator`
     }
 

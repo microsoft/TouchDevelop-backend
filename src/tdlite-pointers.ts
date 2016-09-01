@@ -1051,10 +1051,11 @@ var subFiles = {
     monacoworker: "monacoworker.js",
     simulator: "simulator.html",
     simmanifest: "sim.manifest",
+    siminstructions: "siminstructions.html",
     webmanifest: "sim.webmanifest",
 }
 
-function domainOfTarget(trg: string) {
+export function domainOfTarget(trg: string) {
     for (let domain of Object.keys(core.serviceSettings.domains)) {
         let path = core.serviceSettings.domains[domain]
         if (trg == path) return domain;
