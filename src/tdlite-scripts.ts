@@ -302,7 +302,7 @@ async function insertScriptAsync(jsb: JsonBuilder, pubScript: PubScript, scriptT
     await scriptText.justInsertAsync(pubScript.id, bodyBuilder);
     //
     core.progress("publish - about to update insert2");
-    await core.pubsContainer.updateAsync(updateKey, async(entry: JsonBuilder) => {
+    await core.pubsContainer.updateAsync(updateKey, async (entry: JsonBuilder) => {
         if (!entry.hasOwnProperty("id0")) {
             entry["id0"] = withDefault(entry["scriptId"], updateEntry.pub);
         }
@@ -362,15 +362,15 @@ export async function initAsync(): Promise<void> {
         store: scripts,
         deleteWithAuthor: true,
         importOne: importScriptAsync,
-        specialDeleteAsync: async(entryid: string, delentry: JsonObject) => {
-            await scriptText.updateAsync(entryid, async(entry1: JsonBuilder) => {
+        specialDeleteAsync: async (entryid: string, delentry: JsonObject) => {
+            await scriptText.updateAsync(entryid, async (entry1: JsonBuilder) => {
                 for (let fld of Object.keys(entry1)) {
                     delete entry1[fld];
                 }
             });
         },
     })
-    await core.setResolveAsync(scripts, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(scripts, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await resolveScriptsAsync(fetchResult, apiRequest, false);
     }
         , {
@@ -378,18 +378,18 @@ export async function initAsync(): Promise<void> {
             anonSearch: true
         });
     // ### all
-    core.addRoute("GET", "language", "*", async(req: core.ApiRequest) => {
+    core.addRoute("GET", "language", "*", async (req: core.ApiRequest) => {
         await core.throttleAsync(req, "tdcompile", 20);
         if (req.status == 200) {
             let s = req.origUrl.replace(/^\/api\/language\//g, "");
             await tdliteTdCompiler.forwardToCloudCompilerAsync(req, "language/" + s);
         }
     });
-    core.addRoute("GET", "doctopics", "", async(req1: core.ApiRequest) => {
+    core.addRoute("GET", "doctopics", "", async (req1: core.ApiRequest) => {
         let resp = await tdliteTdCompiler.queryCloudCompilerAsync("doctopics");
         req1.response = resp["topicsExt"];
     });
-    core.addRoute("GET", "*script", "*", async(req2: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "*", async (req2: core.ApiRequest) => {
         let isTd = !req2.rootPub["pub"]["editor"];
         if (!isTd) {
             req2.status = httpCode._405MethodNotAllowed;
@@ -402,7 +402,7 @@ export async function initAsync(): Promise<void> {
             }
         }
     });
-    core.addRoute("POST", "scripts", "", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "scripts", "", async (req: core.ApiRequest) => {
         if (!req.userid) {
             let anonId = core.serviceSettings.accounts["anonscript"]
             if (anonId) {
@@ -477,12 +477,12 @@ export async function initAsync(): Promise<void> {
         , {
             sizeCheckExcludes: "text"
         });
-    core.addRoute("POST", "*script", "", async(req4: core.ApiRequest) => {
+    core.addRoute("POST", "*script", "", async (req4: core.ApiRequest) => {
         let unmod = td.toBoolean(req4.body["unmoderated"])
         if (unmod != null) {
             await core.checkFacilitatorPermissionAsync(req4, req4.rootPub["pub"]["userid"]);
             if (req4.status == 200) {
-                await core.pubsContainer.updateAsync(req4.rootId, async(entry: JsonBuilder) => {
+                await core.pubsContainer.updateAsync(req4.rootId, async (entry: JsonBuilder) => {
                     entry["pub"]["unmoderated"] = unmod;
                 });
                 if (!unmod) {
@@ -495,13 +495,13 @@ export async function initAsync(): Promise<void> {
             req4.status = httpCode._400BadRequest;
         }
     });
-    core.addRoute("POST", "*script", "meta", async(req5: core.ApiRequest) => {
+    core.addRoute("POST", "*script", "meta", async (req5: core.ApiRequest) => {
         if (!core.callerHasPermission(req5, "script-promo")) {
             core.checkPubPermission(req5);
         }
         await core.canPostAsync(req5, "script-meta");
         if (req5.status == 200) {
-            await core.pubsContainer.updateAsync(req5.rootId, async(v: JsonBuilder) => {
+            await core.pubsContainer.updateAsync(req5.rootId, async (v: JsonBuilder) => {
                 let meta = v["pub"]["meta"];
                 if (meta == null) {
                     meta = {};
@@ -528,7 +528,7 @@ export async function initAsync(): Promise<void> {
             }
         }
     });
-    core.addRoute("GET", "*script", "text", async(req6: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "text", async (req6: core.ApiRequest) => {
         if (await canSeeRootpubScriptAsync(req6)) {
             let entry2 = await scriptText.getAsync(req6.rootId);
             req6.response = entry2["text"];
@@ -537,17 +537,17 @@ export async function initAsync(): Promise<void> {
             req6.status = httpCode._402PaymentRequired;
         }
     });
-    core.addRoute("GET", "*script", "scripts", async(req6: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "scripts", async (req6: core.ApiRequest) => {
         // TODO consumers?
         req6.response = {
             items: [],
             continuation: null
         }
     });
-    core.addRoute("GET", "*script", "canexportapp", async(req7: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "canexportapp", async (req7: core.ApiRequest) => {
         req7.response = ({ canExport: false, reason: "App export not supported in Lite." });
     });
-    core.addRoute("GET", "*script", "base", async(req8: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "base", async (req8: core.ApiRequest) => {
         let baseId = req8.rootPub["pub"]["baseid"];
         if (baseId == "") {
             req8.status = 404;
@@ -560,7 +560,7 @@ export async function initAsync(): Promise<void> {
         }
     });
 
-    core.addRoute("GET", "showcase-scripts", "", async(req9: core.ApiRequest) => {
+    core.addRoute("GET", "showcase-scripts", "", async (req9: core.ApiRequest) => {
         if (!lastShowcaseDl || Date.now() - lastShowcaseDl.getTime() > 20000) {
             let js = await td.downloadJsonAsync("https://tdshowcase.blob.core.windows.net/export/current.json");
             showcaseIds = td.toStringArray(js["ids"]) || [];
@@ -575,52 +575,52 @@ export async function initAsync(): Promise<void> {
     core.aliasRoute("GET", "top-scripts", "showcase-scripts");
     // ### by base
     await scripts.createIndexAsync("baseid", entry1 => withDefault(entry1["pub"]["baseid"], "-"));
-    core.addRoute("GET", "*script", "successors", async(req10: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "successors", async (req10: core.ApiRequest) => {
         await core.anyListAsync(scripts, req10, "baseid", req10.rootId);
     });
     await scripts.createIndexAsync("scripthash", entry4 => entry4["pub"]["scripthash"]);
-    core.addRoute("GET", "scripthash", "*", async(req11: core.ApiRequest) => {
+    core.addRoute("GET", "scripthash", "*", async (req11: core.ApiRequest) => {
         await core.anyListAsync(scripts, req11, "scripthash", req11.verb);
     });
     await scripts.createIndexAsync("updatekey", entry5 => entry5["updateKey"]);
-    core.addRoute("GET", "*script", "updates", async(req12: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "updates", async (req12: core.ApiRequest) => {
         await core.anyListAsync(scripts, req12, "updatekey", req12.rootPub["updateKey"]);
     });
     await scripts.createIndexAsync("rootid", entry6 => entry6["pub"]["rootid"]);
-    core.addRoute("GET", "*script", "family", async(req13: core.ApiRequest) => {
+    core.addRoute("GET", "*script", "family", async (req13: core.ApiRequest) => {
         await core.anyListAsync(scripts, req13, "rootid", req13.rootPub["pub"]["rootid"]);
     });
 
-    core.addRoute("POST", "*script", "importfixup", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "*script", "importfixup", async (req: core.ApiRequest) => {
         if (!core.checkPermission(req, "root")) return;
         let text = orEmpty(req.body["text"]);
         if (!text) {
             req.status = 400;
             return;
         }
-        await scriptText.updateAsync(req.rootId, async(v) => {
+        await scriptText.updateAsync(req.rootId, async (v) => {
             v["text"] = req.body["text"];
         })
         let hash = core.sha256(text).substr(0, 32)
-        await scripts.reindexAsync(req.rootId, async(v) => {
+        await scripts.reindexAsync(req.rootId, async (v) => {
             v["pub"]["scripthash"] = hash;
         })
         req.response = { scripthash: hash }
     }, { sizeCheckExcludes: "text" });
 
-    if (1>1)
-        core.addRoute("POST", "admin", "reindexscripts", async(req15: core.ApiRequest) => {
+    if (1 > 1)
+        core.addRoute("POST", "admin", "reindexscripts", async (req15: core.ApiRequest) => {
             core.checkPermission(req15, "operator");
             if (req15.status == 200) {
-            /* async */ scripts.getIndex("all").forAllBatchedAsync("all", 50, async(json) => {
-                    await parallel.forJsonAsync(json, async(json1: JsonObject) => {
+            /* async */ scripts.getIndex("all").forAllBatchedAsync("all", 50, async (json) => {
+                    await parallel.forJsonAsync(json, async (json1: JsonObject) => {
                         let pub = json1["pub"];
                         let r = orFalse(pub["noexternallinks"]);
                         if (!r) {
                             let userjson = await tdliteUsers.getAsync(pub["userid"]);
                             if (!core.hasPermission(userjson, "external-links")) {
                                 logger.debug("noexternallink -> true on " + json1["id"]);
-                                await scripts.container.updateAsync(json1["id"], async(entry7: JsonBuilder) => {
+                                await scripts.container.updateAsync(json1["id"], async (entry7: JsonBuilder) => {
                                     entry7["pub"]["noexternallinks"] = true;
                                 });
                             }
@@ -637,7 +637,7 @@ export async function initAsync(): Promise<void> {
 async function clearScriptCountsAsync(script: PubScript): Promise<void> {
     script.screenshots = 0;
     script.comments = 0;
-    await core.pubsContainer.updateAsync(script.id, async(entry: JsonBuilder) => {
+    await core.pubsContainer.updateAsync(script.id, async (entry: JsonBuilder) => {
         entry["pub"]["screenshots"] = 0;
         entry["pub"]["comments"] = 0;
     });
