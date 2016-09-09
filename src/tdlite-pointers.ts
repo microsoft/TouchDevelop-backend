@@ -595,11 +595,20 @@ async function getTargetThemeAsync(targetName: string, langs: string[]) {
     return theme || {}
 }
 
+async function getThemeTemplateAsync(name: string, theme: any, lang: string[]) {
+    let templ:string = (theme.htmlTemplates || {})[name + ".html"]
+    if (templ)
+        templ = await tdliteI18N.translateHtmlAsync(templ, lang)
+    else
+        templ = await getTemplateTextAsync("templates/" + name, lang)
+    return templ
+}
+
 async function renderMarkdownAsync(ptr: PubPointer, artobj: {}, lang: string[], targetName: string) {
     let theme = await getTargetThemeAsync(targetName, lang)
     let textObj = await getArtTextAsync(artobj)
     if (!textObj) textObj = "Art object not found."
-    let templ = await getTemplateTextAsync("templates/docs", lang)
+    let templ = await getThemeTemplateAsync("docs", theme, lang)
 
     let breadcrumb: tdliteDocs.BreadcrumbEntry[] = [{
         name: ptr.breadcrumbtitle,
@@ -941,7 +950,6 @@ async function lookupScreenshotIdAsync(pub: {}) {
 async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string[], domain: string) {
     let req = core.buildApiRequest("/api")
     let pub = await core.resolveOnePubAsync(tdliteScripts.scripts, streamjson, req);
-    let templ = "templates/stream"
 
     let targetName: string = pub["target"]
     let theme = await getTargetThemeAsync(targetName, lang)
@@ -949,7 +957,7 @@ async function renderStreamPageAsync(streamjson: {}, v: CachedPage, lang: string
     pub["humantime"] = tdliteDocs.humanTime(new Date(pub["time"] * 1000));
     pub["apiroot"] = "https://" + domain + "/api/"
 
-    let templTxt = await getTemplateTextAsync(templ, lang)
+    let templTxt = await getThemeTemplateAsync("stream", theme, lang)
     v.text = tdliteDocs.renderMarkdown(templTxt, "", theme, pub)
 }
 
@@ -997,9 +1005,9 @@ async function renderScriptPageAsync(scriptjson: {}, v: CachedPage, lang: string
         pub["oembedurl"] = `${self}api/oembed?url=${encodeURIComponent(self + req.rootId)}`
         pub["title"] = pub["name"]
         fixupPubForRender(pub, theme)
-        let templTxt = await getTemplateTextAsync(templ, lang)
-        logger.debug("readmeMd: " + readmeMd)
-        logger.debug("templ: " + templTxt)
+        let templTxt = await getThemeTemplateAsync("script", theme, lang)
+        //logger.debug("readmeMd: " + readmeMd)
+        //logger.debug("templ: " + templTxt)
         v.text = tdliteDocs.renderMarkdown(templTxt, readmeMd, theme, pub)
     } else {
         if (/#stepByStep/i.test(pub["description"]))
