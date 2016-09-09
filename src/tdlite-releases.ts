@@ -74,7 +74,7 @@ export async function initAsync(): Promise<void> {
     filesContainer = await core.blobService.createContainerIfNotExistsAsync("files", "hidden");
 
     releases = await indexedStore.createStoreAsync(core.pubsContainer, "release");
-    await core.setResolveAsync(releases, async(fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
+    await core.setResolveAsync(releases, async (fetchResult: indexedStore.FetchResult, apiRequest: core.ApiRequest) => {
         await core.addUsernameEtcAsync(fetchResult);
         let coll = (<PubRelease[]>[]);
         let labels = <IReleaseLabel[]>[];
@@ -102,20 +102,25 @@ export async function initAsync(): Promise<void> {
     }, { byUserid: true });
 
     await releases.createIndexAsync("target", entry => entry["pub"]["target"] || "none");
-    core.addRoute("GET", "releases", "bytarget", async(req: core.ApiRequest) => {
+    core.addRoute("GET", "releases", "bytarget", async (req: core.ApiRequest) => {
         await core.anyListAsync(releases, req, "target", req.argument);
     });
 
-    core.addRoute("GET", "releasecfg", "*", async(req: core.ApiRequest) => {
+    core.addRoute("GET", "releasecfg", "*", async (req: core.ApiRequest) => {
         req.response = {
 
         }
     });
 
-    core.addRoute("POST", "releases", "", async(req: core.ApiRequest) => {
+    core.addRoute("POST", "releases", "", async (req: core.ApiRequest) => {
         let baseid = orEmpty(req.body["baserelease"])
 
-        if (baseid)
+        let target = orEmpty(req.body["target"])
+        if (!core.isValidTargetName(target)) target = ""
+
+        if (target && core.callerHasPermission(req, "upload-trg-" + target))  {
+            // OK
+        } else if (baseid)
             core.checkPermission(req, "upload-target");
         else
             core.checkPermission(req, "upload");
@@ -144,8 +149,7 @@ export async function initAsync(): Promise<void> {
             rel.pkgversion = orEmpty(req.body["pkgversion"]);
             rel.buildnumber = core.orZero(req.body["buildnumber"]);
             rel.baserelease = baseid
-            rel.target = orEmpty(req.body["target"])
-            if (!core.isValidTargetName(rel.target)) rel.target = ""
+            rel.target = target
             rel.type = orEmpty(req.body["type"]) && baseRel ? "target" : ""
 
             if (!baseid && req.body["type"] === "fulltarget")
@@ -160,7 +164,7 @@ export async function initAsync(): Promise<void> {
                 }
             }
 
-            await core.updateSettingsAsync("releaseversion", async(entry: JsonBuilder) => {
+            await core.updateSettingsAsync("releaseversion", async (entry: JsonBuilder) => {
                 let x = core.orZero(entry[core.releaseVersionPrefix]) + 1;
                 entry[core.releaseVersionPrefix] = x;
                 rel.version = core.releaseVersionPrefix + "." + x + "." + rel.buildnumber;
@@ -209,7 +213,7 @@ export async function initAsync(): Promise<void> {
         });
     }
 
-    core.addRoute("POST", "*release", "files", async(req2: core.ApiRequest) => {
+    core.addRoute("POST", "*release", "files", async (req2: core.ApiRequest) => {
         let rel = PubRelease.createFromJson(req2.rootPub["pub"]);
         let isTrg = !!rel.baserelease
         core.checkPermission(req2, isTrg ? "upload-target" : "upload");
@@ -231,7 +235,7 @@ export async function initAsync(): Promise<void> {
         }
     }, { sizeCheckExcludes: "content" });
 
-    core.addRoute("POST", "*release", "label", async(req3: core.ApiRequest) => {
+    core.addRoute("POST", "*release", "label", async (req3: core.ApiRequest) => {
         let name = orEmpty(req3.body["name"]);
         if (!isKnownReleaseName(name)) {
             req3.status = httpCode._412PreconditionFailed;
@@ -249,7 +253,7 @@ export async function initAsync(): Promise<void> {
             lab.relid = rel3.id;
             lab.numpokes = 0;
             await audit.logAsync(req3, "lbl-" + lab.name);
-            await core.updateSettingsAsync("releases", async(entry2: JsonBuilder) => {
+            await core.updateSettingsAsync("releases", async (entry2: JsonBuilder) => {
                 let jsb2 = entry2["ids"];
                 if (jsb2 == null) {
                     jsb2 = {};
@@ -265,11 +269,11 @@ export async function initAsync(): Promise<void> {
             req3.response = ({});
         }
     });
-    core.addRoute("POST", "pokecloud", "", async(req4: core.ApiRequest) => {
+    core.addRoute("POST", "pokecloud", "", async (req4: core.ApiRequest) => {
         await pokeReleaseAsync("cloud", 0);
         req4.response = {}
     });
-    core.addRoute("POST", "upload", "files", async(req4: core.ApiRequest) => {
+    core.addRoute("POST", "upload", "files", async (req4: core.ApiRequest) => {
         if (td.startsWith(orEmpty(req4.body["filename"]).toLowerCase(), "override")) {
             core.checkPermission(req4, "root");
         }
@@ -288,7 +292,7 @@ export async function initAsync(): Promise<void> {
         }
     }, { sizeCheckExcludes: "content" });
 
-    core.addRoute("GET", "language", "touchdevelop.tgz", async(req: core.ApiRequest) => {
+    core.addRoute("GET", "language", "touchdevelop.tgz", async (req: core.ApiRequest) => {
         let r = core.getSettings("releases")["ids"] || {}
         let labl = <IReleaseLabel>r["cloud"]
         if (labl) {
@@ -383,7 +387,7 @@ export async function serveWebAppAsync(req: restify.Request, res: restify.Respon
 
     wid = scr["id"];
 
-    await rewriteAndCacheAsync(rel + "-" + wid, relid, "webapp.html", "text/html", res, async(text) => {
+    await rewriteAndCacheAsync(rel + "-" + wid, relid, "webapp.html", "text/html", res, async (text) => {
         text = await rewriteIndexAsync(rel, relid, text);
         text = text.replace("precompiled.js?a=", "/api/" + wid + "/webapp.js")
         return text;
@@ -464,17 +468,17 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
         else if (fn == "") {
             if (core.pxt && (rel == "current" || rel == "latest" || rel == "beta"))
                 res.redirect(httpCode._302MovedTemporarily, "/microbit");
-            await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async(text: string) => {
+            await rewriteAndCacheAsync(rel, relid, "index.html", "text/html", res, async (text: string) => {
                 return await rewriteIndexAsync(rel, relid, text)
             });
         }
         else if (fn == "simulator.html" || fn == "sim.manifest") {
-            await rewriteAndCacheAsync(rel, relid, fn, /html/.test(fn) ? "text/html" : "text/cache-manifest", res, async(text2: string) => {
+            await rewriteAndCacheAsync(rel, relid, fn, /html/.test(fn) ? "text/html" : "text/cache-manifest", res, async (text2: string) => {
                 return await getLegacyRewrittenIndexAsync("/app/sim.manifest?r=" + relid, relid, fn)
             });
         }
         else if (/\.manifest$/.test(fn)) {
-            await rewriteAndCacheAsync(rel, relid, "app.manifest", "text/cache-manifest", res, async(text: string) => {
+            await rewriteAndCacheAsync(rel, relid, "app.manifest", "text/cache-manifest", res, async (text: string) => {
                 let result1: string;
                 text = td.replaceAll(text, "../../../", core.currClientConfig.primaryCdnUrl + "/");
                 text = td.replaceAll(text, "./", core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
@@ -490,7 +494,7 @@ export async function serveReleaseAsync(req: restify.Request, res: restify.Respo
             res.redirect(httpCode._301MovedPermanently, "/app/error.html");
         }
         else if (fn == "error.html" || fn == "browsers.html") {
-            await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async(text2: string) => {
+            await rewriteAndCacheAsync(rel, relid, fn, "text/html", res, async (text2: string) => {
                 return td.replaceAll(text2, "\"./", "\"" + core.currClientConfig.primaryCdnUrl + "/app/" + relid + "/c/");
             });
         }
@@ -569,7 +573,7 @@ export async function getLegacyRewrittenIndexAsync(manifest: string, id: string,
     cfg["ksVersion"] = (baseRel ? baseRel["pub"]["pkgversion"] : null)
     let verPref = `
         var tdVersion = "${ver}";
-        var tdConfig = ${JSON.stringify(cfg, null, 2) };
+        var tdConfig = ${JSON.stringify(cfg, null, 2)};
     `;
     text = td.replaceAll(text, "var rootUrl = ", verPref + "var tdlite = \"url\";\nvar rootUrl = ");
     return text;
@@ -590,13 +594,13 @@ export async function getRewrittenIndexAsync(relprefix: string, id: string, srcF
     if (!relpub) return "Release deleted."
 
     let prel = PubRelease.createFromJson(relpub["pub"]);
-    
+
     let isSim = /^sim/.test(srcFile)
 
     // no cache manifest on versioned releases - they just clog storage
     let manifest = relprefix + (isSim ? "simmanifest" : "manifest")
     if (/v\d+\./.test(relprefix)) manifest = ""
-    
+
     if (core.basicCreds) manifest = ""
 
     if (!prel.type)
@@ -683,7 +687,7 @@ async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string,
         let info = await appContainer.getBlobToTextAsync(relid + "/" + srcFile);
         if (info.succeded()) {
             let text = await rewrite(info.text());
-            await cacheRewritten.updateAsync(path, async(entry: JsonBuilder) => {
+            await cacheRewritten.updateAsync(path, async (entry: JsonBuilder) => {
                 entry["version"] = core.rewriteVersion;
                 entry["text"] = text;
             });
@@ -702,7 +706,7 @@ async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string,
 
 export async function pokeReleaseAsync(relLabel: string, delay: number): Promise<void> {
     await td.sleepAsync(delay);
-    await core.updateSettingsAsync("releases", async(entry: JsonBuilder) => {
+    await core.updateSettingsAsync("releases", async (entry: JsonBuilder) => {
         let jsb = entry["ids"][relLabel];
         jsb["numpokes"] = jsb["numpokes"] + 1;
     });
