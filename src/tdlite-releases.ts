@@ -118,7 +118,7 @@ export async function initAsync(): Promise<void> {
         let target = orEmpty(req.body["target"])
         if (!core.isValidTargetName(target)) target = ""
 
-        if (target && core.callerHasPermission(req, "upload-trg-" + target))  {
+        if (target && core.callerHasPermission(req, "upload-trg-" + target)) {
             // OK
         } else if (baseid)
             core.checkPermission(req, "upload-target");
@@ -270,6 +270,7 @@ export async function initAsync(): Promise<void> {
         }
     });
     core.addRoute("POST", "pokecloud", "", async (req4: core.ApiRequest) => {
+        if (!core.checkPermission(req4, "root-ptr")) return
         await pokeReleaseAsync("cloud", 0);
         req4.response = {}
     });
