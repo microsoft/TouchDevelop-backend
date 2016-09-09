@@ -1,11 +1,18 @@
 /// <reference path="../../typings/bluebird/bluebird.d.ts"/>
 var ts;
 (function (ts) {
-    var pxt;
-    (function (pxt) {
+    var pxtc;
+    (function (pxtc) {
+        pxtc.__dummy = 42;
+    })(pxtc = ts.pxtc || (ts.pxtc = {}));
+})(ts || (ts = {}));
+var pxtc = ts.pxtc;
+var ts;
+(function (ts) {
+    var pxtc;
+    (function (pxtc) {
         var Util;
         (function (Util) {
-            Util.debug = false;
             function assert(cond, msg) {
                 if (msg === void 0) { msg = "Assertion failed"; }
                 if (!cond) {
@@ -48,16 +55,16 @@ var ts;
                 return JSON.parse(JSON.stringify(v));
             }
             Util.clone = clone;
-            function iterStringMap(m, f) {
+            function iterMap(m, f) {
                 Object.keys(m).forEach(function (k) { return f(k, m[k]); });
             }
-            Util.iterStringMap = iterStringMap;
-            function mapStringMap(m, f) {
+            Util.iterMap = iterMap;
+            function mapMap(m, f) {
                 var r = {};
                 Object.keys(m).forEach(function (k) { return r[k] = f(k, m[k]); });
                 return r;
             }
-            Util.mapStringMap = mapStringMap;
+            Util.mapMap = mapMap;
             function mapStringMapAsync(m, f) {
                 var r = {};
                 return Promise.all(Object.keys(m).map(function (k) { return f(k, m[k]).then(function (v) { return r[k] = v; }); }))
@@ -87,11 +94,14 @@ var ts;
                 return r;
             }
             Util.concat = concat;
+            function isKV(v) {
+                return !!v && typeof v === "object" && !Array.isArray(v);
+            }
             function jsonMergeFrom(trg, src) {
                 if (!src)
                     return;
                 Object.keys(src).forEach(function (k) {
-                    if (typeof trg[k] === 'object' && typeof src[k] === "object")
+                    if (isKV(trg[k]) && isKV(src[k]))
                         jsonMergeFrom(trg[k], src[k]);
                     else
                         trg[k] = clone(src[k]);
@@ -506,7 +516,7 @@ var ts;
             function getMime(filename) {
                 var m = /\.([a-zA-Z0-9]+)$/.exec(filename);
                 if (m)
-                    switch (m[1]) {
+                    switch (m[1].toLowerCase()) {
                         case "txt": return "text/plain";
                         case "html":
                         case "htm": return "text/html";
@@ -671,6 +681,7 @@ var ts;
                 if (!sForPlural && lfmt != format && /\d:s\}/.test(lfmt)) {
                     lfmt = lfmt.replace(/\{\d+:s\}/g, "");
                 }
+                lfmt = lfmt.replace(/\{(id|loc):[^\}]+\}/g, '');
                 return fmt_va(lfmt, args);
             }
             Util.lf_va = lf_va;
@@ -686,6 +697,13 @@ var ts;
                 return n ? (n[0].toLocaleUpperCase() + n.slice(1)) : n;
             }
             Util.capitalize = capitalize;
+            function range(len) {
+                var r = [];
+                for (var i = 0; i < len; ++i)
+                    r.push(i);
+                return r;
+            }
+            Util.range = range;
             function toDataUri(data, mimetype) {
                 // TODO does this only support trusted data?
                 // weed out urls
@@ -706,18 +724,18 @@ var ts;
                     return "data:" + (mimetype || "image/png") + ";base64," + btoa(toUTF8(data));
             }
             Util.toDataUri = toDataUri;
-        })(Util = pxt.Util || (pxt.Util = {}));
-    })(pxt = ts.pxt || (ts.pxt = {}));
+        })(Util = pxtc.Util || (pxtc.Util = {}));
+    })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
 var ts;
 (function (ts) {
-    var pxt;
-    (function (pxt) {
+    var pxtc;
+    (function (pxtc) {
         var BrowserImpl;
         (function (BrowserImpl) {
-            pxt.Util.httpRequestCoreAsync = httpRequestCoreAsync;
-            pxt.Util.sha256 = sha256string;
-            pxt.Util.getRandomBuf = function (buf) {
+            pxtc.Util.httpRequestCoreAsync = httpRequestCoreAsync;
+            pxtc.Util.sha256 = sha256string;
+            pxtc.Util.getRandomBuf = function (buf) {
                 if (window.crypto)
                     window.crypto.getRandomValues(buf);
                 else {
@@ -729,7 +747,7 @@ var ts;
                 return new Promise(function (resolve, reject) {
                     var client;
                     var resolved = false;
-                    var headers = pxt.Util.clone(options.headers) || {};
+                    var headers = pxtc.Util.clone(options.headers) || {};
                     client = new XMLHttpRequest();
                     client.onreadystatechange = function () {
                         if (resolved)
@@ -767,7 +785,7 @@ var ts;
                         buf = data;
                     }
                     else {
-                        pxt.Util.oops("bad data");
+                        pxtc.Util.oops("bad data");
                     }
                     client.open(method, options.url);
                     Object.keys(headers).forEach(function (k) {
@@ -793,8 +811,8 @@ var ts;
                 return (v >>> b) | (v << (32 - b));
             }
             function sha256round(hs, w) {
-                pxt.Util.assert(hs.length == 8);
-                pxt.Util.assert(w.length == 64);
+                pxtc.Util.assert(hs.length == 8);
+                pxtc.Util.assert(w.length == 64);
                 for (var i = 16; i < 64; ++i) {
                     var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
                     var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
@@ -881,20 +899,22 @@ var ts;
             }
             BrowserImpl.sha256buffer = sha256buffer;
             function sha256string(s) {
-                return sha256buffer(pxt.Util.stringToUint8Array(pxt.Util.toUTF8(s)));
+                return sha256buffer(pxtc.Util.stringToUint8Array(pxtc.Util.toUTF8(s)));
             }
             BrowserImpl.sha256string = sha256string;
-        })(BrowserImpl = pxt.BrowserImpl || (pxt.BrowserImpl = {}));
-    })(pxt = ts.pxt || (ts.pxt = {}));
+        })(BrowserImpl = pxtc.BrowserImpl || (pxtc.BrowserImpl = {}));
+    })(pxtc = ts.pxtc || (ts.pxtc = {}));
 })(ts || (ts = {}));
 /// <reference path='../typings/marked/marked.d.ts' />
+/// <reference path='../built/pxtarget.d.ts' />
 /// <reference path="emitter/util.ts"/>
 var pxt;
 (function (pxt) {
     var docs;
     (function (docs) {
         var marked;
-        var U = ts.pxt.Util;
+        var U = pxtc.Util;
+        var lf = U.lf;
         var stdboxes = {};
         var stdmacros = {};
         var stdSetting = "<!-- @CMD@ @ARGS@ -->";
@@ -951,10 +971,11 @@ var pxt;
                 return undefined;
             return require("marked");
         };
-        function renderMarkdown(template, src, theme, pubinfo, breadcrumb) {
+        function renderMarkdown(template, src, theme, pubinfo, breadcrumb, filepath) {
             if (theme === void 0) { theme = {}; }
             if (pubinfo === void 0) { pubinfo = null; }
             if (breadcrumb === void 0) { breadcrumb = []; }
+            if (filepath === void 0) { filepath = null; }
             var params = pubinfo || {};
             var boxes = U.clone(stdboxes);
             var macros = U.clone(stdmacros);
@@ -1164,11 +1185,20 @@ var pxt;
             params["targetname"] = theme.name || "PXT";
             params["targetlogo"] = theme.docsLogo ? "<img class=\"ui mini image\" src=\"" + U.toDataUri(theme.docsLogo) + "\" />" : "";
             params["name"] = params["title"] + " - " + params["targetname"];
+            if (filepath && theme.githubUrl) {
+                //I would have used NodeJS path library, but this code may have to work in browser
+                var leadingTrailingSlash = /^\/|\/$/;
+                var githubUrl = theme.githubUrl.replace(leadingTrailingSlash, '') + "/blob/master/docs/" + filepath.replace(leadingTrailingSlash, '');
+                params["github"] = "<p style=\"margin-top:1em\"><a href=\"" + githubUrl + "\"><i class=\"write icon\"></i>" + lf("Edit this page on GitHub") + "</a></p>";
+            }
+            else {
+                params["github"] = "";
+            }
             var style = '';
             if (theme.accentColor)
                 style += "\n.ui.accent { color: " + theme.accentColor + "; }\n.ui.inverted.accent { background: " + theme.accentColor + "; }\n";
             params["targetstyle"] = style;
-            return injectHtml(template, params, ["body", "menu", "breadcrumb", "targetlogo"]);
+            return injectHtml(template, params, ["body", "menu", "breadcrumb", "targetlogo", "github"]);
         }
         docs.renderMarkdown = renderMarkdown;
         function injectHtml(template, vars, quoted) {
@@ -1184,6 +1214,18 @@ var pxt;
                 return res;
             });
         }
+        function embedUrl(rootUrl, id, height) {
+            var url = rootUrl + "?sandbox=1#pub:" + id;
+            var padding = '70%';
+            return "<div class=\"ui card sim\"><div class=\"ui content\"><div style=\"position:relative;height:0;padding-bottom:" + padding + ";overflow:hidden;\"><iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + url + "\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\"></iframe></div></div></div>";
+        }
+        docs.embedUrl = embedUrl;
+        function docsEmbedUrl(rootUrl, id, height) {
+            var docurl = rootUrl + "--docs?projectid=" + id;
+            height = Math.ceil(height || 300);
+            return "<div style=\"position:relative;height:calc(" + height + "px + 5em);width:100%;overflow:hidden;\"><iframe style=\"position:absolute;top:0;left:0;width:100%;height:100%;\" src=\"" + docurl + "\" allowfullscreen=\"allowfullscreen\" frameborder=\"0\"></iframe></div>";
+        }
+        docs.docsEmbedUrl = docsEmbedUrl;
     })(docs = pxt.docs || (pxt.docs = {}));
 })(pxt || (pxt = {}));
 /// <reference path="../pxtlib/docsrender.ts"/>
