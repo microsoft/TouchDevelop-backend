@@ -596,7 +596,7 @@ async function getTargetThemeAsync(targetName: string, langs: string[]) {
 }
 
 async function getThemeTemplateAsync(name: string, theme: any, lang: string[]) {
-    let templ:string = (theme.htmlTemplates || {})[name + ".html"]
+    let templ: string = (theme.htmlTemplates || {})[name + ".html"]
     if (templ)
         templ = await tdliteI18N.translateHtmlAsync(templ, lang)
     else
@@ -846,7 +846,7 @@ async function renderScriptAsync(scriptid: string, v: CachedPage, pubdata: JsonB
 }
 
 function cacheRoot(ptrid: string) {
-    return "ptrroot/" + splitLang(ptrid).base.replace(/---[a-z]+$/, "")
+    return "ptrroot/" + splitLang(ptrid).base.replace(/---[a-z]+$/, "").replace(/-app$/, "")
 }
 
 async function cacheRootVersionAsync(id: string, withCloud: boolean) {
@@ -1194,6 +1194,13 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             existing = await core.getPubAsync(id, "pointer");
             if (existing && !existing["pub"]["releaseid"])
                 existing = null
+            if (!existing) {
+                existing = await core.getPubAsync(id + "-app", "pointer")
+                if (existing && !existing["pub"]["releaseid"])
+                    existing = null
+                if (existing)
+                    id += "-app"
+            }
         }
 
         if (existing)
