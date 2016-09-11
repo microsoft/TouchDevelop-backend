@@ -216,7 +216,10 @@ export async function initAsync(): Promise<void> {
     core.addRoute("POST", "*release", "files", async (req2: core.ApiRequest) => {
         let rel = PubRelease.createFromJson(req2.rootPub["pub"]);
         let isTrg = !!rel.baserelease
-        core.checkPermission(req2, isTrg ? "upload-target" : "upload");
+        if (rel.target && core.callerHasPermission(req2, "upload-trg-" + rel.target)) {
+            // OK
+        } else
+            core.checkPermission(req2, isTrg ? "upload-target" : "upload");
         if (req2.status == 200) {
             let body = req2.body;
             let buf = new Buffer(orEmpty(body["content"]), orEmpty(body["encoding"]));
