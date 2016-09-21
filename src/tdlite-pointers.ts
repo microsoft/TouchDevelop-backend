@@ -319,7 +319,7 @@ export async function initAsync(): Promise<void> {
             let sid = req.param("scriptid")
             let script = await core.getPubAsync(sid, "script")
             if (script && script["pub"]["target"]) {
-                res.redirect(302, "/" + script["pub"]["target"] + "#embed:" + script["id"])
+                res.redirect(302, "/" + script["pub"]["target"] + "#sandbox:" + script["id"])
             } else {
                 let tmp = await errorHtmlAsync("Script not found", "No such script: /" + sid, lang)
                 res.html(tmp, { status: httpCode._404NotFound })
