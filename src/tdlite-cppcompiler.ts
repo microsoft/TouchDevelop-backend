@@ -425,8 +425,9 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
 
         let metainfo = await githubFetchAsync(ccfg, tag + "/generated/metainfo.json");
         if (metainfo == null) {
-            req.status = httpCode._412PreconditionFailed;
-            return;
+            metainfo = '{"functions": [],"enums": {}}'
+            //req.status = httpCode._412PreconditionFailed;
+            //return;
         }
 
         let modulejson = {
