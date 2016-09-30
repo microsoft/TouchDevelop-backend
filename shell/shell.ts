@@ -1726,7 +1726,7 @@ function startWorker(cb0, cb)
         w.child = child_process.fork("./script/compiled.js", [], {
             env: env,
             silent: true,
-        })
+        } as any)
         w.init(cb)
 
         cb0(w)
@@ -2942,7 +2942,7 @@ function main()
 
     var webSocketHandler = (req, sock, body) =>
         loadModule("faye-websocket", wsModule => {
-            global.WebSocket = wsModule.Client
+            (global as any).WebSocket = wsModule.Client
             if (!wsModule.isWebSocket(req)) {
                 sock.end()
                 return

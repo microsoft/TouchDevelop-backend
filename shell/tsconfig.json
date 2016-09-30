@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "target": "es5",
+        "noImplicitAny": false,
+        "outDir": "../built",
+        "newLine": "LF",
+        "module": "commonjs",
+        "sourceMap": false
+    },
+    "exclude": [
+    ]
+}
