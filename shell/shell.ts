@@ -26,14 +26,14 @@ import events = require('events');
 import net = require("net");
 import tls = require("tls");
 
-var config:any;
+var config: any;
 var currentReqNo = 0;
 var inAzure = false;
 var trustXff = false;
 var controllerUrl = "";
 var isNpm = false;
 var inNodeWebkit = false;
-var dataDir : string = ".";
+var dataDir: string = ".";
 var useFileSockets = false;
 var allowEditor = false;
 var numWorkers = 1;
@@ -41,46 +41,46 @@ var blobChannel = "";
 var restartInterval = 0;
 var numResponses = 0;
 var defaultCiphers =
-"ECDHE-RSA-AES128-GCM-SHA256:" +
-"ECDHE-ECDSA-AES128-GCM-SHA256:" +
-"ECDHE-RSA-AES256-GCM-SHA384:" +
-"ECDHE-ECDSA-AES256-GCM-SHA384:" +
-"DHE-RSA-AES128-GCM-SHA256:" +
-"ECDHE-RSA-AES128-SHA256:" +
-"DHE-RSA-AES128-SHA256:" +
-"ECDHE-RSA-AES256-SHA384:" +
-"DHE-RSA-AES256-SHA384:" +
-"ECDHE-RSA-AES256-SHA256:" +
-"DHE-RSA-AES256-SHA256:" +
-"HIGH:" +
-"!aNULL:" +
-"!eNULL:" +
-"!EXPORT:" +
-"!DES:" +
-"!RC4:" +
-"!MD5:" +
-"!PSK:" +
-"!SRP:" +
-"!CAMELLIA" +
-"";
+    "ECDHE-RSA-AES128-GCM-SHA256:" +
+    "ECDHE-ECDSA-AES128-GCM-SHA256:" +
+    "ECDHE-RSA-AES256-GCM-SHA384:" +
+    "ECDHE-ECDSA-AES256-GCM-SHA384:" +
+    "DHE-RSA-AES128-GCM-SHA256:" +
+    "ECDHE-RSA-AES128-SHA256:" +
+    "DHE-RSA-AES128-SHA256:" +
+    "ECDHE-RSA-AES256-SHA384:" +
+    "DHE-RSA-AES256-SHA384:" +
+    "ECDHE-RSA-AES256-SHA256:" +
+    "DHE-RSA-AES256-SHA256:" +
+    "HIGH:" +
+    "!aNULL:" +
+    "!eNULL:" +
+    "!EXPORT:" +
+    "!DES:" +
+    "!RC4:" +
+    "!MD5:" +
+    "!PSK:" +
+    "!SRP:" +
+    "!CAMELLIA" +
+    "";
 
-function dataPath(p : string) : string {
-  p = p || "";
-  return dataDir ? path.join(dataDir, p) : p;
+function dataPath(p: string): string {
+    p = p || "";
+    return dataDir ? path.join(dataDir, p) : p;
 }
 
-function userHome() : string {
-  return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+function userHome(): string {
+    return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
 }
 
 interface TdState {
-    downloadedFiles:StringMap<string>;
-    numDeploys:number;
-    deployedId:string;
-    dmeta:any;
+    downloadedFiles: StringMap<string>;
+    numDeploys: number;
+    deployedId: string;
+    dmeta: any;
 }
 
-var tdstate:TdState;
+var tdstate: TdState;
 
 interface LogMessage {
     timestamp: number;
@@ -89,14 +89,13 @@ interface LogMessage {
 
 class Logger {
     logIdx = -1;
-    logMsgs:LogMessage[] = [];
+    logMsgs: LogMessage[] = [];
     logSz = 1000;
-    
-    constructor(public name : string, public level:number)
-    {}
 
-    addMsg(s:string)
-    {
+    constructor(public name: string, public level: number)
+    { }
+
+    addMsg(s: string) {
         var m = {
             timestamp: Date.now(),
             msg: s
@@ -113,13 +112,11 @@ class Logger {
         }
     }
 
-    log(...args:any[])
-    {
+    log(...args: any[]) {
         this.addMsg(util.format.apply(null, args))
     }
 
-    getMsgs():any[]
-    {
+    getMsgs(): any[] {
         var i = this.logIdx;
         var res = [];
         var wrapped = false;
@@ -151,19 +148,17 @@ var info = new Logger("info", 6)
 var debug = new Logger("debug", 7)
 
 class ApiRequest {
-    data:any = {}
-    cmd:string[] = [];
+    data: any = {}
+    cmd: string[] = [];
     reqNo = ++currentReqNo;
     encrypted = false;
     respStream = null;
 
-    constructor(public req:http.ServerRequest, public resp:http.ServerResponse)
-    {
+    constructor(public req: http.ServerRequest, public resp: http.ServerResponse) {
         this.respStream = this.resp;
     }
 
-    forwardToWorkers()
-    {
+    forwardToWorkers() {
         var respArr = []
         var numReqs = 1
 
@@ -172,7 +167,7 @@ class ApiRequest {
         }
 
         workers.forEach((w, i) => {
-            var thisResp:any = {
+            var thisResp: any = {
                 worker: w.description(),
             }
             respArr[i] = thisResp
@@ -195,9 +190,9 @@ class ApiRequest {
                 cres.on("data", d => s += d)
                 cres.on("end", () => {
                     try {
-                      thisResp.body = JSON.parse(s)
+                        thisResp.body = JSON.parse(s)
                     } catch (e) {
-                      thisResp.body = s
+                        thisResp.body = s
                     }
                     oneUp()
                 })
@@ -214,24 +209,21 @@ class ApiRequest {
         oneUp()
     }
 
-    error(code:number, text:string)
-    {
+    error(code: number, text: string) {
         info.log("HTTP error " + code + ": " + text)
         this.resp.writeHead(code, { 'Content-Type': 'text/plain' })
         this.respStream.write(text, "utf8")
         this.respStream.end()
     }
 
-    setCors()
-    {
+    setCors() {
         this.resp.setHeader('Access-Control-Allow-Origin', "*");
         this.resp.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST');
         this.resp.setHeader('Access-Control-Allow-Headers', 'Content-Type');
         this.resp.setHeader('Access-Control-Expose-Headers', 'ErrorMessage');
     }
 
-    processMgmt()
-    {
+    processMgmt() {
         var cmd = this.cmd
         if (this.data.minVersion && config.shellVersion < this.data.minVersion) {
             this.error(400, "shell version is too old")
@@ -244,8 +236,7 @@ class ApiRequest {
         }
     }
 
-    forwardToOneWorker()
-    {
+    forwardToOneWorker() {
         var w = pickWorker()
         var u = w.getUrl()
         u.method = this.data.method || "GET"
@@ -274,8 +265,7 @@ class ApiRequest {
         else creq.end()
     }
 
-    handleEncryptedMgmt()
-    {
+    handleEncryptedMgmt() {
         var stream = decipherReq(this.req)
         if (stream == this.req)
             this.error(403, "Not encrypted")
@@ -301,8 +291,7 @@ class ApiRequest {
         })
     }
 
-    handleMgmt(cmd:string[])
-    {
+    handleMgmt(cmd: string[]) {
         var buf = ""
 
         var final = () => {
@@ -339,11 +328,10 @@ class ApiRequest {
         }
     }
 
-    ok(r:any)
-    {
+    ok(r: any) {
         var buf = new Buffer(JSON.stringify(r), "utf8")
-        var hd:any = { 'Content-Type': 'application/json; encoding=utf-8' }
-        var zl:any = zlib;
+        var hd: any = { 'Content-Type': 'application/json; encoding=utf-8' }
+        var zl: any = zlib;
         if (zl.gzipSync && /gzip/.test(this.req.headers['accept-encoding'])) {
             buf = zl.gzipSync(buf);
             hd['Content-Encoding'] = this.encrypted ? 'x-td-encgz' : 'gzip';
@@ -353,31 +341,28 @@ class ApiRequest {
         this.respStream.end()
     }
 
-    exception(e:any)
-    {
+    exception(e: any) {
         saveState()
         var msg = "exception: " + e.toString() + " " + e.stack
         error.log(msg)
         this.error(500, msg) // TODO remove
     }
 
-    pluginCb(passData = false)
-    {
+    pluginCb(passData = false) {
         return (err, data) => {
             if (err) this.ok({ error: err + "" })
             else if (passData)
                 this.ok({ data: data })
             else
-                this.ok({ })
+                this.ok({})
         }
     }
 }
 
-function downloadStream(u:string, f:(str:any)=>void)
-{
-    var p:any = url.parse(u);
+function downloadStream(u: string, f: (str: any) => void) {
+    var p: any = url.parse(u);
 
-    https.get(p, (res:http.ClientResponse) => {
+    https.get(p, (res: http.ClientResponse) => {
         if (res.statusCode == 200) {
             f(res)
         } else {
@@ -403,26 +388,25 @@ function readRes(g, f) {
     })
 }
 
-function downloadFile(u:string, f:(err:any, s:NodeBuffer, h?:any)=>void)
-{
-    var p:any = url.parse(u);
+function downloadFile(u: string, f: (err: any, s: NodeBuffer, h?: any) => void) {
+    var p: any = url.parse(u);
 
     p.headers = {
         "Accept-Encoding": "gzip"
     }
 
-    var mod:any = http
+    var mod: any = http
     if (p.protocol == "https:")
         mod = https
 
     debug.log('download ' + u);
-    mod.get(p, (res:http.ClientResponse) => {
+    mod.get(p, (res: http.ClientResponse) => {
         if (res.statusCode == 302) {
             downloadFile(res.headers['location'], f);
             (<any>res).end();
         } else if (res.statusCode == 200) {
             if (/gzip/.test(res.headers['content-encoding'])) {
-                var g:events.EventEmitter = zlib.createUnzip(undefined);
+                var g: events.EventEmitter = zlib.createUnzip(undefined);
                 (<any>res).pipe(g);
             } else {
                 g = res;
@@ -445,8 +429,7 @@ function downloadFile(u:string, f:(err:any, s:NodeBuffer, h?:any)=>void)
     })
 }
 
-function downloadJson(u:string, f:(err:any, d:any)=>void)
-{
+function downloadJson(u: string, f: (err: any, d: any) => void) {
     downloadFile(u, (err, b) => {
         if (err) f(err, null)
         else {
@@ -467,9 +450,8 @@ var vaultSecret = ""
 var vaultUrl = ""
 var numRetries = 0
 
-function downloadSecret(uri:string, f:(d:any) => void, opts:any = {})
-{
-    var p:any = url.parse(uri + "?api-version=2015-06-01")
+function downloadSecret(uri: string, f: (d: any) => void, opts: any = {}) {
+    var p: any = url.parse(uri + "?api-version=2015-06-01")
     p.headers = {}
     if (vaultToken)
         p.headers['Authorization'] = 'Bearer ' + vaultToken
@@ -480,7 +462,7 @@ function downloadSecret(uri:string, f:(d:any) => void, opts:any = {})
         p.headers['Content-Type'] = "application/json;charset=utf8"
     }
     debug.log("vault: downloading secret from " + uri)
-    var r = https.request(p, (res:http.ClientResponse) => {
+    var r = https.request(p, (res: http.ClientResponse) => {
         if (res.statusCode == 401) {
             if (numRetries > 3) {
                 error.log("too many retries")
@@ -495,15 +477,15 @@ function downloadSecret(uri:string, f:(d:any) => void, opts:any = {})
             }
 
             var d = "grant_type=client_credentials" +
-                    "&client_id=" + encodeURIComponent(vaultClientId) +
-                    "&client_secret=" + encodeURIComponent(vaultSecret) +
-                    "&resource=" + encodeURIComponent(m[2]);
-            var pp:any = url.parse(m[1] + "/oauth2/token")
-            pp.headers =  {
-              'Content-Type': 'application/x-www-form-urlencoded'
+                "&client_id=" + encodeURIComponent(vaultClientId) +
+                "&client_secret=" + encodeURIComponent(vaultSecret) +
+                "&resource=" + encodeURIComponent(m[2]);
+            var pp: any = url.parse(m[1] + "/oauth2/token")
+            pp.headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
             pp.method = 'POST';
-            var r = https.request(pp, (res:http.ClientResponse) => {
+            var r = https.request(pp, (res: http.ClientResponse) => {
                 readRes(res, total => {
                     if (res.statusCode != 200) {
                         error.log("get token failed for " + uri)
@@ -536,19 +518,18 @@ function downloadSecret(uri:string, f:(d:any) => void, opts:any = {})
     r.end(data)
 }
 
-interface StringMap<T>
-{
-    [index:string] : T;
+interface StringMap<T> {
+    [index: string]: T;
 }
 
 interface FileEntry {
-    path:string;
-    url?:string;
-    content?:string;
-    updated?:boolean;
+    path: string;
+    url?: string;
+    content?: string;
+    updated?: boolean;
 }
 
-function mkDirP(path: string, mode = "777", cb? : () => void) {
+function mkDirP(path: string, mode = "777", cb?: () => void) {
     var elts = path.split(/\/|\\/)
     // we might have gotten a race here if we used async
     var mk = (i: number) => {
@@ -564,8 +545,7 @@ function mkDirP(path: string, mode = "777", cb? : () => void) {
     if (cb) cb();
 }
 
-function processFileEntry(fe:FileEntry, f)
-{
+function processFileEntry(fe: FileEntry, f) {
     var state = tdstate.downloadedFiles
 
     fe.path = fe.path.replace(/\\/g, "/")
@@ -617,13 +597,12 @@ function lazyRequire(pkg: string, finish: (md: any) => void) {
     catch (e) {
         executeNpm(["install", pkg], function () {
             var md = require(pkg.split('@')[0]);
-            finish(md);            
+            finish(md);
         });
     }
 }
 
-function executeNpm(args:string[], finish:()=>void)
-{
+function executeNpm(args: string[], finish: () => void) {
     // NPM_JS_PATH defined in Azure Web Apps
     var p = process.env["NPM_JS_PATH"] || path.join(path.dirname(process.execPath), "node_modules/npm/bin/npm-cli.js")
     if (!fs.existsSync(p))
@@ -665,14 +644,14 @@ function initPython(force: boolean, finish: (err?: string) => void) {
         finish();
     }
 
-    function pythonVersion(next: (err,stdout) => void) {
-        child_process.exec("python --version", (err,stdout,stderr) => {
+    function pythonVersion(next: (err, stdout) => void) {
+        child_process.exec("python --version", (err, stdout, stderr) => {
             if (!err && stdout) info.log(stdout.toString())
-            next(err,stdout);
+            next(err, stdout);
         })
     }
-    function findPython(next : () => void) {
-        pythonVersion((err,stdout) => {
+    function findPython(next: () => void) {
+        pythonVersion((err, stdout) => {
             if (err) {
                 // python is typically not added to the PATH in windows
                 if (/^win/.test(process.platform)) {
@@ -689,8 +668,8 @@ function initPython(force: boolean, finish: (err?: string) => void) {
                             debug.log('adding python to PATH');
                             process.env["PYTHONHOME"] = pythonPath
                             process.env["PATH"] = pathEnv + pathSep + pythonPath + pathSep + path.join(pythonPath, "Scripts")
-                            pythonVersion((err2,stdout2) => {
-                                if(err2) error.log('could not find python.exe. make sure the python installation folder is added to the path');
+                            pythonVersion((err2, stdout2) => {
+                                if (err2) error.log('could not find python.exe. make sure the python installation folder is added to the path');
                                 next();
                             });
                             return;
@@ -705,7 +684,7 @@ function initPython(force: boolean, finish: (err?: string) => void) {
             next();
         });
     }
-    function mkVirtualEnv(pyDir : string) {
+    function mkVirtualEnv(pyDir: string) {
         // install virtualenv if needed.
         child_process.execFile("pip", ["install", "virtualenv"], {}, (e, so, se) => {
             child_process.execFile("python", ["-m", "virtualenv", "--verbose", pyDir], {}, (err, stdout, stderr) => {
@@ -770,14 +749,13 @@ function executePip(args: string[], finish: () => void) {
         env: pythonEnv
     }, (err, stdout, stderr) => {
         if (err) error.log("pip failure: " + err)
-            if (stdout) info.log(stdout.toString())
-            if (stderr) error.log(stderr.toString())
-            finish()
-        })
+        if (stdout) info.log(stdout.toString())
+        if (stderr) error.log(stderr.toString())
+        finish()
+    })
 }
 
-function deploy(d:any, cb:(err:any,resp:any) => void, isScript = true)
-{
+function deploy(d: any, cb: (err: any, resp: any) => void, isScript = true) {
     var numFiles = 1
     var hadExn = false
     var runNpm = false
@@ -828,7 +806,7 @@ function deploy(d:any, cb:(err:any,resp:any) => void, isScript = true)
         tdstate.numDeploys = (tdstate.numDeploys || 0) + 1
         tdstate.deployedId = ""
         tdstate.dmeta = d.dmeta || {}
-        tdstate.dmeta.activationtime = Math.round(Date.now()/1000)
+        tdstate.dmeta.activationtime = Math.round(Date.now() / 1000)
         saveState()
     }
 
@@ -876,8 +854,7 @@ function clone<T>(obj: T): T {
     return <T>r
 }
 
-function createProcess(d:RunCliOptions)
-{
+function createProcess(d: RunCliOptions) {
     var isWin = /^win/.test(os.platform())
     debug.log("running: " + (d.cwd || "") + ">" + d.command + (d.args ? (" " + d.args.join(" ")) : ""))
     var env = clone(process.env);
@@ -895,7 +872,7 @@ function createProcess(d:RunCliOptions)
     return proc
 }
 
-function runCommand(d:RunCliOptions, f) {
+function runCommand(d: RunCliOptions, f) {
     var proc = createProcess(d)
 
     proc.stdin.write(d.stdin || "", "utf8");
@@ -923,22 +900,21 @@ function runCommand(d:RunCliOptions, f) {
     })
 }
 
-function deployAr(ar:ApiRequest, isScript:boolean)
-{
+function deployAr(ar: ApiRequest, isScript: boolean) {
     var final = (err, resp) => {
         if (err) ar.ok({ status: "error", message: err + "" })
         else ar.ok(resp)
     }
 
     if (isScript && blobChannel) {
-        var n = Math.round((Date.now()/1000))
+        var n = Math.round((Date.now() / 1000))
         var did = crypto.randomBytes(8).toString("hex")
         var id = (100000000000 - n) + "." + crypto.randomBytes(8).toString("hex")
         setBlobJson(id, ar.data, err => {
             if (err) ar.exception(err)
             else
-                setBlobJson("000ch-" + blobChannel, { 
-                    blob: id, 
+                setBlobJson("000ch-" + blobChannel, {
+                    blob: id,
                     time: n,
                     did: did,
                 }, err => {
@@ -958,7 +934,7 @@ function deployAr(ar:ApiRequest, isScript:boolean)
     deploy(ar.data, final, isScript)
 }
 
-var socketCmds:StringMap<(ws, data)=>void> = {
+var socketCmds: StringMap<(ws, data) => void> = {
     shell: (ws, data) => {
         data.cwd = dataPath(data.cwd); // map to userhome if needed
         var proc = createProcess(data)
@@ -1084,7 +1060,7 @@ function sendLogMsg(json) {
     logListeners.forEach(w => w.send(payload))
 }
 var logTransport = {
-    log: (level : number, category : string, msg: string, meta?: any) => {
+    log: (level: number, category: string, msg: string, meta?: any) => {
         if (logListeners.length == 0) return
         sendLogMsg({
             op: "logmsg",
@@ -1095,7 +1071,7 @@ var logTransport = {
         })
     },
 
-    logException: (err: any, meta? : any) => {
+    logException: (err: any, meta?: any) => {
         if (logListeners.length == 0) return
         sendLogMsg({
             op: "logexception",
@@ -1105,8 +1081,7 @@ var logTransport = {
     },
 }
 
-function mgmtSocket(ws)
-{
+function mgmtSocket(ws) {
     ws.sendJson = j => ws.send(JSON.stringify(j))
     ws.sendError = err => ws.sendJson({ op: "error", message: err + "" })
 
@@ -1124,7 +1099,7 @@ function mgmtSocket(ws)
 }
 
 var pluginCmds: StringMap<(ar: ApiRequest) => void> = {
-    mkdir: ar => mkDirP(dataPath(path.join(ar.data.name, "dummy")), ar.data.mode,() => { ar.pluginCb()(undefined, undefined); }),
+    mkdir: ar => mkDirP(dataPath(path.join(ar.data.name, "dummy")), ar.data.mode, () => { ar.pluginCb()(undefined, undefined); }),
     writeFile: ar => {
         mkDirP(dataPath(ar.data.name));
         return fs.writeFile(dataPath(ar.data.name), ar.data.data, "utf8", <any>ar.pluginCb())
@@ -1139,8 +1114,8 @@ var pluginCmds: StringMap<(ar: ApiRequest) => void> = {
         ar.data.cwd = dataPath(ar.data.cwd);
         runCommand(ar.data, r => ar.ok(r))
     },
-    open: ar => openUrl(ar.data.url,() => ar.ok({})),
-    pythonEnv: ar => initPython(false,(err?) => {
+    open: ar => openUrl(ar.data.url, () => ar.ok({})),
+    pythonEnv: ar => initPython(false, (err?) => {
         if (err) ar.exception(err)
         else ar.ok({})
     }),
@@ -1159,7 +1134,7 @@ function hasAutoUpdate() {
 }
 
 
-var mgmt:StringMap<(ar:ApiRequest)=>void> = {
+var mgmt: StringMap<(ar: ApiRequest) => void> = {
     config: ar => {
         ar.ok(config)
     },
@@ -1313,9 +1288,9 @@ var mgmt:StringMap<(ar:ApiRequest)=>void> = {
             var data = img.bitmap.data;
             img.scan(x, y, w, h, function (_x, _y, idx) {
                 bitmap.push(data[idx]);
-                bitmap.push(data[idx+1]);
-                bitmap.push(data[idx+2]);
-                bitmap.push(data[idx+3]);
+                bitmap.push(data[idx + 1]);
+                bitmap.push(data[idx + 2]);
+                bitmap.push(data[idx + 3]);
             });
             img.bitmap.data = new Buffer(bitmap);
             img.bitmap.width = w;
@@ -1341,12 +1316,12 @@ var mgmt:StringMap<(ar:ApiRequest)=>void> = {
                 }
                 debug.log("size: " + Math.ceil(srcdata.length / 1e3) + "Kb");
                 var png = new pngjs.PNG();
-                png.parse(srcdata,(errpng, pngdata) => {
+                png.parse(srcdata, (errpng, pngdata) => {
                     var mimeType = errpng ? "image/jpeg" : "image/png";
-                    debug.log("image type: " +  mimeType);
+                    debug.log("image type: " + mimeType);
                     ar.data.files.forEach(target => {
                         try {
-                            new Jimp(srcdata, function() {
+                            new Jimp(srcdata, function () {
                                 try {
                                     var jimg = this;
                                     debug.log("writing " + target.path);
@@ -1363,7 +1338,7 @@ var mgmt:StringMap<(ar:ApiRequest)=>void> = {
                                     }
                                     jimg.resize(tw, th);
                                     mkDirP(target.path);
-                                    jimg.write(target.path,() => onedone());
+                                    jimg.write(target.path, () => onedone());
                                 } catch (e) {
                                     debug.log("resize error: " + e);
                                     debug.log(e.stack);
@@ -1427,18 +1402,16 @@ var mgmt:StringMap<(ar:ApiRequest)=>void> = {
 }
 
 export interface ProxyRequest {
-    data:any;
-    cmd:string[];
-    postBack:string;
+    data: any;
+    cmd: string[];
+    postBack: string;
 }
 
 class ProxyApiRequest
-    extends ApiRequest
-{
-    postBackUrl:string;
+    extends ApiRequest {
+    postBackUrl: string;
 
-    constructor(controller:string, d:any)
-    {
+    constructor(controller: string, d: any) {
         super(null, null)
         this.data = d.data
         this.cmd = d.cmd
@@ -1447,10 +1420,9 @@ class ProxyApiRequest
         debug.log("PROXY " + this.cmd.join("/"))
     }
 
-    setCors() {}
+    setCors() { }
 
-    error(code:number, text:string)
-    {
+    error(code: number, text: string) {
         info.log("HTTP (proxied) error " + code + ": " + text)
         this.postBack({
             code: code,
@@ -1459,8 +1431,7 @@ class ProxyApiRequest
         })
     }
 
-    ok(r:any)
-    {
+    ok(r: any) {
         this.postBack({
             code: 200,
             headers: { 'Content-Type': 'application/json; encoding=utf-8' },
@@ -1468,17 +1439,15 @@ class ProxyApiRequest
         })
     }
 
-    postBack(d:any)
-    {
-        var opts:any = url.parse(this.postBackUrl)
+    postBack(d: any) {
+        var opts: any = url.parse(this.postBackUrl)
         opts.method = 'POST'
         var req = (/^https/.test(this.postBackUrl) ? <any>https : http).request(opts)
         req.write(JSON.stringify(d), "utf8")
         req.end()
     }
 
-    execute()
-    {
+    execute() {
         try {
             this.processMgmt()
         } catch (e) {
@@ -1487,8 +1456,7 @@ class ProxyApiRequest
     }
 }
 
-function scanProxyQueue(ar:ApiRequest)
-{
+function scanProxyQueue(ar: ApiRequest) {
     var id = ar.cmd[1]
     var seenOld = 0
 
@@ -1506,26 +1474,23 @@ function scanProxyQueue(ar:ApiRequest)
     return false
 }
 
-var pendingProxyEntries:ProxyEntry[] = []
-var pendingContollers:any[] = [];
+var pendingProxyEntries: ProxyEntry[] = []
+var pendingContollers: any[] = [];
 
 class ProxyEntry {
-    public timestamp:number;
+    public timestamp: number;
 
-    constructor(public ar:ApiRequest, public postBackId:string, public id:string, public preq:ProxyRequest)
-    {
+    constructor(public ar: ApiRequest, public postBackId: string, public id: string, public preq: ProxyRequest) {
         this.timestamp = Date.now();
     }
 }
 
 
-function saveState()
-{
+function saveState() {
     fs.writeFileSync(dataPath("tdstate.json"), JSON.stringify(tdstate))
 }
 
-function getMime(filename:string)
-{
+function getMime(filename: string) {
     var ext = path.extname(filename).slice(1)
     switch (ext) {
         case "txt": return "text/plain";
@@ -1546,42 +1511,39 @@ function getMime(filename:string)
 }
 
 var needsStop = false
-var scriptLoadPromise : any;
+var scriptLoadPromise: any;
 var rootDir = ""
 
-function loadScript(f)
-{
+function loadScript(f) {
     scriptLoadPromise.done(f)
 }
 
-function reloadScript()
-{
+function reloadScript() {
     scriptLoadPromise = loadScriptCoreAsync();
 }
 
-function findFreePort(cb:(p:number)=>void) {
-  var port = Math.floor(Math.random() * 50000 + 10000)
-  var tester = net.createServer()
-  tester.on("error", err => findFreePort(cb))
-  tester.listen(port, err => {
-    tester.once('close', () => cb(port))
-    tester.close()
-  })
+function findFreePort(cb: (p: number) => void) {
+    var port = Math.floor(Math.random() * 50000 + 10000)
+    var tester = net.createServer()
+    tester.on("error", err => findFreePort(cb))
+    tester.listen(port, err => {
+        tester.once('close', () => cb(port))
+        tester.close()
+    })
 }
 
-var logException = (msg:string) => {}
+var logException = (msg: string) => { }
 
 class Worker {
     public socketPath: string;
     public port: number;
     public child: child_process.ChildProcess
     public isready: boolean;
-    public iscurrent:boolean;
-    public isdying:boolean;
+    public iscurrent: boolean;
+    public isdying: boolean;
     public startTime = Date.now();
 
-    public shutdown()
-    {
+    public shutdown() {
         var u = this.getUrl()
         u.path = "/-tdevmgmt-/" + config.deploymentKey + "/shutdown"
         debug.log("sending shutdown request")
@@ -1595,23 +1557,21 @@ class Worker {
 
         this.isdying = true;
         setTimeout(() => {
-                if (this.child) {
-                    debug.log("sending kill signal")
-                    this.child.kill()
-                }
-                setTimeout(() => {
-                    if (this.child) this.child.kill("SIGKILL")
-                }, 5000)
-            }, 3*60000)
+            if (this.child) {
+                debug.log("sending kill signal")
+                this.child.kill()
+            }
+            setTimeout(() => {
+                if (this.child) this.child.kill("SIGKILL")
+            }, 5000)
+        }, 3 * 60000)
     }
 
-    public description()
-    {
+    public description() {
         return "port:" + (this.socketPath || this.port) + ", pid:" + (this.child ? this.child.pid : "?")
     }
 
-    private died()
-    {
+    private died() {
         this.isready = false;
         this.isdying = true;
         if (this.child) {
@@ -1629,8 +1589,7 @@ class Worker {
         }
     }
 
-    public init(cb:()=>void)
-    {
+    public init(cb: () => void) {
         info.log("worker start " + this.description())
         this.child.on("exit", code => {
             info.log("worker exit " + code + " : " + this.description())
@@ -1681,7 +1640,7 @@ class Worker {
                     return
                 }
 
-                if (err.code == 'ECONNREFUSED') {}
+                if (err.code == 'ECONNREFUSED') { }
                 else debug.log("ping failed, " + err.message)
                 setTimeout(ping, 1000)
             })
@@ -1690,8 +1649,7 @@ class Worker {
         ping()
     }
 
-    public getUrl():any
-    {
+    public getUrl(): any {
         if (this.socketPath)
             return { socketPath: this.socketPath }
         else
@@ -1702,14 +1660,13 @@ class Worker {
     }
 }
 
-var workers:Worker[] = []
-var allWorkers:Worker[] = []
+var workers: Worker[] = []
+var allWorkers: Worker[] = []
 var totalWorkers = 0;
 var whenWorkers = []
 
 
-function startWorker(cb0, cb)
-{
+function startWorker(cb0, cb) {
     var isWin = /^win/.test(os.platform())
 
     var w = new Worker()
@@ -1749,14 +1706,12 @@ function startWorker(cb0, cb)
 var loadVersion = new Object();
 var restartTime = 0;
 
-function preventRestart(mins:number)
-{
+function preventRestart(mins: number) {
     loadVersion = new Object()
-    restartTime = Math.max(Date.now() + mins*60*1000, restartTime)
+    restartTime = Math.max(Date.now() + mins * 60 * 1000, restartTime)
 }
 
-function loadScriptCoreAsync()
-{
+function loadScriptCoreAsync() {
     if (numWorkers < 0) {
         numWorkers = Math.round(os.cpus().length * -numWorkers)
     }
@@ -1768,7 +1723,7 @@ function loadScriptCoreAsync()
     var myVersion = loadVersion;
     restartInterval = parseInt(additionalEnv['TD_RESTART_INTERVAL'] || process.env['TD_RESTART_INTERVAL'] || "0") || 0
 
-    var newWorkers:Worker[] = []
+    var newWorkers: Worker[] = []
 
     var numW = numWorkers
     var oneUp = () => {
@@ -1787,7 +1742,7 @@ function loadScriptCoreAsync()
 
             if (restartInterval > 0)
                 // randomize the time a bit
-                restartTime = Date.now() + Math.round((restartInterval * (0.5 + Math.random()))*1000)
+                restartTime = Date.now() + Math.round((restartInterval * (0.5 + Math.random())) * 1000)
             else
                 restartTime = 0;
         }
@@ -1805,10 +1760,9 @@ function loadScriptCoreAsync()
     }
 }
 
-var loadedModules:any = {}
+var loadedModules: any = {}
 
-function loadModule(name:string, f:(mod)=>void)
-{
+function loadModule(name: string, f: (mod) => void) {
     if (loadedModules.hasOwnProperty(name))
         f(loadedModules[name])
     else {
@@ -1826,22 +1780,19 @@ function loadModule(name:string, f:(mod)=>void)
     }
 }
 
-function loadWsModule(f:()=>void)
-{
+function loadWsModule(f: () => void) {
 }
 
 var lastCtrlResponse = Date.now();
 var numControllers = 0;
 var maxControllers = 2;
 
-function nodeExit()
-{
+function nodeExit() {
     // process.exit(1) doesn't seem to work, at least on RPI
     process.kill(process.pid, "SIGTERM")
 }
 
-function checkRespawn()
-{
+function checkRespawn() {
     setTimeout(() => {
         if (Date.now() - lastCtrlResponse > 40000) {
             error.log("cannot connect to controller for 40s; exiting")
@@ -1852,14 +1803,13 @@ function checkRespawn()
     }, 20000)
 }
 
-function connectToContoller(controller:string)
-{
+function connectToContoller(controller: string) {
     var req;
 
     if (numControllers >= maxControllers) return
     numControllers++
 
-    var opts:any = url.parse(controller)
+    var opts: any = url.parse(controller)
     opts.agent = false
 
     var respawn = () => {
@@ -1869,8 +1819,8 @@ function connectToContoller(controller:string)
         } else {
             if (numControllers == 0)
                 connectToContoller(controller);
-            setTimeout(() => connectToContoller(controller), Math.random()*5000)
-            setTimeout(() => connectToContoller(controller), Math.random()*5000)
+            setTimeout(() => connectToContoller(controller), Math.random() * 5000)
+            setTimeout(() => connectToContoller(controller), Math.random() * 5000)
         }
     }
 
@@ -1927,20 +1877,18 @@ function connectToContoller(controller:string)
     })
 }
 
-var editorCache:any;
+var editorCache: any;
 
-function cacheError(err:any)
-{
+function cacheError(err: any) {
     error.log(err + "")
 }
 
-function cacheEditor(version:string, manifest:string)
-{
-    var cache:any = {}
+function cacheEditor(version: string, manifest: string) {
+    var cache: any = {}
 
     var ent = (buf, hd) => {
         var tp = hd['content-type']
-        var r:any = {
+        var r: any = {
             headers: {
                 'Content-Type': tp
             }
@@ -1997,8 +1945,7 @@ function cacheEditor(version:string, manifest:string)
     })
 }
 
-function proxyEditor(cmds:string[], req, resp)
-{
+function proxyEditor(cmds: string[], req, resp) {
     if (!editorCache) {
         editorCache = {};
         ["current", "beta", "latest"].forEach(v => {
@@ -2061,13 +2008,13 @@ function proxyEditor(cmds:string[], req, resp)
     }
     else suff = "?r=" + rel
 
-    var rewrite: (s:string) => string;
+    var rewrite: (s: string) => string;
 
     var specRel = rel
     var selfUrl = "http://" + req.headers.host + "/editor"
     var relUrl = selfUrl + "/" + rel + "/"
 
-    var replUrl = (s:string) => s.replace(/https:\/\/az820584.vo.msecnd.net\/app\/\d\d\d[\da-z\.-]+\/(c\/)?/g, relUrl)
+    var replUrl = (s: string) => s.replace(/https:\/\/az820584.vo.msecnd.net\/app\/\d\d\d[\da-z\.-]+\/(c\/)?/g, relUrl)
 
     switch (file) {
         case "index.html":
@@ -2178,7 +2125,7 @@ function proxyEditor(cmds:string[], req, resp)
             localPath += "/build"
 
 
-        fs.readFile(localPath + "/" + file, enc, (err, data:any) => {
+        fs.readFile(localPath + "/" + file, enc, (err, data: any) => {
             if (err) {
                 resp.writeHead(404)
                 resp.end(err + "")
@@ -2221,11 +2168,11 @@ function proxyEditor(cmds:string[], req, resp)
     }
 }
 
-var key:Buffer = null;
+var key: Buffer = null;
 var onlyEncrypted = false;
 
 function decipherReq(req) {
-    var err = function(m) {
+    var err = function (m) {
         console.log("decipher: " + m)
     }
 
@@ -2259,8 +2206,7 @@ function cipherResp(res) {
     return g
 }
 
-function specHandleReq(req, resp)
-{
+function specHandleReq(req, resp) {
     var ar = new ApiRequest(req, resp);
     try {
         var u = url.parse(req.url);
@@ -2299,8 +2245,8 @@ function specHandleReq(req, resp)
             proxyEditor(["cache", encodeURIComponent("https://www.touchdevelop.com/favicon.ico")], req, resp)
         } else {
             ar.error(404, "No script deployed")
-        } 
-        
+        }
+
         /*{
             initScript(() => {
                 var rt = TDev.Runtime.theRuntime
@@ -2328,13 +2274,11 @@ function specHandleReq(req, resp)
     }
 }
 
-function pickWorker()
-{
+function pickWorker() {
     return workers[Math.floor(Math.random() * workers.length)]
 }
 
-function setupHeaders(req)
-{
+function setupHeaders(req) {
     if (!trustXff) {
         req.headers['x-forwarded-for'] = req.connection.remoteAddress
         req.headers['x-forwarded-proto'] = req.connection.encrypted ? "https" : "http"
@@ -2350,8 +2294,7 @@ function setupHeaders(req)
     }
 }
 
-function forwardWebSocket(req, sock, body)
-{
+function forwardWebSocket(req, sock, body) {
     var w = pickWorker()
     var u = w.getUrl()
     if (u.socketPath)
@@ -2371,8 +2314,7 @@ function forwardWebSocket(req, sock, body)
     })
 }
 
-function handleReq(req, resp)
-{
+function handleReq(req, resp) {
     setupHeaders(req)
 
     if (/^\/-tdevmgmt-/.test(req.url)) {
@@ -2438,8 +2380,7 @@ function openUrl(startUrl: string, cb?: () => void) {
     if (cb) cb();
 }
 
-function runScript(id:string, start:()=>void, reload:()=>void)
-{
+function runScript(id: string, start: () => void, reload: () => void) {
     var pkgPath = process.env["TD_PKG_PATH"] || ""
 
     var getpackage = id => {
@@ -2468,17 +2409,16 @@ function runScript(id:string, start:()=>void, reload:()=>void)
     downloadJson("https://www.touchdevelop.com/api/" + id, (err, json) => {
         if (err) handleError(err)
         else if (json.updateid != id && json.updatetime > json.time) {
-            info.log("getting updated script /"+ json.updateid)
+            info.log("getting updated script /" + json.updateid)
             getpackage(json.updateid)
         } else {
-            info.log("getting original script /"+ id)
+            info.log("getting original script /" + id)
             getpackage(id)
         }
     })
 }
 
-function respawnLoop()
-{
+function respawnLoop() {
     info.log('starting shell watch...')
 
     function copy() {
@@ -2514,8 +2454,7 @@ function respawnLoop()
 }
 
 var _shellSha = ""
-function shellSha()
-{
+function shellSha() {
     if (!_shellSha) {
         var h = crypto.createHash("sha256")
         h.update(fs.readFileSync(__filename))
@@ -2530,7 +2469,7 @@ var blobSvc;
 var containerName = 'tddeployments'
 var updateDelay = 3000;
 var lastAzureDeployment = "";
-var additionalEnv:StringMap<string> = {}
+var additionalEnv: StringMap<string> = {}
 var updateWatchdog = 0;
 var blobDeployCallback;
 
@@ -2554,8 +2493,7 @@ function applyConfig(cfg) {
     }
 }
 
-function checkUpdate()
-{
+function checkUpdate() {
     var n = Date.now()
     if (n - updateWatchdog < 25000)
         return
@@ -2606,8 +2544,7 @@ function checkUpdate()
     })
 }
 
-function loadAzureStorage(f)
-{
+function loadAzureStorage(f) {
     loadModule("azure-storage", az => {
         if (!blobSvc)
             blobSvc = az.createBlobService()
@@ -2635,7 +2572,7 @@ function networkIP(): string {
     return "localhost";
 }
 
-function withVault(inner:()=>void) {
+function withVault(inner: () => void) {
     if (vaultUrl) {
         vaultToken = ""
         downloadSecret(vaultUrl, d => {
@@ -2655,12 +2592,11 @@ function withVault(inner:()=>void) {
 
 
 var pfx = null
-function main()
-{
+function main() {
     var agent = (<any>http).globalAgent;
     agent.keepAlive = true;
     if (agent.options) agent.options.keepAlive = true;
-    agent.maxSockets = Infinity; 
+    agent.maxSockets = Infinity;
     // don't limit maxSockets - they might be long-living
 
     inAzure = !!process.env.PORT;
@@ -2718,7 +2654,7 @@ function main()
         process.exit(1)
     }
 
-    trustXff = !! (process.env['TD_TRUST_XFF'] || process.env['IISNODE_VERSION'])
+    trustXff = !!(process.env['TD_TRUST_XFF'] || process.env['IISNODE_VERSION'])
 
     if (!inAzure && !inNodeWebkit && __dirname != process.cwd()) {
         if (isNpm) process.env["TD_ALLOW_EDITOR"] = "true"
@@ -2798,14 +2734,14 @@ function main()
     useBeta = true; // always use beta
 
     if (inNodeWebkit) {
-      cli = true;
-      process.env['TD_ALLOW_EDITOR'] = true;
-      useHome = true;
+        cli = true;
+        process.env['TD_ALLOW_EDITOR'] = true;
+        useHome = true;
     }
     if (useHome && userHome()) {
-      dataDir = path.join(userHome(), "TouchDevelop");
-      mkDirP(path.join(dataDir, 'dummy'));
-      info.log('data directory: ' + dataDir);
+        dataDir = path.join(userHome(), "TouchDevelop");
+        mkDirP(path.join(dataDir, 'dummy'));
+        info.log('data directory: ' + dataDir);
     }
 
     debug.log("start, autoupdate=" + hasAutoUpdate())
@@ -2891,11 +2827,11 @@ function main()
                 console.log(d)
                 info.log("secret uploaded")
                 process.exit(0)
-            }, { 
-                put: {
-                    value: JSON.stringify(j, null, 4)
-                }
-            })
+            }, {
+                    put: {
+                        value: JSON.stringify(j, null, 4)
+                    }
+                })
             return
         }
     }
@@ -2948,8 +2884,7 @@ function main()
                 return
             }
 
-            if (req.url.slice(0, 12)  == "/-tdevmgmt-/")
-            {
+            if (req.url.slice(0, 12) == "/-tdevmgmt-/") {
                 if (req.url.slice(-config.deploymentKey.length) == config.deploymentKey) {
                     debug.log("starting mgmt socket")
                     mgmtSocket(new wsModule(req, sock, body))
@@ -2980,15 +2915,15 @@ function main()
                 info.log("restart-time reached; reloading")
                 reloadScript()
             }
-        }, Math.round((Math.random()+0.5) * 2000))
+        }, Math.round((Math.random() + 0.5) * 2000))
 
         var ciphers = process.env["TD_TLS_CIPHERS"] || defaultCiphers
 
         if (sslport) {
             sslapp = https.createServer({
-              pfx: new Buffer(pfx, "base64"),
-              honorCipherOrder: true,
-              ciphers: ciphers
+                pfx: new Buffer(pfx, "base64"),
+                honorCipherOrder: true,
+                ciphers: ciphers
             })
             sslapp.on("request", handleReq)
             sslapp.on("upgrade", webSocketHandler)
