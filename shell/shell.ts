@@ -771,7 +771,7 @@ var mgmt: StringMap<(ar: ApiRequest) => void> = {
             dmeta: tdstate.dmeta,
             encryption: !!key,
             onlyEncrypted: onlyEncrypted,
-            versionStamp: "v11",
+            versionStamp: "v20",
         })
     },
 
