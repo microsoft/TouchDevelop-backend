@@ -573,6 +573,8 @@ function executeNpm(args: string[], finish: () => void) {
     if (!fs.existsSync(p))
         p = path.join(path.dirname(process.execPath).replace("/bin", "/lib"), "node_modules/npm/bin/npm-cli.js")
     if (!fs.existsSync(p))
+        p = path.join(path.dirname(process.execPath).replace("/bin", "/libexec/npm/lib"), "node_modules/npm/bin/npm-cli.js")
+    if (!fs.existsSync(p))
         p = process.execPath.replace(/nodejs.*/, "npm/1.4.10/node_modules/npm/bin/npm-cli.js")
     info.log("running npm, " + p)
     child_process.execFile(process.execPath, [p].concat(args), {}, (err, stdout, stderr) => {
