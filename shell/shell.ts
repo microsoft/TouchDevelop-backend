@@ -38,29 +38,6 @@ var numWorkers = 1;
 var blobChannel = "";
 var restartInterval = 0;
 var numResponses = 0;
-var defaultCiphers =
-    "ECDHE-RSA-AES128-GCM-SHA256:" +
-    "ECDHE-ECDSA-AES128-GCM-SHA256:" +
-    "ECDHE-RSA-AES256-GCM-SHA384:" +
-    "ECDHE-ECDSA-AES256-GCM-SHA384:" +
-    "DHE-RSA-AES128-GCM-SHA256:" +
-    "ECDHE-RSA-AES128-SHA256:" +
-    "DHE-RSA-AES128-SHA256:" +
-    "ECDHE-RSA-AES256-SHA384:" +
-    "DHE-RSA-AES256-SHA384:" +
-    "ECDHE-RSA-AES256-SHA256:" +
-    "DHE-RSA-AES256-SHA256:" +
-    "HIGH:" +
-    "!aNULL:" +
-    "!eNULL:" +
-    "!EXPORT:" +
-    "!DES:" +
-    "!RC4:" +
-    "!MD5:" +
-    "!PSK:" +
-    "!SRP:" +
-    "!CAMELLIA" +
-    "";
 
 function dataPath(p: string): string {
     p = p || "";
@@ -1735,13 +1712,9 @@ function main() {
             }
         }, Math.round((Math.random() + 0.5) * 2000))
 
-        var ciphers = process.env["TD_TLS_CIPHERS"] || defaultCiphers
-
         if (sslport) {
             sslapp = https.createServer({
-                pfx: new Buffer(pfx, "base64"),
-                honorCipherOrder: true,
-                ciphers: ciphers
+                pfx: new Buffer(pfx, "base64")
             })
             sslapp.on("request", handleReq)
             sslapp.on("upgrade", webSocketHandler)
