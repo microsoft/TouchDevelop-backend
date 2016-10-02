@@ -1470,6 +1470,73 @@ function withVault(inner: () => void) {
     } else inner()
 }
 
+function readCerts(secretsJson: string, cb) {
+    let secr = JSON.parse(fs.readFileSync(secretsJson, "utf8"))
+    let certsDir = "certs"
+    if (fs.existsSync(certsDir)) {
+        let certs = []
+        let defl = ""
+        for (let f of fs.readdirSync(certsDir)) {
+            if (/\.pfx$/.test(f)) {
+                let certName = certsDir + "/" + f
+                console.log("Parsing", certName)
+                let res = child_process.execFileSync("openssl",
+                    ["pkcs12", "-password", "pass:", "-clcerts", "-nokeys",
+                        "-in", certName]) as any as Buffer
+                fs.writeFileSync("tmp.cer", res)
+                res = child_process.execFileSync("openssl", ["x509", "-text", "-in", "tmp.cer"]) as any
+                fs.unlinkSync("tmp.cer")
+                let desc = res.toString("utf8")
+                let m = /^\s*Subject:.*CN=(\S+)/m.exec(desc)
+                let cn = m[1]
+                m = /^\s*X509.* Subject Alternative Name:\s*(DNS.*)/m.exec(desc)
+                let names = [cn]
+                if (m) {
+                    names = m[1].replace(/DNS:/g, "").split(/,\s*/)
+                    if (names.indexOf(cn) < 0) names.unshift(cn)
+                }
+                let info = {
+                    wildcardDomains: [],
+                    exactDomains: [],
+                    cert: fs.readFileSync(certName).toString("base64")
+                }
+                if (f == "default.pfx") defl = info.cert
+                for (let n of names) {
+                    if (/^\*\./.test(n)) {
+                        info.wildcardDomains.push(n.slice(2))
+                    } else {
+                        info.exactDomains.push(n)
+                    }
+                }
+                certs.push(info)
+            }
+        }
+        let data = new Buffer(JSON.stringify(certs, null, 4), "utf8")
+        let pass = crypto.randomBytes(16)
+        let ciph = crypto.createCipher("AES256", pass)
+        let first = ciph.update(data)
+        let enc = Buffer.concat([first, ciph.final()])
+
+        if (!defl) {
+            console.log("No certs/default.pfx file. Aborting")
+            process.exit(1)
+        }
+
+        secr["TD_HTTPS_PFX"] = defl
+        secr["TD_CERT_JSON_PASSWORD"] = pass.toString("base64")
+        let jsonName = "cert-" + crypto.randomBytes(8).toString("hex") + ".json"
+        secr["TD_CERT_JSON_NAME"] = jsonName
+
+        process.env["AZURE_STORAGE_ACCOUNT"] = secr["AZURE_STORAGE_ACCOUNT"]
+        process.env["AZURE_STORAGE_ACCESS_KEY"] = secr["AZURE_STORAGE_ACCESS_KEY"]
+
+        loadAzureStorage(() =>
+            setBlobJson(jsonName, { encrypted: enc.toString("base64") }, () => {
+                console.log("blob uploaded")
+                cb(secr)
+            }))
+    } else cb(secr)
+}
 
 var pfx = null
 function main() {
@@ -1631,17 +1698,18 @@ function main() {
         }
 
         if (putSecret) {
-            var j = JSON.parse(fs.readFileSync(putSecret, "utf8"))
-            downloadSecret(vaultUrl, d => {
-                delete d.value;
-                console.log(d)
-                info.log("secret uploaded")
-                process.exit(0)
-            }, {
-                    put: {
-                        value: JSON.stringify(j, null, 4)
-                    }
-                })
+            readCerts(putSecret, (j) => {
+                downloadSecret(vaultUrl, d => {
+                    delete d.value;
+                    console.log(d)
+                    info.log("secret uploaded")
+                    process.exit(0)
+                }, {
+                        put: {
+                            value: JSON.stringify(j, null, 4)
+                        }
+                    })
+            })
             return
         }
     }
