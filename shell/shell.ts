@@ -1668,6 +1668,7 @@ function main() {
     delete process.env['TD_HTTPS_PFX']
 
     var putSecret = ""
+    var getSecret = ""
 
     while (args.length > 0) {
         switch (args[0]) {
@@ -1688,6 +1689,10 @@ function main() {
             case "--putsecret":
                 args.shift()
                 putSecret = args.shift()
+                break;
+            case "--getsecret":
+                args.shift()
+                getSecret = args.shift()
                 break;
             default:
                 var m = /^([A-Za-z0-9_]+)=(.*)$/.exec(args[0])
@@ -1770,6 +1775,12 @@ function main() {
                             value: JSON.stringify(j, null, 4)
                         }
                     })
+            })
+            return
+        } else if (getSecret) {
+            downloadSecret(vaultUrl, d => {
+                fs.writeFileSync(getSecret, d.value)
+                process.exit(0)
             })
             return
         }
