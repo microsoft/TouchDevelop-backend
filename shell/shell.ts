@@ -38,6 +38,9 @@ var numWorkers = 1;
 var blobChannel = "";
 var restartInterval = 0;
 var numResponses = 0;
+var pfx = null
+var domainContexts = {}
+var defaultContext: any
 
 function dataPath(p: string): string {
     p = p || "";
@@ -1353,11 +1356,11 @@ var additionalEnv: StringMap<string> = {}
 var updateWatchdog = 0;
 var blobDeployCallback;
 
-function setBlobJson(name, json, f) {
+function setBlobJson(name: string, json, f) {
     blobSvc.createBlockBlobFromText(containerName, name, JSON.stringify(json, null, 2), f)
 }
 
-function getBlobJson(name, f) {
+function getBlobJson(name: string, f) {
     blobSvc.getBlobToText(containerName, name, (err, data) => {
         f(err, data ? JSON.parse(data) : null)
     })
@@ -1452,6 +1455,12 @@ function networkIP(): string {
     return "localhost";
 }
 
+interface StoredCert {
+    cert: string;
+    domains: string[];
+    isDefault: boolean;
+}
+
 function withVault(inner: () => void) {
     if (vaultUrl) {
         vaultToken = ""
@@ -1459,13 +1468,46 @@ function withVault(inner: () => void) {
             var env = JSON.parse(d.value)
             var pfx0 = env['TD_HTTPS_PFX']
             delete env['TD_HTTPS_PFX']
+
+            let manyPfxPass = env["TD_CERT_JSON_PASSWORD"]
+            let manyPfxName = env["TD_CERT_JSON_NAME"]
+            delete env['TD_CERT_JSON_PASSWORD']
+            delete env['TD_CERT_JSON_NAME']
+
             if (pfx0) pfx = pfx0
             Object.keys(env).forEach(k => {
                 if (process.env[k] != env[k])
                     debug.log("vault: setting " + k)
                 process.env[k] = env[k]
             })
-            inner()
+
+            if (manyPfxName && manyPfxPass)
+                loadAzureStorage(() => {
+                    getBlobJson(manyPfxName, (err, val) => {
+                        let enc = new Buffer(val.encrypted, "base64")
+                        let ciph = crypto.createDecipher("AES256", new Buffer(manyPfxPass, "base64"))
+                        let prev = ciph.update(enc)
+                        let buf = Buffer.concat([prev, ciph.final()])
+                        let certs = JSON.parse(buf.toString("utf8")) as StoredCert[]
+                        domainContexts = {}
+                        defaultContext = null
+                        for (let cert of certs) {
+                            let ctx = tls.createSecureContext({
+                                pfx: new Buffer(cert.cert, "base64")
+                            })
+                            for (let d of cert.domains)
+                                domainContexts[d.toLowerCase()] = ctx
+                            if (cert.isDefault)
+                                defaultContext = ctx
+                        }
+                        if (!defaultContext && pfx)
+                            defaultContext = tls.createSecureContext({
+                                pfx: new Buffer(pfx, "base64")
+                            })
+                        inner()
+                    })
+                })
+            else inner()
         })
     } else inner()
 }
@@ -1474,11 +1516,12 @@ function readCerts(secretsJson: string, cb) {
     let secr = JSON.parse(fs.readFileSync(secretsJson, "utf8"))
     let certsDir = "certs"
     if (fs.existsSync(certsDir)) {
-        let certs = []
+        let certs: StoredCert[] = []
         let defl = ""
         for (let f of fs.readdirSync(certsDir)) {
             if (/\.pfx$/.test(f)) {
                 let certName = certsDir + "/" + f
+                console.log("\n***")
                 console.log("Parsing", certName)
                 let res = child_process.execFileSync("openssl",
                     ["pkcs12", "-password", "pass:", "-clcerts", "-nokeys",
@@ -1495,18 +1538,15 @@ function readCerts(secretsJson: string, cb) {
                     names = m[1].replace(/DNS:/g, "").split(/,\s*/)
                     if (names.indexOf(cn) < 0) names.unshift(cn)
                 }
-                let info = {
-                    wildcardDomains: [],
-                    exactDomains: [],
-                    cert: fs.readFileSync(certName).toString("base64")
+                console.log(`${f}: ${names.join(", ")}`)
+                let info: StoredCert = {
+                    domains: names,
+                    cert: fs.readFileSync(certName).toString("base64"),
+                    isDefault: false
                 }
-                if (f == "default.pfx") defl = info.cert
-                for (let n of names) {
-                    if (/^\*\./.test(n)) {
-                        info.wildcardDomains.push(n.slice(2))
-                    } else {
-                        info.exactDomains.push(n)
-                    }
+                if (f == "default.pfx") {
+                    defl = info.cert
+                    info.isDefault = true
                 }
                 certs.push(info)
             }
@@ -1530,6 +1570,8 @@ function readCerts(secretsJson: string, cb) {
         process.env["AZURE_STORAGE_ACCOUNT"] = secr["AZURE_STORAGE_ACCOUNT"]
         process.env["AZURE_STORAGE_ACCESS_KEY"] = secr["AZURE_STORAGE_ACCESS_KEY"]
 
+        console.log("\n***\n***\n")
+
         loadAzureStorage(() =>
             setBlobJson(jsonName, { encrypted: enc.toString("base64") }, () => {
                 console.log("blob uploaded")
@@ -1538,7 +1580,23 @@ function readCerts(secretsJson: string, cb) {
     } else cb(secr)
 }
 
-var pfx = null
+function httpsSni(servername: string, cb) {
+    let s = servername.toLowerCase()
+    let ctx = defaultContext
+    if (domainContexts.hasOwnProperty(s)) {
+        ctx = domainContexts[s]
+    } else {
+        s = s.replace(/^[^.]+/, "*")
+        if (domainContexts.hasOwnProperty(s)) {
+            ctx = domainContexts[s]
+        }
+    }
+    if (cb)
+        cb(null, ctx)
+    else
+        return ctx
+}
+
 function main() {
     var agent = (<any>http).globalAgent;
     agent.keepAlive = true;
@@ -1605,8 +1663,11 @@ function main() {
 
     var sslport = process.env.HTTPS_PORT || 443;
     pfx = process.env['TD_HTTPS_PFX']
+
+    // we don't really want the workers to see this
+    delete process.env['TD_HTTPS_PFX']
+
     var putSecret = ""
-    delete process.env['TD_HTTPS_PFX'] // we don't really want the workers to see this
 
     while (args.length > 0) {
         switch (args[0]) {
@@ -1782,7 +1843,8 @@ function main() {
 
         if (sslport) {
             sslapp = https.createServer({
-                pfx: new Buffer(pfx, "base64")
+                pfx: new Buffer(pfx, "base64"),
+                SNICallback: httpsSni as any,
             })
             sslapp.on("request", handleReq)
             sslapp.on("upgrade", webSocketHandler)
