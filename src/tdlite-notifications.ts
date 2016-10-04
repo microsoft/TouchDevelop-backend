@@ -24,24 +24,22 @@ var logger = core.logger;
 var subscriptions: indexedStore.Store;
 var notificationsTable: azureTable.Table;
 
+
 export class PubSubscription
-    extends core.PubOnPub
-{
-    static createFromJson(o:JsonObject) { let r = new PubSubscription(); r.fromJson(o); return r; }
+    extends core.PubOnPub {
+    static createFromJson(o: JsonObject) { let r = new PubSubscription(); r.fromJson(o); return r; }
 }
 
 export class PubNotification
-    extends core.PubOnPub
-{
+    extends core.PubOnPub {
     @td.json public notificationkind: string = "";
     @td.json public supplementalid: string = "";
     @td.json public supplementalkind: string = "";
     @td.json public supplementalname: string = "";
-    static createFromJson(o:JsonObject) { let r = new PubNotification(); r.fromJson(o); return r; }
+    static createFromJson(o: JsonObject) { let r = new PubNotification(); r.fromJson(o); return r; }
 }
 
-export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind: string) : Promise<void>
-{
+export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind: string): Promise<void> {
     let pub = jsb["pub"];
     let userid = pub["userid"];
     let pubkind = pub["kind"];
@@ -111,8 +109,8 @@ export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind
             jsb3["PartitionKey"] = id;
             jsb3["notificationkind"] = toNotify[id];
             await notificationsTable.insertEntityAsync(td.clone(jsb3), "or merge");
-            if (id != "all") {                 
-                await core.pubsContainer.updateAsync(id, async(entry: JsonBuilder) => {
+            if (id != "all") {
+                await core.pubsContainer.updateAsync(id, async (entry: JsonBuilder) => {
                     // this may be a user or a group
                     let num = core.orZero(entry["notifications"]);
                     entry["notifications"] = num + 1;
@@ -124,8 +122,7 @@ export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind
     }
 }
 
-export async function initAsync() : Promise<void>
-{
+export async function initAsync(): Promise<void> {
     let notTableClient = await core.specTableClientAsync("NOTIFICATIONS");
     notificationsTable = await notTableClient.createTableIfNotExistsAsync("notifications2");
     subscriptions = await indexedStore.createStoreAsync(core.pubsContainer, "subscription");
@@ -138,10 +135,10 @@ export async function initAsync() : Promise<void>
         fetchResult.items = td.arrayToJson(users);
         tdliteUsers.resolveUsers(fetchResult, apiRequest);
     }
-    , {
-        byUserid: true,
-        byPublicationid: true
-    });
+        , {
+            byUserid: true,
+            byPublicationid: true
+        });
     // Note that it logically should be ``subscribers``, but we use ``subscriptions`` for backward compat.
     core.addRoute("POST", "*user", "subscriptions", async (req: core.ApiRequest) => {
         await core.canPostAsync(req, "subscription");
@@ -192,8 +189,7 @@ export async function initAsync() : Promise<void>
     });
 }
 
-async function addSubscriptionAsync(follower: string, celebrity: string) : Promise<void>
-{
+async function addSubscriptionAsync(follower: string, celebrity: string): Promise<void> {
     let sub = new PubSubscription();
     sub.id = "s-" + follower + "-" + celebrity;
     if (follower != celebrity && await core.getPubAsync(sub.id, "subscription") == null) {
@@ -212,8 +208,7 @@ async function addSubscriptionAsync(follower: string, celebrity: string) : Promi
 }
 
 
-async function removeSubscriptionAsync(follower: string, celebrity: string) : Promise<void>
-{
+async function removeSubscriptionAsync(follower: string, celebrity: string): Promise<void> {
     let subid = "s-" + follower + "-" + celebrity;
     let entry2 = await core.getPubAsync(subid, "subscription");
     if (entry2 != null) {
@@ -226,8 +221,7 @@ async function removeSubscriptionAsync(follower: string, celebrity: string) : Pr
     }
 }
 
-async function getNotificationsAsync(req: core.ApiRequest, long: boolean) : Promise<void>
-{
+async function getNotificationsAsync(req: core.ApiRequest, long: boolean): Promise<void> {
     if (req.rootId == "all") {
         core.checkPermission(req, "global-list");
     }
@@ -235,7 +229,7 @@ async function getNotificationsAsync(req: core.ApiRequest, long: boolean) : Prom
         let pub = req.rootPub["pub"];
         if (pub["isclass"]) {
             let b = req.userinfo.json.groups.hasOwnProperty(pub["id"]);
-            if ( ! b) {
+            if (!b) {
                 core.checkPermission(req, "global-list");
             }
         }
@@ -255,8 +249,7 @@ async function getNotificationsAsync(req: core.ApiRequest, long: boolean) : Prom
     }
 }
 
-export async function sendAsync(about: JsonObject, notkind: string, suplemental: JsonObject) : Promise<void>
-{
+export async function sendAsync(about: JsonObject, notkind: string, suplemental: JsonObject): Promise<void> {
     let notification = new PubNotification();
     notification.kind = "notification";
     notification.id = (await cachedStore.invSeqIdAsync()).toString();
@@ -280,7 +273,7 @@ export async function sendAsync(about: JsonObject, notkind: string, suplemental:
     jsb2["PartitionKey"] = target;
     jsb2["RowKey"] = notification.id;
     await notificationsTable.insertEntityAsync(td.clone(jsb2), "or merge");
-    await tdliteUsers.updateAsync(target, async(entry) => {
+    await tdliteUsers.updateAsync(target, async (entry) => {
         // target is always user
         entry.notifications++;
     });
