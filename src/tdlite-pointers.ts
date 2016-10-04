@@ -1090,20 +1090,51 @@ function splitLang(path: string) {
         }
 }
 
+let emptyManifest = `CACHE MANIFEST
+# @URL@
+CACHE:
+NETWORK:
+*
+`
+
+let redirHTML = `<!doctype html>
+<html>
+<head>
+    <title>Page moved</title>
+<script>
+    document.location.href = "@URL@" + document.location.hash
+</script>
+</head>
+<body>
+</body>
+</html>
+`
+
 export async function servePointerAsync(req: restify.Request, res: restify.Response): Promise<void> {
     let urlFile = req.url().replace(/\?.*/g, "")
     let fn = urlFile.replace(/^\//g, "").replace(/\/$/g, "").toLowerCase();
     let bareFn = fn
+    let host = (req.header("host") || "").toLowerCase()
 
     let baseDir = fn.replace(/[\/-].*/, "")
-    let redirDomain = domainOfTarget(baseDir)
-    let host = (req.header("host") || "").toLowerCase()
-    let redirs = core.serviceSettings.redirDomains
-    if (!redirDomain && redirs.hasOwnProperty(host)) {
-        redirDomain = redirs[host]
+
+    // https://www.pxt.io/sample-foo -> https://sample.pxt.io/foo
+    if (core.pxt && host == core.myHost && domainOfTarget(baseDir)) {
+        res.redirect(httpCode._301MovedPermanently, "https://" + domainOfTarget(baseDir) + "/" + req.url().slice(baseDir.length + 2))
+        return
     }
-    if (redirDomain) {
-        res.redirect(httpCode._301MovedPermanently, "https://" + redirDomain + "/" + req.url().slice(baseDir.length + 2))
+
+    let redirs = core.serviceSettings.redirDomains
+    if (redirs && redirs.hasOwnProperty(host)) {
+        let trgDom = redirs[host]
+        let trgUrl = "https://" + redirs[host] + req.url()
+        if (fn.endsWith("--manifest")) {
+            res.sendText(emptyManifest.replace("@URL@", trgUrl), "text/cache-manifest")
+        } else if (fn == "" || fn == "beta") {
+            res.html(redirHTML.replace("@URL@", trgUrl))
+        } else {
+            res.redirect(httpCode._301MovedPermanently, trgUrl) 
+        }
         return
     }
 
