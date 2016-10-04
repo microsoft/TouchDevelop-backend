@@ -20,6 +20,7 @@ import * as tdliteGroups from "./tdlite-groups"
 
 var orEmpty = td.orEmpty;
 var logger = core.logger;
+let enabled = false
 
 var subscriptions: indexedStore.Store;
 var notificationsTable: azureTable.Table;
@@ -44,6 +45,9 @@ export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind
     let userid = pub["userid"];
     let pubkind = pub["kind"];
     logger.tick("New_" + pubkind);
+
+    if (!enabled) return
+
     if (pubkind == "abusereport") {
         userid = pub["publicationuserid"];
     }
@@ -123,6 +127,8 @@ export async function storeAsync(req: core.ApiRequest, jsb: JsonBuilder, subkind
 }
 
 export async function initAsync(): Promise<void> {
+    if (core.pxt) return
+    enabled = true
     let notTableClient = await core.specTableClientAsync("NOTIFICATIONS");
     notificationsTable = await notTableClient.createTableIfNotExistsAsync("notifications2");
     subscriptions = await indexedStore.createStoreAsync(core.pubsContainer, "subscription");
@@ -250,6 +256,7 @@ async function getNotificationsAsync(req: core.ApiRequest, long: boolean): Promi
 }
 
 export async function sendAsync(about: JsonObject, notkind: string, suplemental: JsonObject): Promise<void> {
+    if (!enabled) return
     let notification = new PubNotification();
     notification.kind = "notification";
     notification.id = (await cachedStore.invSeqIdAsync()).toString();
