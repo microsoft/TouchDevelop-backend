@@ -180,7 +180,13 @@ export interface IPubInstalledHistory {
 }
 
 
+let enabled = false
+
 export async function initAsync(): Promise<void> {
+    if (core.pxt)
+        return
+
+    enabled = true
     let tableClientWs = await core.specTableClientAsync("WORKSPACE");
     let tableClientHist = await core.specTableClientAsync("WORKSPACE_HIST");
     installSlotsTable = await tableClientWs.createTableIfNotExistsAsync("installslots");
@@ -199,19 +205,19 @@ export async function initAsync(): Promise<void> {
         workspaceContainer.push(container);
     }
 
-    core.addRoute("GET", "*user", "installed", async(req: core.ApiRequest) => {
+    core.addRoute("GET", "*user", "installed", async (req: core.ApiRequest) => {
         core.meOnly(req);
         if (req.status == 200) {
             await getInstalledAsync(req, false);
         }
     });
-    core.addRoute("GET", "*user", "installedlong", async(req1: core.ApiRequest) => {
+    core.addRoute("GET", "*user", "installedlong", async (req1: core.ApiRequest) => {
         core.meOnly(req1);
         if (req1.status == 200) {
             await getInstalledAsync(req1, true);
         }
     });
-    core.addRoute("POST", "*user", "installed", async(req2: core.ApiRequest) => {
+    core.addRoute("POST", "*user", "installed", async (req2: core.ApiRequest) => {
         core.meOnly(req2);
         if (req2.status == 200) {
             await postInstalledAsync(req2);
@@ -221,19 +227,19 @@ export async function initAsync(): Promise<void> {
         });
 
 
-    core.addRoute("DELETE", "*user", "workspace", async(req: core.ApiRequest) => {
+    core.addRoute("DELETE", "*user", "workspace", async (req: core.ApiRequest) => {
         // this isn't really safe - has interactions with client syncing
         if (!core.checkPermission(req, "root")) return;
         core.meOnly(req);
         let entities = await installSlotsTable.createQuery().partitionKeyIs(req.rootId).fetchAllAsync();
-        await parallel.forJsonAsync(entities, async(v) => {
+        await parallel.forJsonAsync(entities, async (v) => {
             await installSlotsTable.deleteEntityAsync(v);
         })
         //await core.pokeSubChannelAsync("installed:" + req.rootId);
         req.response = {}
     });
 
-    core.addRoute("DELETE", "*user", "installed", async(req3: core.ApiRequest) => {
+    core.addRoute("DELETE", "*user", "installed", async (req3: core.ApiRequest) => {
         core.meOnly(req3);
         if (req3.status == 200) {
             let result = await installSlotsTable.getEntityAsync(req3.rootId, req3.argument);
@@ -250,6 +256,7 @@ export async function initAsync(): Promise<void> {
 }
 
 export async function getInstalledHeadersAsync(uid: string): Promise<IPubHeader[]> {
+    if (!enabled) return []
     let jsons = await installSlotsTable.createQuery().partitionKeyIs(uid).fetchAllAsync();
     return jsons.map(headerFromSlot)
 }
@@ -324,7 +331,7 @@ async function postInstalledAsync(req: core.ApiRequest): Promise<void> {
                 }
                 req.verb = "installedrecent";
             }
-        }        
+        }
         // This is used to patch-up missing metas. This happens after import from the legacy system.
         if (req.body["metas"]) {
             for (let meta of req.body["metas"]) {
@@ -364,8 +371,9 @@ async function postInstalledAsync(req: core.ApiRequest): Promise<void> {
 }
 
 export async function deleteAllHistoryAsync(userid: string, req: core.ApiRequest) {
+    if (!enabled) return
     let resQuery = installSlotsTable.createQuery().partitionKeyIs(userid);
-    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async(json1: JsonObject) => {
+    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async (json1: JsonObject) => {
         await deleteHistoryAsync(req, json1["RowKey"]);
     });
 }
@@ -383,7 +391,7 @@ async function deleteHistoryAsync(req: core.ApiRequest, guid: string): Promise<v
     let wsContainer = workspaceForUser(req.rootId);
     let scriptGuid = req.rootId + "." + guid;
     let resQuery = historyTable.createQuery().partitionKeyIs(scriptGuid);
-    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async(json: JsonObject) => {
+    await parallel.forJsonAsync(await resQuery.fetchAllAsync(), async (json: JsonObject) => {
         await historyTable.deleteEntityAsync(json);
         await wsContainer.blobContainer().deleteBlobAsync(json["historyid"]);
     });

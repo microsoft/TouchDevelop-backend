@@ -238,40 +238,41 @@ export async function initAsync(): Promise<void> {
         }
     }, { sizeCheckExcludes: "content" });
 
-    core.addRoute("POST", "*release", "label", async (req3: core.ApiRequest) => {
-        let name = orEmpty(req3.body["name"]);
-        if (!isKnownReleaseName(name)) {
-            req3.status = httpCode._412PreconditionFailed;
-        }
-        if (req3.status == 200) {
-            core.checkPermission(req3, "lbl-" + name);
-        }
-        if (req3.status == 200) {
-            let rel3 = PubRelease.createFromJson(req3.rootPub["pub"]);
-            let lab: IReleaseLabel = <any>{};
-            lab.name = name;
-            lab.time = await core.nowSecondsAsync();
-            lab.userid = req3.userid;
-            lab.releaseid = rel3.releaseid;
-            lab.relid = rel3.id;
-            lab.numpokes = 0;
-            await audit.logAsync(req3, "lbl-" + lab.name);
-            await core.updateSettingsAsync("releases", async (entry2: JsonBuilder) => {
-                let jsb2 = entry2["ids"];
-                if (jsb2 == null) {
-                    jsb2 = {};
-                    entry2["ids"] = jsb2;
-                }
-                jsb2[lab.name] = lab;
-                core.bareIncrement(entry2, "updatecount");
-            });
-            if (name == "cloud") {
+    if (!core.pxt)
+        core.addRoute("POST", "*release", "label", async (req3: core.ApiRequest) => {
+            let name = orEmpty(req3.body["name"]);
+            if (!isKnownReleaseName(name)) {
+                req3.status = httpCode._412PreconditionFailed;
+            }
+            if (req3.status == 200) {
+                core.checkPermission(req3, "lbl-" + name);
+            }
+            if (req3.status == 200) {
+                let rel3 = PubRelease.createFromJson(req3.rootPub["pub"]);
+                let lab: IReleaseLabel = <any>{};
+                lab.name = name;
+                lab.time = await core.nowSecondsAsync();
+                lab.userid = req3.userid;
+                lab.releaseid = rel3.releaseid;
+                lab.relid = rel3.id;
+                lab.numpokes = 0;
+                await audit.logAsync(req3, "lbl-" + lab.name);
+                await core.updateSettingsAsync("releases", async (entry2: JsonBuilder) => {
+                    let jsb2 = entry2["ids"];
+                    if (jsb2 == null) {
+                        jsb2 = {};
+                        entry2["ids"] = jsb2;
+                    }
+                    jsb2[lab.name] = lab;
+                    core.bareIncrement(entry2, "updatecount");
+                });
+                if (name == "cloud") {
                 /* async */ pokeReleaseAsync(name, 15);
                 /* async */ tdliteTdCompiler.deployCompileServiceAsync(rel3, req3);
+                }
+                req3.response = ({});
             }
-            req3.response = ({});
-        }
-    });
+        });
     core.addRoute("POST", "pokecloud", "", async (req4: core.ApiRequest) => {
         if (!core.checkPermission(req4, "root-ptr")) return
         await pokeReleaseAsync("cloud", 0);
