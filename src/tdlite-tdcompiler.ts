@@ -28,8 +28,7 @@ var doctopicsByTopicid = {};
 export var doctopicsCss: string = "";
 var cloudRelid: string = "";
 
-export async function initAsync()
-{
+export async function initAsync() {
     cacheCompiler = await cachedStore.createContainerAsync("cachecompiler", {
         redisCacheSeconds: 600
     });
@@ -39,43 +38,42 @@ export async function initAsync()
             await importDoctopicsAsync(req4);
         }
     });
-    
-    core.addRoute("GET", "*script", "webapp.js", async(req) => {
+
+    core.addRoute("GET", "*script", "webapp.js", async (req) => {
         if (await core.throttleAsync(req, "webappjs", 10))
             return;
         let json = await queryCloudCompilerAsync("q/" + req.rootId + "/webapp");
         req.response = json["compiled"];
         req.responseContentType = "application/javascript";
     });
-    
+
     // TODO this stuff should be migrated and done from here directly, not forwarded to noderunner
-    core.addRoute("POST", "deploy", "*", async(req) => {
+    core.addRoute("POST", "deploy", "*", async (req) => {
         if (!core.checkPermission(req, "azure-deploy")) return;
-        
+
         let response = await tdshell.sendEncryptedAsync(td.serverSetting("TDC_ENDPOINT"), "worker", {
             method: "POST",
             url: "/deploy/" + req.verb,
             body: req.body
         })
-                        
+
         let resp = {
             code: response.statusCode(),
             headers: {},
             resp: null
         }
-        
+
         if (response.contentAsJson())
             resp = <any>response.contentAsJson();
-        
+
         if (!resp.resp)
             req.status = httpCode._400BadRequest;
         else
-            req.response = resp.resp;        
+            req.response = resp.resp;
     }, { noSizeCheck: true })
 }
 
-export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: string) : Promise<void>
-{
+export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: string): Promise<void> {
     let resp = await queryCloudCompilerAsync(api);
     if (resp == null) {
         req.status = httpCode._400BadRequest;
@@ -85,11 +83,10 @@ export async function forwardToCloudCompilerAsync(req: core.ApiRequest, api: str
     }
 }
 
-export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
-{
+export async function queryCloudCompilerAsync(api: string): Promise<JsonObject> {
     if (!td.serverSetting("TDC_ENDPOINT", true))
         return {}
-    
+
     let totalResp: JsonObject;
     let js = (<JsonObject>null);
     let canCache = /^[\w\/\-]+$/.test(api);
@@ -114,7 +111,7 @@ export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
                 resp: null
             }
         logger.debug(`cloud compiler: ${api} -> ${resp["code"]}`);
-        let respData = resp["resp"] 
+        let respData = resp["resp"]
         let headers = resp["headers"] || {}
         if (respData && resp["code"] == 200) {
             if (td.startsWith(headers["content-type"] || "", "application/json")) {
@@ -128,8 +125,8 @@ export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
             totalResp = (<JsonObject>null);
             canCache = false;
         }
-        logger.debug(`v=${ver}, cache=${canCache} api=${api} hd=${headers["x-touchdevelop-relid"]}`);                                 
-        if (canCache && headers["x-touchdevelop-relid"] == ver) {            
+        logger.debug(`v=${ver}, cache=${canCache} api=${api} hd=${headers["x-touchdevelop-relid"]}`);
+        if (canCache && headers["x-touchdevelop-relid"] == ver) {
             let jsb = {
                 version: ver,
                 resp: totalResp
@@ -144,8 +141,7 @@ export async function queryCloudCompilerAsync(api: string) : Promise<JsonObject>
 /**
  * TODO include access token for the compile service
  */
-export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, req: core.ApiRequest) : Promise<void>
-{
+export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, req: core.ApiRequest): Promise<void> {
     let cfg = {};
     let clientConfig = tdliteReleases.clientConfigForRelease(rel);
     clientConfig.doNothingText = core.fullTD ? "..." : "add code here"
@@ -161,17 +157,17 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
     }
     jsSrc = jsSrc + "require(\"./noderunner.js\");\n";
     let deployData = {
-        "files": [ {
+        "files": [{
             "path": "script/compiled.js",
             "content": jsSrc
         }, {
-            "path": "script/noderunner.js",
-            "url": tdliteReleases.appContainerUrl() + "/" + rel.releaseid + "/c/noderunner.js"
-        }] 
+                "path": "script/noderunner.js",
+                "url": tdliteReleases.appContainerUrl() + "/" + rel.releaseid + "/c/noderunner.js"
+            }]
     };
-    let file = {};        
+    let file = {};
     //    logger.debug("cloud JS: " + JSON.stringify(deployData, null, 2));
-    
+
     let endpoint = td.serverSetting("TDC_ENDPOINT")
 
     let response = await tdshell.sendEncryptedAsync(endpoint, "deploy", deployData);
@@ -192,8 +188,7 @@ export async function deployCompileServiceAsync(rel: tdliteReleases.PubRelease, 
     */
 }
 
-export async function cacheCloudCompilerDataAsync(ver: string) : Promise<void>
-{
+export async function cacheCloudCompilerDataAsync(ver: string): Promise<void> {
     if (cloudRelid != ver) {
         let resp2 = /* async */ queryCloudCompilerAsync("css");
         doctopicsCss = (await resp2)["css"];
@@ -201,8 +196,7 @@ export async function cacheCloudCompilerDataAsync(ver: string) : Promise<void>
     }
 }
 
-async function importDoctopicsAsync(req: core.ApiRequest) : Promise<void>
-{
+async function importDoctopicsAsync(req: core.ApiRequest): Promise<void> {
     await cacheCloudCompilerDataAsync(await core.getCloudRelidAsync(true));
     let ids = asArray(doctopics).map<string>(elt => orEmpty(elt["scriptId"])).filter(elt1 => elt1 != "");
     let fetchResult = await tdliteScripts.scripts.fetchFromIdListAsync(ids, (<JsonObject>null));
@@ -223,15 +217,13 @@ async function importDoctopicsAsync(req: core.ApiRequest) : Promise<void>
     req.response = resp.toJson();
 }
 
-function topicLink(doctopic: JsonObject) : string
-{
+function topicLink(doctopic: JsonObject): string {
     let s: string;
     s = "<a href='/docs/" + doctopic["id"] + "'>" + core.htmlQuote(doctopic["name"]) + "</a>";
     return s;
 }
 
-function topicList(doctopic: JsonObject, childId: string, childRepl: string) : string
-{
+function topicList(doctopic: JsonObject, childId: string, childRepl: string): string {
     let html: string;
     html = "<li class='active'>" + topicLink(doctopic);
     let children = doctopic["childTopics"];
