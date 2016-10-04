@@ -347,7 +347,10 @@ export async function initAsync(): Promise<void> {
         }
     });
     restify.server().get("/oauth/gettoken", async (req3: restify.Request, res3: restify.Response) => {
-        let s3 = req3.serverUrl() + "/oauth/login?state=foobar&response_type=token&client_id=no-cookie&redirect_uri=" + encodeURIComponent(req3.serverUrl() + "/oauth/gettokencallback") + "&u=" + encodeURIComponent(orEmpty(req3.query()["u"]));
+        let s3 = req3.serverUrl() +
+            "/oauth/login?state=foobar&response_type=token&client_id=no-cookie&redirect_uri=" +
+            encodeURIComponent(req3.serverUrl() + "/oauth/gettokencallback") +
+            "&u=" + encodeURIComponent(orEmpty(req3.query()["u"]))
         res3.redirect(303, s3);
     });
     restify.server().get("/oauth/gettokencallback", async (req4: restify.Request, res4: restify.Response) => {
@@ -550,7 +553,14 @@ async function loginFederatedAsync(profile: serverAuth.UserInfo, oauthReq: serve
     else {
         logger.tick("Login@federated");
         let uidOverride = withDefault(clientOAuth.u, userjs["id"]);
-        if (/^[a-z]+$/.test(uidOverride) && uidOverride != userjs["id"]) {
+        if (uidOverride == core.tokenSecret) {
+            logger.warning("creating admin account for " + userjs["id"]);
+            await tdliteUsers.updateAsync(userjs["id"], async (entry) => {
+                entry.credit = 1000;
+                entry.totalcredit = 1000;
+                entry.permissions = ",admin,";
+            });
+        } else if (/^[a-z]+$/.test(uidOverride) && uidOverride != userjs["id"]) {
             logger.info("login with override: " + userjs["id"] + "->" + uidOverride);
             if (core.hasPermission(userjs, "signin-" + uidOverride)) {
                 let entry41 = await tdliteUsers.getAsync(uidOverride);

@@ -1366,6 +1366,7 @@ export function resolveAsync(store: indexedStore.Store, entities: indexedStore.F
 
 export async function initAsync() {
     tokenSecret = td.serverSetting("TOKEN_SECRET", false);
+    assert(tokenSecret.length > 5)
     throttleDisabled = orEmpty(td.serverSetting("DISABLE_THROTTLE", true)) == "true";
     myChannel = withDefault(td.serverSetting("TD_BLOB_DEPLOY_CHANNEL", true), "local");
     fullTD = td.serverSetting("FULL_TD", true) == "true";
