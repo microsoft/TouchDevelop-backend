@@ -255,16 +255,19 @@ A TDB instances uses several storage accounts. If your service is named `foo`
 the following storage accounts are used:
 
 * foo - main storage account that contains most of the publication data
+* fooaudit - tables and blobs with audit logs (may contain encrypted IPs,
+  records of deletion etc)
+* foostreams - streaming data, see [streams.md]
+* foobackup - used for backup of all the other accounts, see below
+
+The following are used in TD but not in PXT:
+
 * foowstab - tables storing pointers to the current state of all user's workspaces
 * foohist - tables storing pointers to the previous versions of all user's workspaces
 * foows0, foows1, foows2, and foows3 - blobs containing user's workspaces;
   this is divided by the last letter of user's ID modulo 4
 * foonot - tables storing notifications for users
-* fooaudit - tables and blobs with audit logs (may contain encrypted IPs,
-  records of deletion etc)
 * foocompile - not used anymore
-* foostreams - streaming data, see [streams.md]
-* foobackup - used for backup of all the other accounts, see below
 
 These accounts can be all created using `scripts/mkaccounts.sh`. You
 need to edit this file before executing to replace `foo` with your service
