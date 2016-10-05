@@ -95,14 +95,16 @@ export interface ICompilerConfig {
 }
 
 export async function initAsync() {
-    mbedworkshopCompiler.init();
-    mbedworkshopCompiler.setVerbosity("debug");
+    if (core.hasSetting("MBED_API_KEY")) {
+        mbedworkshopCompiler.init();
+        mbedworkshopCompiler.setVerbosity("debug");
+    }
 
     compileContainer = await core.blobService.createContainerIfNotExistsAsync("compile", "hidden");
     githubCache = await cachedStore.createContainerAsync("cachegithub");
     cppCache = await cachedStore.createContainerAsync("cachecpp");
 
-    core.addRoute("POST", "admin", "mbedint", async(req9: core.ApiRequest) => {
+    core.addRoute("POST", "admin", "mbedint", async (req9: core.ApiRequest) => {
         core.checkPermission(req9, "root");
         if (req9.status == 200) {
             let ccfg = CompilerConfig.createFromJson(core.getSettings("compile")[req9.argument]);
@@ -112,12 +114,12 @@ export async function initAsync() {
         }
     });
 
-    core.addRoute("POST", "compile", "extension", async(req) => {
+    core.addRoute("POST", "compile", "extension", async (req) => {
         //if (!core.checkPermission(req, "root")) return;
         await mbedCompileExtAsync(req);
     }, { noSizeCheck: true })
 
-    core.addRoute("GET", "*script", "hex", async(req) => {
+    core.addRoute("GET", "*script", "hex", async (req) => {
         let pub = req.rootPub
 
         if (core.orFalse(req.queryOptions["applyupdates"])) {
@@ -142,7 +144,7 @@ export async function initAsync() {
                 return;
             // create status file first to avoid races
             let doIt = false
-            curr = await cppCache.updateAsync(key + "-hexstatus", async(v) => {
+            curr = await cppCache.updateAsync(key + "-hexstatus", async (v) => {
                 doIt = !v["url"]
                 v["url"] = core.currClientConfig.primaryCdnUrl + "/compile/" + blobName
             })
@@ -349,7 +351,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
         req.status = httpCode._413RequestEntityTooLarge;
         return;
     }
-    
+
     let buildTimeout = 120
 
     let hexurl = compileContainer.url() + "/" + sha + ".hex";
@@ -374,7 +376,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
 
     let shouldStart = false;
 
-    await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
+    await cppCache.updateAsync(sha + "-status", async (entry: IntCompileStatus) => {
         let starttime = entry.starttime
         if (now - starttime < buildTimeout) {
             logger.info("race on compile start for " + sha)
@@ -465,7 +467,7 @@ async function mbedCompileExtAsync(req: core.ApiRequest): Promise<void> {
             gittag: ccfg.repourl.replace(/.*#/, ""),
             empty: true,
         };
-        
+
         /* async */ mbedintDownloadAsync(sha, jsb, ccfg, true);
 
         req.response = {
@@ -527,7 +529,7 @@ async function mbedwsDownloadAsync(sha: string, compile: mbedworkshopCompiler.Co
     let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
 
     if (saveSt)
-        await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
+        await cppCache.updateAsync(sha + "-status", async (entry: IntCompileStatus) => {
             entry.finished = true;
             entry.success = task.success;
         })
@@ -567,7 +569,7 @@ async function mbedintDownloadAsync(sha: string, jsb2: JsonBuilder, ccfg: Compil
     let result2 = await compileContainer.createBlockBlobFromJsonAsync(sha + ".json", st.toJson());
 
     if (saveSt)
-        await cppCache.updateAsync(sha + "-status", async(entry: IntCompileStatus) => {
+        await cppCache.updateAsync(sha + "-status", async (entry: IntCompileStatus) => {
             entry.finished = true;
             entry.success = st.success;
         })

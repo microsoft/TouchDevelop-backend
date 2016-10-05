@@ -71,7 +71,7 @@ export async function initAsync()
         req.response = td.clone(jsb);
     });
     
-    if (!core.fullTD) return;
+    if (!core.fullTD || core.pxt) return;
         
     let encKey = core.sha256bin(core.tokenSecret + ":revision");         
     

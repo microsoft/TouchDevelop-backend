@@ -24,7 +24,6 @@ export type GetProviderTemplate = () => Promise<string>;
 export type ErrorCallback = (res1: restify.Response, msg: string) => Promise<void>;
 
 var logger: td.AppLogger;
-var tokenSecret: string = "";
 var debug: boolean = false;
 var globalOptions: IInitOptions;
 var fedTargets: string[];
@@ -326,7 +325,6 @@ export function init(options_: IInitOptions = {}): void {
     if (!globalOptions.isValidDomain)
         globalOptions.isValidDomain = d => d == globalOptions.self
 
-    tokenSecret = td.serverSetting("TOKEN_SECRET", false);
     initRestify();
     logger.info("Started");
 }
