@@ -712,7 +712,12 @@ async function rewriteAndCacheAsync(rel: string, relid: string, srcFile: string,
 export async function pokeReleaseAsync(relLabel: string, delay: number): Promise<void> {
     await td.sleepAsync(delay);
     await core.updateSettingsAsync("releases", async (entry: JsonBuilder) => {
+        if (!entry["ids"]) entry["ids"] = {}
         let jsb = entry["ids"][relLabel];
+        if (!jsb) jsb = {
+            numpokes: 1,
+            relid: "none"
+        }
         jsb["numpokes"] = jsb["numpokes"] + 1;
     });
 }

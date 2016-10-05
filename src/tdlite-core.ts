@@ -1697,8 +1697,8 @@ export function registerPubKind(desc: IPubKind) {
 export async function getCloudRelidAsync(includeVer: boolean): Promise<string> {
     let ver: string;
     let entry = getSettings("releases");
-    let js = entry["ids"]["cloud"];
-    ver = js["relid"];
+    let js = entry ? entry["ids"]["cloud"] : {};
+    ver = js["relid"] || "unset";
     if (includeVer) {
         ver = ver + "." + rewriteVersion + "." + js["numpokes"];
     }
