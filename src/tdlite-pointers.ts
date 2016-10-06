@@ -1118,6 +1118,9 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
 
     let baseDir = fn.replace(/[\/-].*/, "")
 
+
+    //logger.info(`host=${host} ${JSON.stringify(core.serviceSettings.domains)}`)
+
     // https://www.pxt.io/sample-foo -> https://sample.pxt.io/foo
     if (core.pxt && host == core.myHost && domainOfTarget(baseDir)) {
         res.redirect(httpCode._301MovedPermanently, "https://" + domainOfTarget(baseDir) + "/" + req.url().slice(baseDir.length + 2))
@@ -1133,7 +1136,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
         } else if (fn == "" || fn == "beta") {
             res.html(redirHTML.replace("@URL@", trgUrl))
         } else {
-            res.redirect(httpCode._301MovedPermanently, trgUrl) 
+            res.redirect(httpCode._301MovedPermanently, trgUrl)
         }
         return
     }
@@ -1166,7 +1169,7 @@ export async function servePointerAsync(req: restify.Request, res: restify.Respo
             hasVhosts = true
             let path = core.serviceSettings.domains[domain]
             if (domain == host) {
-                vhostDirName = core.serviceSettings.domains[host].replace(/^\//, "")
+                vhostDirName = path.replace(/^\//, "")
                 fn = vhostDirName + "/" + fn
                 break
             }
