@@ -19,11 +19,13 @@ ExecStart=/usr/bin/docker daemon -H fd:// -g /docker
 Then do:
 
 ```
+cd
+sudo su -
 mkdir /docker
 mount -a
 systemctl daemon-reload
 systemctl restart docker
-docker pull mmoskal/yotta
+docker pull pext/yotta
 ```
 
 Install node.js (on host, not in docker):
