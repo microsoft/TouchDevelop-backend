@@ -40,11 +40,16 @@ Clone TD-backend repo:
 sudo su - build
 git clone https://github.com/Microsoft/TouchDevelop-backend.git
 cd TouchDevelop-backend/dockerbuild
+npm install
 ```
 
-Copy `.yotta/config.json` with the right credentials to `yottaconfig.json`.
+Copy `.yotta/config.json` with the right credentials to `yottaconfig.json`:
 
-Run `node server.js` and create `config.json` file as prompted. 
+```
+scp yottaconfig.json build@somewhere.cloudapp.net:TouchDevelop-backend/dockerbuild
+```
+
+Run `node server.js` and create `config.json` file as prompted. You can use the key it generates.
 
 Then run the server in screen session.
 ```
@@ -52,3 +57,5 @@ screen
 node server.js
 Ctrl-A Ctrl-D
 ```
+
+You can login later into the machine, you can do `screen -r` to re-attach the screen and see what's going on.
