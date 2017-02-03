@@ -183,7 +183,7 @@ export async function updateAndUpsertAsync(container: cachedStore.Container, req
     return last;
 }
 
-export async function initAsync(): Promise<void> {
+export async function initAsync(noCreate: boolean): Promise<void> {
     disableSearch = orEmpty(td.serverSetting("DISABLE_SEARCH", true)) == "true";
     core.executeSearchAsync = executeSearchAsync;
 
@@ -193,7 +193,7 @@ export async function initAsync(): Promise<void> {
         allow_409: true
     });
 
-    await tdliteIndex.initAsync();
+    await tdliteIndex.initAsync(noCreate);
 
     core.addRoute("GET", "websearch", "", async (req: core.ApiRequest) => {
         if (req.status == 200) {
