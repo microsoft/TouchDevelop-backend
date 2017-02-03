@@ -249,7 +249,7 @@ export class Container
         let len = minIdLength;
         id = "";
         while (collisions > 0) {
-            id = freshShortId(minIdLength);
+            id = freshShortId(len);
             data_["id"] = id;
             let ok = await this.tryInsertAsync(id, data_);
             if (ok) {
