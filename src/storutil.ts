@@ -17,41 +17,38 @@ let helpMessage = "";
 let tableClient: azureTable.Client;
 let blobClient: azureBlobStorage.BlobService;
 
-let isConsole = !!(<any>process.stdout).isTTY; 
+let isConsole = !!(<any>process.stdout).isTTY;
 
 function fmt(n: string, len: number) {
     while (n.length < len - 1)
-        n += " ";   
-    return n + " "; 
+        n += " ";
+    return n + " ";
 }
 
-function addCommand(name: string, args: string, cmdhelp: string, f: (args: string[]) => Promise<void>)
-{
+function addCommand(name: string, args: string, cmdhelp: string, f: (args: string[]) => Promise<void>) {
     cmds[name] = f;
-    helpMessage = helpMessage + fmt(name, 10) + fmt(args, 10) + cmdhelp + "\n"; 
+    helpMessage = helpMessage + fmt(name, 10) + fmt(args, 10) + cmdhelp + "\n";
 }
 
-function printHelp()
-{
+function printHelp() {
     console.log("USAGE: node storutil COMMAND ARGS...")
     console.log("Commands:")
     console.log(helpMessage)
     process.exit(1)
 }
 
-let decodeHex = false; 
+let decodeHex = false;
 
-function decode(s:string)
-{
+function decode(s: string) {
     if (decodeHex)
         s = s.replace(/%([0-9A-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
     // try { s = new Buffer(s, "base64").toString("hex");   } catch (e) { }
-    return  s;
+    return s;
 }
 
-addCommand("query", "table {count=N|part=S|row=S|cont=S|hex|line}", "list tables", async(args) => {
+addCommand("query", "table {count=N|part=S|row=S|cont=S|hex|line}", "list tables", async (args) => {
     let tblnm = args.shift()
-    if (!tblnm) printHelp();    
+    if (!tblnm) printHelp();
     let tbl = await tableClient.createTableIfNotExistsAsync(tblnm);
     let q = tbl.createQuery().pageSize(100);
     let oneline = false;
@@ -62,14 +59,14 @@ addCommand("query", "table {count=N|part=S|row=S|cont=S|hex|line}", "list tables
         m = /^cont=(.*)/.exec(arg);
         if (m) { q = q.continueAt(m[1]); continue; }
         m = /^part(=|==|!=|<|>|<=|>=)(.*)/.exec(arg);
-        if (m) { q = q.where("PartitionKey", m[1], m[2]); continue; }       
+        if (m) { q = q.where("PartitionKey", m[1], m[2]); continue; }
         m = /^row(=|==|!=|<|>|<=|>=)(.*)/.exec(arg);
         if (m) { q = q.where("RowKey", m[1], m[2]); continue; }
         if (arg == "hex") { decodeHex = true; continue; }
-        if (arg == "line") { oneline = true; continue;}
+        if (arg == "line") { oneline = true; continue; }
         console.log("not understood:", arg)
         process.exit(1)
-    }   
+    }
     if (isConsole && q.onlyTop > 1000) q = q.top(20);
     while (true) {
         let fr = await q.fetchPageAsync();
@@ -92,7 +89,7 @@ addCommand("query", "table {count=N|part=S|row=S|cont=S|hex|line}", "list tables
                 console.log("****** " + hd)
                 console.log(item)
                 console.log("")
-            }   
+            }
         }
         if (isConsole) break;
         if (!fr.continuation) break;
@@ -100,7 +97,7 @@ addCommand("query", "table {count=N|part=S|row=S|cont=S|hex|line}", "list tables
     }
 });
 
-addCommand("containers", "[conttoken]", "list blob containers", async(args) => {
+addCommand("containers", "[conttoken]", "list blob containers", async (args) => {
     blobClient.handle.listContainersSegmented(args[0], {}, (err, res) => {
         for (let t of res.entries) {
             console.log("container:", t.name)
@@ -111,10 +108,10 @@ addCommand("containers", "[conttoken]", "list blob containers", async(args) => {
     })
 });
 
-addCommand("blobs", "container [prefix [cont]]", "list blob containers", async(args) => {   
-    blobClient.handle.listBlobsSegmentedWithPrefix(args[0], args[1] || "", args[2], { maxResults: 100 }, (err, res) => {        
+addCommand("blobs", "container [prefix [cont]]", "list blob containers", async (args) => {
+    blobClient.handle.listBlobsSegmentedWithPrefix(args[0], args[1] || "", args[2], { maxResults: 100 }, (err, res) => {
         for (let t of res.entries) {
-            console.log("container:", t.name)
+            console.log("blob:", t.name)
         }
         let cont = res.continuationToken
         if (cont)
@@ -122,10 +119,11 @@ addCommand("blobs", "container [prefix [cont]]", "list blob containers", async(a
     })
 });
 
-function decompress(buf: Buffer)
-{
+
+
+function decompress(buf: Buffer) {
     if (buf.length <= 1) return "";
-    
+
     if (buf[0] == 0) {
         buf = buf.slice(1);
     } else if (buf[0] == 1 || buf[0] == 2) {
@@ -134,15 +132,15 @@ function decompress(buf: Buffer)
             buf = zlib.inflateRawSync(buf.slice(5));
         else
             buf = zlib.gunzipSync(buf.slice(5));
-        assert(len == buf.length)       
+        assert(len == buf.length)
     } else {
-        assert(false)       
+        assert(false)
     }
-    
+
     return buf.toString("utf8");
 }
 
-addCommand("getblob", "container path", "list blob containers", async(args) => {
+addCommand("getblob", "container path", "list blob containers", async (args) => {
     let cont = await blobClient.createContainerIfNotExistsAsync(args[0], "private");
     let r = await cont.getBlobToBufferAsync(args[1]);
     let buf = r.buffer();
@@ -158,7 +156,7 @@ addCommand("getblob", "container path", "list blob containers", async(args) => {
                 }
 
                 let len = buf.readInt32LE(pos);
-                pos += 4;               
+                pos += 4;
                 console.log(len);
                 json.push(decompress(buf.slice(pos, pos + len)))
                 pos += len;
@@ -171,10 +169,10 @@ addCommand("getblob", "container path", "list blob containers", async(args) => {
 
 
 
-addCommand("tables", "[cont]", "list tables", async(args) => {
+addCommand("tables", "[cont]", "list tables", async (args) => {
     var opts = {
         nextTableName: args[0]
-    }   
+    }
     tableClient.handle.listTables(opts, (err, buf, cont) => {
         for (let t of buf) {
             console.log("table:", t)
@@ -196,15 +194,14 @@ function init() {
     azureBlobStorage.assumeContainerExists();
 }
 
-function main()
-{
+function main() {
     let args = process.argv.slice(2);
     let cmd = args.shift();
-    
+
     if (!cmd) printHelp();
     cmd = cmd.toLowerCase();
     if (!cmds.hasOwnProperty(cmd)) printHelp();
-    
+
     init();
     cmds[cmd](args);
 }
