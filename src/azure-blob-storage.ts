@@ -20,83 +20,77 @@ var logger: td.AppLogger;
 
 const transientErrors = [500, 501, 502, 503, 'ETIMEDOUT', 'ECONNRESET', 'EADDRINUSE', 'ESOCKETTIMEDOUT', 'ECONNREFUSED'];
 
-export class BlobService
-{
-    public handle:any;
-    public tdAccount:string;
+export class BlobService {
+    public handle: any;
+    public tdAccount: string;
 
-    tdError(err:any, msg:string)
-    {
+    tdError(err: any, msg: string) {
         if (!err) return;
-        
+
         if (transientErrors.indexOf(err.code) !== -1 || transientErrors.indexOf(err.statusCode) !== -1) {
             err.statusCode = 503; // for restify etc
             err.tdSkipReporting = true; // skip reporting
             logger.measure("503@" + this.tdAccount, 1000)
         }
-    
+
         if (!err.tdMeta) err.tdMeta = {};
         err.tdMeta.func = msg || "";
         throw err;
     }
-    
-    tdError404(err:any, msg:string)
-    {
-      if (err && !/does not exist/.test(err + "")) this.tdError(err, msg);
+
+    tdError404(err: any, msg: string) {
+        if (err && !/does not exist/.test(err + "")) this.tdError(err, msg);
     }
 
     /**
      * All blobs reside in a container. This method creates a new container with permission 'hidden,' 'private,' or 'public.'
      * {hints:permission:private,hidden,public}
      */
-    public async createContainerIfNotExistsAsync(containerName: string, permission: string) : Promise<Container>
-    {
+    public async createContainerIfNotExistsAsync(containerName: string, permission: string): Promise<Container> {
         let blob_service = this.handle;
         let container: Container;
         if (assumeExists) {
-           log("would create container, " + containerName);
-           return new Container(this, containerName, null)
+            log("would create container, " + containerName);
+            return new Container(this, containerName, null)
         }
         log("create container");
         await new Promise(resume => {
             var opts = {}
             if (permission == "hidden" || permission == "blob")
-              opts = {publicAccessLevel:'blob'}
+                opts = { publicAccessLevel: 'blob' }
             else if (permission == "public")
-              opts = {publicAccessLevel:'container'}
-            
-            blob_service.createContainerIfNotExists(containerName, opts, (error,res,resp) => {
-               this.tdError(error, "create container");
-               container = new Container(this, containerName, res)
-               resume();
+                opts = { publicAccessLevel: 'container' }
+
+            blob_service.createContainerIfNotExists(containerName, opts, (error, res, resp) => {
+                this.tdError(error, "create container");
+                container = new Container(this, containerName, res)
+                resume();
             });
         });
         log("container created");
         return container;
     }
-    
-    public getContainer(name: string)
-    {
+
+    public getContainer(name: string) {
         return new Container(this, name, null)
     }
 
     /**
      * Specifies the service properties. See http://msdn.microsoft.com/en-us/library/azure/hh452235.aspx
      */
-    public async setServicePropertiesAsync(properties: JsonObject) : Promise<[JsonObject, JsonObject]>
-    {
+    public async setServicePropertiesAsync(properties: JsonObject): Promise<[JsonObject, JsonObject]> {
         let result: JsonObject;
         let response: JsonObject;
         logger.debug("settings properties: " + JSON.stringify(properties));
         await new Promise(resume => {
-            this.handle.setServiceProperties(properties, (error,res,resp) => {
-                this.tdError(error, "set service properties");    
+            this.handle.setServiceProperties(properties, (error, res, resp) => {
+                this.tdError(error, "set service properties");
                 result = res;
                 response = resp;
                 resume();
             });
         });
-        return <[{},{}]>[result, response]
+        return <[{}, {}]>[result, response]
     }
 
     /**
@@ -105,10 +99,9 @@ export class BlobService
      * {hints:allowed headers:*}
      * {hints:exposed headers:*}
      */
-    public async setCorsPropertiesAsync(allowedOrigins: string, allowedMethods: string, allowedHeaders: string, exposedHeaders: string, maxAgeInSeconds: number) : Promise<boolean>
-    {
+    public async setCorsPropertiesAsync(allowedOrigins: string, allowedMethods: string, allowedHeaders: string, exposedHeaders: string, maxAgeInSeconds: number): Promise<boolean> {
         let success: boolean;
-        let props = ({Cors: { CorsRule: [ {  } ] } });
+        let props = ({ Cors: { CorsRule: [{}] } });
         let corsRule = props["Cors"]["CorsRule"][0];
         corsRule["AllowedOrigins"] = stringToJsarray(allowedOrigins);
         corsRule["AllowedMethods"] = stringToJsarray(allowedMethods);
@@ -127,13 +120,12 @@ export class BlobService
     /**
      * Specifies the service properties. See http://msdn.microsoft.com/en-us/library/azure/hh452235.aspx
      */
-    public async servicePropertiesAsync() : Promise<JsonObject>
-    {
+    public async servicePropertiesAsync(): Promise<JsonObject> {
         let result: JsonObject;
         let response: JsonObject;
         await new Promise(resume => {
             /*JS*/
-            this.handle.getServiceProperties((error,res,resp) => {
+            this.handle.getServiceProperties((error, res, resp) => {
                 this.tdError(error, "service properties");
                 result = res;
                 response = resp;
@@ -146,29 +138,26 @@ export class BlobService
     /**
      * Generate an random block id prefix
      */
-    public generateRandomId() : string
-    {
+    public generateRandomId(): string {
         return this.handle.generateBlockIdPrefix()
     }
 
     /**
      * Set log level to 'debug' or 'info'
      */
-    public setLogLevel(level: string) : void
-    {
+    public setLogLevel(level: string): void {
         this.handle.logger.level = level;
     }
 
     /**
      * Permanently removes the container. It cannot be undone.
      */
-    public async deleteContainerAsync(containerName: string) : Promise<void>
-    {
+    public async deleteContainerAsync(containerName: string): Promise<void> {
         log("delete container: " + containerName);
         await new Promise(resume => {
-            this.handle.deleteContainer(containerName, (error,res,resp) => {
-               this.tdError(error, "delete container");
-               resume();
+            this.handle.deleteContainer(containerName, (error, res, resp) => {
+                this.tdError(error, "delete container");
+                resume();
             });
         });
         log("container deleted");
@@ -177,25 +166,21 @@ export class BlobService
     /**
      * Storage account name for this service
      */
-    public storageAccount() : string
-    {
+    public storageAccount(): string {
         return this.tdAccount;
     }
 }
 
-export class Container
-{
-    constructor(public svc:BlobService, public name:string, public result:any)
-    {
+export class Container {
+    constructor(public svc: BlobService, public name: string, public result: any) {
     }
 
     /**
      * Creates a new block blob and uploads the contents of a JSON.
      */
-    public async createBlockBlobFromJsonAsync(blobName: string, json: {}, options: ICreateOptions = {}) : Promise<BlobInfo>
-    {
+    public async createBlockBlobFromJsonAsync(blobName: string, json: {}, options: ICreateOptions = {}): Promise<BlobInfo> {
         if (!options.contentType)
-            options.contentType = "application/json; charset=utf-8";        
+            options.contentType = "application/json; charset=utf-8";
         return await this.createBlockBlobFromTextAsync(blobName, JSON.stringify(json), options);
     }
 
@@ -203,22 +188,21 @@ export class Container
     /**
      * Creates a new block blob and uploads the contents of a string.
      */
-    public async createBlockBlobFromTextAsync(blobName: string, text: string, options?: ICreateOptions) : Promise<BlobInfo>
-    {
+    public async createBlockBlobFromTextAsync(blobName: string, text: string, options?: ICreateOptions): Promise<BlobInfo> {
         let container: Container = this;
         let result: BlobInfo;
         let opts = prepOptions(options);
         await new Promise(resume => {
             /*JS*/
             this.svc.handle.createBlockBlobFromText(this.name, blobName, text, opts, (error, res, resp) => {
-              if (!opts.justTry) this.svc.tdError(error, "create blob from text");
-              if(error){
-                 result = new BlobInfo({ error: error + "" })
-              }
-              else{
+                if (!opts.justTry) this.svc.tdError(error, "create blob from text");
+                if (error) {
+                    result = new BlobInfo({ error: error + "" })
+                }
+                else {
                     result = new BlobInfo(res);
-               }
-            resume();
+                }
+                resume();
             });
         });
         container.timeOp(opts, "put");
@@ -228,29 +212,28 @@ export class Container
     /**
      * Writes the blob contents to a string. The `result` will contain information about the blob, including ETag information.
      */
-    public async getBlobToTextAsync(blobName: string, options?: IGetOptions) : Promise<BlobInfo>
-    {
+    public async getBlobToTextAsync(blobName: string, options?: IGetOptions): Promise<BlobInfo> {
         let info: BlobInfo;
         let opts = prepGetOptions(options);
         await new Promise(resume => {
-            this.svc.handle.getBlobToText(this.name, blobName, opts, 
-            (error,txt,res,resp) => {
-                if (!opts.justTry) this.svc.tdError404(error, "get blob to buffer");
-                if(error){
-                    if (error.statusCode == 404) { 
-                      info = new BlobInfo({ error: "404" })
+            this.svc.handle.getBlobToText(this.name, blobName, opts,
+                (error, txt, res, resp) => {
+                    if (!opts.justTry) this.svc.tdError404(error, "get blob to buffer");
+                    if (error) {
+                        if (error.statusCode == 404) {
+                            info = new BlobInfo({ error: "404" })
+                        }
+                        else {
+                            td.checkAndLog(error);
+                            info = new BlobInfo({ error: error + "" })
+                        }
                     }
                     else {
-                       td.checkAndLog(error);
-                       info = new BlobInfo({ error: error + "" })
+                        info = new BlobInfo(res);
+                        res.text = txt;
                     }
-                }
-                else{
-                    info= new BlobInfo(res);
-                    res.text = txt;
-                }
-            resume();
-            });
+                    resume();
+                });
         });
         this.timeOp(opts, "get");
         return info;
@@ -259,13 +242,12 @@ export class Container
     /**
      * Deletes a blob.
      */
-    public async deleteBlobAsync(blobName: string) : Promise<void>
-    {
+    public async deleteBlobAsync(blobName: string): Promise<void> {
         await new Promise(resume => {
             /*JS*/
-            this.svc.handle.deleteBlob(this.name, blobName, (error,resp) => {
-               this.svc.tdError404(error, "delete blob");
-               resume();
+            this.svc.handle.deleteBlob(this.name, blobName, (error, resp) => {
+                this.svc.tdError404(error, "delete blob");
+                resume();
             });
         });
     }
@@ -273,27 +255,26 @@ export class Container
     /**
      * Writes the blob contents to a file. The `result` will contain information about the blob, including ETag information.
      */
-    public async getBlobToBufferAsync(blobName: string, options?: IGetOptions) : Promise<BlobInfo>
-    {
+    public async getBlobToBufferAsync(blobName: string, options?: IGetOptions): Promise<BlobInfo> {
         let result: BlobInfo;
         let opts = prepGetOptions(options);
         await new Promise(resume => {
-            let buf:Buffer;
-            var rs = this.svc.handle.createReadStream(this.name, blobName, opts, (error,res,resp) => {
+            let buf: Buffer;
+            var rs = this.svc.handle.createReadStream(this.name, blobName, opts, (error, res, resp) => {
                 if (!opts.justTry) this.svc.tdError404(error, "get blob to buffer");
                 if (td.checkAndLog(error)) {
                     res.buffer = buf;
-                   result = new BlobInfo(res);
+                    result = new BlobInfo(res);
                 } else {
                     result = new BlobInfo({ error: error + "" })
-                   resume();
+                    resume();
                 }
             });
             var bufs = []
-            rs.on("data",d => { bufs.push(d); })
+            rs.on("data", d => { bufs.push(d); })
             rs.on("end", () => {
-              buf = Buffer.concat(bufs);                         
-              resume()
+                buf = Buffer.concat(bufs);
+                resume()
             })
         });
         this.timeOp(opts, "get");
@@ -304,34 +285,32 @@ export class Container
     /**
      * Gets the URL of the container.
      */
-    public url() : string
-    {
+    public url(): string {
         if (!this._url)
             this._url = this.svc.handle.getUrl(this.name)
         return this._url;
     }
-    private _url:string;
+    private _url: string;
 
     /**
      * Creates a new block blob with contents downloaded from given `url`.
      */
-    public async createBlockBlobFromUrlAsync(blobName: string, url: string, options?: ICreateOptions) : Promise<BlobInfo>
-    {
+    public async createBlockBlobFromUrlAsync(blobName: string, url: string, options?: ICreateOptions): Promise<BlobInfo> {
         let result: BlobInfo;
         let opts = prepOptions(options);
         await new Promise(resume => {
             /* async */ td.httpRequestStreamAsync(url)
-              .then(urlResp => {
-                  if (!opts.contentType) opts.contentType = urlResp.headers['content-type'];
-                  var ws = this.svc.handle.createWriteStreamToBlockBlob(
-                    this.name, blobName, opts,
-                    (error, res, resp) => {
-                       this.svc.tdError(error, "create blob from URL");
-                       result = new BlobInfo(res);
-                       resume();
-                    });
-                  urlResp.pipe(ws);
-              })
+                .then(urlResp => {
+                    if (!opts.contentType) opts.contentType = urlResp.headers['content-type'];
+                    var ws = this.svc.handle.createWriteStreamToBlockBlob(
+                        this.name, blobName, opts,
+                        (error, res, resp) => {
+                            this.svc.tdError(error, "create blob from URL");
+                            result = new BlobInfo(res);
+                            resume();
+                        });
+                    urlResp.pipe(ws);
+                })
         });
         return result;
     }
@@ -339,8 +318,7 @@ export class Container
     /**
      * Creates a new block blob and uploads the contents of a buffer.
      */
-    public async createBlockBlobFromBufferAsync(blobName: string, buffer:Buffer, options?: ICreateOptions) : Promise<BlobInfo>
-    {
+    public async createBlockBlobFromBufferAsync(blobName: string, buffer: Buffer, options?: ICreateOptions): Promise<BlobInfo> {
         let result: BlobInfo;
         assert(buffer.length > 0, "cannot create empty blob.");
         let opts = prepOptions(options);
@@ -348,15 +326,15 @@ export class Container
             var buf = buffer;
             this.svc.handle._putBlockBlob(this.name, blobName, buf, null, buf.length, opts,
                 (error, res, resp) => {
-                      if (!opts.justTry) this.svc.tdError(error, "create blob from buffer");
-                      if(error){
-                         result = new BlobInfo({ error: error + "" })
-                      }
-                      else{
-                            result= new BlobInfo(res);
-                       }
+                    if (!opts.justTry) this.svc.tdError(error, "create blob from buffer");
+                    if (error) {
+                        result = new BlobInfo({ error: error + "" })
+                    }
+                    else {
+                        result = new BlobInfo(res);
+                    }
                     resume();
-            });
+                });
         });
         this.timeOp(opts, "put");
         return result;
@@ -365,25 +343,24 @@ export class Container
     /**
      * Creates a new block blob with the buffer gzipped. `smartGzip` option will disable compression of images etc.
      */
-    public async createGzippedBlockBlobFromBufferAsync(blobName: string, buffer:Buffer, options?: ICreateOptions) : Promise<BlobInfo>
-    {
+    public async createGzippedBlockBlobFromBufferAsync(blobName: string, buffer: Buffer, options?: ICreateOptions): Promise<BlobInfo> {
         let result: BlobInfo;
-        if ( ! options.smartGzip || /(text\/|javascript|xml|font\/ttf|microbit-hex|application.*json)/.test(options.contentType)) {
+        if (!options.smartGzip || /(text\/|javascript|xml|font\/ttf|microbit-hex|application.*json)/.test(options.contentType)) {
             let opts = prepOptions(options);
             await new Promise(resume => {
-                      opts.contentEncoding = "gzip"
-                      if (!opts.contentType) opts.contentType = "text/plain";
-                      var ws = this.svc.handle.createWriteStreamToBlockBlob(
-                        this.name, blobName, opts,
-                        (error, res, resp) => {
-                           this.svc.tdError(error, "create gzipped blob");
-                           result = new BlobInfo(res);
-                           resume();
-                        });
-                      
-                      var str = zlib.createGzip()
-                      str.pipe(ws);
-                      str.end(buffer)
+                opts.contentEncoding = "gzip"
+                if (!opts.contentType) opts.contentType = "text/plain";
+                var ws = this.svc.handle.createWriteStreamToBlockBlob(
+                    this.name, blobName, opts,
+                    (error, res, resp) => {
+                        this.svc.tdError(error, "create gzipped blob");
+                        result = new BlobInfo(res);
+                        resume();
+                    });
+
+                var str = zlib.createGzip()
+                str.pipe(ws);
+                str.end(buffer)
             });
             this.timeOp(opts, "put");
         }
@@ -393,8 +370,7 @@ export class Container
         return result;
     }
 
-    private timeOp(opts: JsonBuilder, id: string) : void
-    {
+    private timeOp(opts: JsonBuilder, id: string): void {
         let start = opts["startTime"];
         this.timeOpCore(start, id);
     }
@@ -402,75 +378,65 @@ export class Container
     /**
      * Gets the service of the this.
      */
-    public service() : BlobService
-    {
+    public service(): BlobService {
         return this.svc;
     }
 
-    private timeOpCore(start: number, id: string) : void
-    {
+    private timeOpCore(start: number, id: string): void {
         let delta = logger.loggerDuration() - start;
         logger.measure(id + "@" + this.service().storageAccount(), delta);
     }
 }
 
-export class BlobInfo
-{
-    constructor(private inf:any) {}
+export class BlobInfo {
+    constructor(private inf: any) { }
 
     /**
      * Get the `ETag` of a blob.
      */
-    public etag() : string
-    {
+    public etag(): string {
         return this.inf.etag;
     }
 
     /**
      * Get the last modification time of a blob.
      */
-    public lastModified() : Date
-    {
+    public lastModified(): Date {
         return new Date(this.inf.lastModified)
     }
 
     /**
      * Get the name of a blob.
      */
-    public name() : string
-    {
+    public name(): string {
         return this.inf.name
     }
 
     /**
      * Checks if blob update succeeded. Can only be false when optional parameter `just try` is set.
      */
-    public succeded() : boolean
-    {
+    public succeded(): boolean {
         return !this.inf.error
     }
 
     /**
      * Get the text of a blob.
      */
-    public text() : string
-    {
+    public text(): string {
         return this.inf.text
     }
 
     /**
      * Get the buffer of a blob.
      */
-    public buffer() : Buffer
-    {
+    public buffer(): Buffer {
         return this.inf.buffer
     }
 
     /**
      * Get the error message if not `->succeded`
      */
-    public error() : string
-    {
+    public error(): string {
         return this.inf.error
     }
 
@@ -496,14 +462,14 @@ export interface IGetOptions {
 export interface ICreateServiceOptions {
     storageAccount?: string;
     storageAccessKey?: string;
+    connectionString?: string;
 }
 
 
 var agentSSL;
 var assumeExists = false;
 
-export function init() : void
-{
+export function init(): void {
     logger = td.createLogger("blobs");
 
     // Create a HTTP Agent with reuse:
@@ -514,28 +480,29 @@ export function init() : void
     instanceId = td.createRandomId(6);
 }
 
-export function assumeContainerExists()
-{
+export function assumeContainerExists() {
     assumeExists = true;
 }
 
 /**
  * Logs a message to the console.
  */
-function log(message: string) : void
-{
+function log(message: string): void {
     logger.info(message);
 }
 
 /**
  * Creates a 'BlobService,' an object that lets you work with containers and blobs.
  */
-export function createBlobService(options: ICreateServiceOptions = {}) : BlobService
-{
+export function createBlobService(options: ICreateServiceOptions = {}): BlobService {
     let blobService = new BlobService();
     var opt = options;
-    let blob_service:any;
-    if (opt.storageAccount) {
+    let blob_service: any;
+    if (opt.connectionString) {
+        blob_service = azure_storage.createBlobService(opt.connectionString);
+        let m = /(\w+)\.blob.core.windows/.exec(opt.connectionString)
+        blobService.tdAccount = m ? m[1] : "account";
+    } else if (opt.storageAccount) {
         blob_service = azure_storage.createBlobService(opt.storageAccount, opt.storageAccessKey);
         blobService.tdAccount = opt.storageAccount;
     } else {
@@ -546,21 +513,21 @@ export function createBlobService(options: ICreateServiceOptions = {}) : BlobSer
     var retryOperations = new azure_storage.LinearRetryPolicyFilter(10, 1000);
     blob_service = blob_service.withFilter(retryOperations);
     blobService.handle = blob_service;
-    
+
     var svc = blob_service;
     // hack to keep sockets open (EADDRINUSE error)
     var prev = svc._buildRequestOptions;
     svc._buildRequestOptions = function (wr, bd, opt, cb) {
-      prev.apply(this, [wr, bd, opt, function (err, opts) {
-         if (opts) {
-           opts.agent = agentSSL;
-           if (opt.timeoutIntervalInMs)
-              opts.timeout = opt.timeoutIntervalInMs; 
-         }
-         cb(err, opts);
-      }]);
+        prev.apply(this, [wr, bd, opt, function (err, opts) {
+            if (opts) {
+                opts.agent = agentSSL;
+                if (opt.timeoutIntervalInMs)
+                    opts.timeout = opt.timeoutIntervalInMs;
+            }
+            cb(err, opts);
+        }]);
     };
-    
+
     return blobService;
 }
 
@@ -577,8 +544,7 @@ export function createBlobService(options: ICreateServiceOptions = {}) : BlobSer
  * You can use Blob storage to expose data publicly to the world or privately for internal application storage.
  * For full documentation, go to this link: http://azure.microsoft.com/en-us/documentation/articles/storage-dotnet-how-to-use-blobs/
  */
-async function exampleAsync() : Promise<void>
-{
+async function exampleAsync(): Promise<void> {
     let blobService = createBlobService();
     // The BlobService object lets you work with containers and blobs. The above code creates a BlobService object.
     // When using blob services, containers, or blobs, ensure that each object's name does not contain any spaces or other illegal JavaScript characters.
@@ -599,15 +565,13 @@ async function exampleAsync() : Promise<void>
     // Writes the blob contents to a file. The `result` will contain information about the blob, including ETag information.
 }
 
-function stringToJsarray(list: string) : JsonObject[]
-{
+function stringToJsarray(list: string): JsonObject[] {
     if (list != "") {
         return list.split(",")
     } else return []
 }
 
-function invalidToEmpty(etag: string) : string
-{
+function invalidToEmpty(etag: string): string {
     let etag2: string;
     if (etag == null) {
         etag = "";
@@ -616,8 +580,7 @@ function invalidToEmpty(etag: string) : string
     return etag2;
 }
 
-function prepOptions(options: ICreateOptions) : ICreateOptions
-{
+function prepOptions(options: ICreateOptions): ICreateOptions {
     if (!options) options = {}
     if (!options.timeoutIntervalInMs)
         delete options.timeoutIntervalInMs
@@ -634,8 +597,7 @@ function prepOptions(options: ICreateOptions) : ICreateOptions
     return opts;
 }
 
-function prepGetOptions(options: IGetOptions) : IGetOptions
-{
+function prepGetOptions(options: IGetOptions): IGetOptions {
     if (!options) options = {}
     if (!options.timeoutIntervalInMs)
         delete options.timeoutIntervalInMs
