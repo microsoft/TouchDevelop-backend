@@ -120,6 +120,119 @@ addCommand("blobs", "container [prefix [cont]]", "list blob containers", async (
 });
 
 
+addCommand("mirror", "container [prefix [cont]]", "list blob containers", async (args) => {
+    let dir = "mirror"
+    if (!fs.existsSync(dir))
+        fs.mkdirSync(dir)
+    let container = blobClient.getContainer(args[0])
+    blobClient.handle.listBlobsSegmentedWithPrefix(args[0], args[1] || "", args[2], { maxResults: 100 }, async (err, res) => {
+        if (err) {
+            console.log(err.message)
+            return
+        }
+        for (let t of res.entries) {
+            let res = await container.getBlobToBufferAsync(t.name)
+            let fn = dir + "/" + t.name
+            fs.writeFileSync(fn, res.buffer())
+            console.log("wrote:", fn)
+        }
+        let cont = res.continuationToken
+        if (cont) {
+            console.log("continuation:", cont);
+        }
+    })
+});
+
+const idLength = 20
+
+const digits = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "A", "C", "D", "E", "F", "H", "J", "K", "L", "M",
+    "P", "R", "T", "U", "V", "W", "X", "Y", "a", "b",
+    "c", "d", "e", "f", "g", "h", "i", "j", "k", "m",
+    "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
+    "y", "z",
+]
+
+function decompressId(id: string) {
+    id = id.replace(/B/g, "8")
+        .replace(/G/g, "6")
+        .replace(/I/g, "1")
+        .replace(/l/g, "1")
+        .replace(/O/g, "0")
+        .replace(/Q/g, "D")
+        .replace(/S/g, "5")
+        .replace(/Z/g, "2")
+        .replace(/n/g, "m")
+        .replace(/N/g, "M")
+        .replace(/_/g, "")
+        .replace(/-/g, "")
+
+    let r = ""
+
+    for (let i = 0; i < id.length; i += 3) {
+        let num = 0
+        for (let j = 0; j < 3; ++j) {
+            let idx = digits.indexOf(id.charAt(i + j))
+            if (idx < 0) return null
+            num = num * digits.length + idx
+        }
+        r += ("00000" + num).slice(-5)
+    }
+    return normalizeId(r)
+}
+
+export function normalizeId(id: string): string {
+    if (id[0] == "_")
+        return decompressId(id)
+    id = id.replace(/[^0-9]/g, "")
+    if (id.length != idLength) return null
+    let r = ""
+    for (let i = 0; i < id.length; i += 5) {
+        if (i) r += "-"
+        r += id.slice(i, i + 5)
+    }
+    return r
+}
+
+function blobId(id: string) {
+    return crypto.pbkdf2Sync(id, "blobid", 10000, 32, "sha256").toString("hex")
+}
+
+function encKey(salt: Buffer, id: string) {
+    return crypto.pbkdf2Sync(id, salt as any, 1000, 32, "sha256")
+}
+
+addCommand("decrypt", "id", "decrypt a backed-up script blob", async (args) => {
+    let dir = "mirror"
+    if (!fs.existsSync(dir))
+        fs.mkdirSync(dir)
+    let id = normalizeId(args[0])
+    if (!id) {
+        console.log("invalid id")
+        return
+    }
+    let bid = blobId(id)
+    let fn = dir + "/" + bid
+    if (!fs.existsSync(fn)) {
+        let all = fs.readdirSync(dir)
+        let base = all.filter(f => f.endsWith(bid))[0]
+        if (base) fn = "mirror/" + base
+        else {
+            console.log("cannot find file: " + fn)
+            return
+        }
+    }
+    let buffer = fs.readFileSync(fn)
+    let key = encKey(buffer.slice(0, 32), id)
+    let cipher = crypto.createDecipher("AES256", key)
+    let buf0 = cipher.update(buffer.slice(32))
+    let buf1 = cipher.final()
+    let scr = JSON.parse(Buffer.concat([buf0, buf1]).toString("utf8"))
+    fs.writeFileSync("script.json", JSON.stringify(scr, null, 2))
+    console.log("write script.json")
+});
+
 
 function decompress(buf: Buffer) {
     if (buf.length <= 1) return "";
@@ -183,14 +296,23 @@ addCommand("tables", "[cont]", "list tables", async (args) => {
 });
 
 function init() {
-    if (!process.env["AZURE_STORAGE_ACCESS_KEY"]) {
-        console.log("you need to set AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_ACCESS_KEY environment variables");
+    let connStr = process.env["AZURE_STORAGE_CONNECTION_STRING"]
+    if (!process.env["AZURE_STORAGE_ACCESS_KEY"] && !connStr) {
+        console.log("you need to set AZURE_STORAGE_CONNECTION_STRING or both AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_ACCESS_KEY environment variables");
         process.exit(1);
     }
-    tableClient = azureTable.createClient();
-    azureTable.assumeTablesExists();
+    if (!connStr) {
+        tableClient = azureTable.createClient();
+        azureTable.assumeTablesExists();
+    }
     azureBlobStorage.init();
-    blobClient = azureBlobStorage.createBlobService();
+    if (connStr) {
+        blobClient = azureBlobStorage.createBlobService({
+            connectionString: connStr
+        });
+    } else {
+        blobClient = azureBlobStorage.createBlobService();
+    }
     azureBlobStorage.assumeContainerExists();
 }
 

@@ -10,3 +10,5 @@ web/_temp
 dockerbuild/config.json
 dockerbuild/yottaconfig.json
 localdir/
+script.json
+mirror/
