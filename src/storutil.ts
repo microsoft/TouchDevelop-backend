@@ -281,6 +281,12 @@ addCommand("getblob", "container path", "list blob containers", async (args) => 
 });
 
 
+addCommand("putblob", "container path", "put blob", async (args) => {
+    let buf0 = fs.readFileSync(args[1])
+    let cont = await blobClient.createContainerIfNotExistsAsync(args[0], "hidden");
+    let r = await cont.createBlockBlobFromBufferAsync(args[1], buf0)
+    console.log(r.succeded() ? "OK" : r.error())
+});
 
 addCommand("tables", "[cont]", "list tables", async (args) => {
     var opts = {
