@@ -1466,11 +1466,12 @@ function withVault(inner: () => void) {
         vaultToken = ""
         downloadSecret(vaultUrl, d => {
             var env = JSON.parse(d.value)
-            var pfx0 = env['TD_HTTPS_PFX']
+            var pfx0 = env['TD_HTTPS_PFX'] // legacy
             delete env['TD_HTTPS_PFX']
 
-            let pfxPassword = env["PFX_PASSWORD"]
+            let pfxPassword = env["PFX_PASSWORD"] // current
 
+            // legacy
             let manyPfxPass = env["TD_CERT_JSON_PASSWORD"]
             let manyPfxName = env["TD_CERT_JSON_NAME"]
             delete env['TD_CERT_JSON_PASSWORD']
@@ -1484,28 +1485,32 @@ function withVault(inner: () => void) {
             })
 
             if (pfxPassword)
-                loadAzureStorage(() => {
-                    getBlobJson("certs.json", (err, val) => {
-                        let certs = (val || []) as StoredCert[]
-                        domainContexts = {}
-                        defaultContext = null
-                        for (let cert of certs) {
-                            let ctx = tls.createSecureContext({
-                                pfx: new Buffer(cert.cert, "base64"),
-                                passphrase: pfxPassword
-                            })
-                            for (let d of cert.domains)
-                                domainContexts[d.toLowerCase()] = ctx
-                            if (cert.isDefault)
-                                defaultContext = ctx
-                        }
+                downloadSecret(vaultUrl.replace(/[^\/]+$/, "cert"), d => {
+                    if (d && d.value)
+                        pfx = d.value
+                    loadAzureStorage(() => {
+                        getBlobJson("certs.json", (err, val) => {
+                            let certs = (val || []) as StoredCert[]
+                            domainContexts = {}
+                            defaultContext = null
+                            for (let cert of certs) {
+                                let ctx = tls.createSecureContext({
+                                    pfx: new Buffer(cert.cert, "base64"),
+                                    passphrase: pfxPassword
+                                })
+                                for (let d of cert.domains)
+                                    domainContexts[d.toLowerCase()] = ctx
+                                if (cert.isDefault)
+                                    defaultContext = ctx
+                            }
 
-                        if (!defaultContext)
-                            defaultContext = tls.createSecureContext({
-                                pfx: new Buffer(pfx, "base64")
-                            })
+                            if (!defaultContext)
+                                defaultContext = tls.createSecureContext({
+                                    pfx: new Buffer(pfx, "base64")
+                                })
 
-                        inner()
+                            inner()
+                        })
                     })
                 })
             else if (manyPfxName && manyPfxPass)
@@ -1542,15 +1547,7 @@ function withVault(inner: () => void) {
 function readCerts(secretsJson: string, cb) {
     let secr = JSON.parse(fs.readFileSync(secretsJson, "utf8"))
     let certsDir = "certs"
-    if (secr["PFX_PASSWORD"]) {
-        if (!secr["TD_HTTPS_PFX"]) {
-            let cert = fs.readFileSync(certsDir + "/default.pfx").toString("base64")
-            console.log("adding default cert")
-            secr["TD_HTTPS_PFX"] = cert
-        }
-        cb(secr)
-    }
-    else if (fs.existsSync(certsDir)) {
+    if (!secr["PFX_PASSWORD"] && fs.existsSync(certsDir)) {
         let certs: StoredCert[] = []
         let defl = ""
         for (let f of fs.readdirSync(certsDir)) {
