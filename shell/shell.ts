@@ -753,7 +753,7 @@ var mgmt: StringMap<(ar: ApiRequest) => void> = {
             dmeta: tdstate.dmeta,
             encryption: !!key,
             onlyEncrypted: onlyEncrypted,
-            versionStamp: "v20",
+            versionStamp: "v21",
         })
     },
 
@@ -1880,7 +1880,7 @@ function main() {
             if (restartTime && Date.now() >= restartTime) {
                 restartTime = 0
                 info.log("restart-time reached; reloading")
-                reloadScript()
+                withVault(reloadScript);
             }
         }, Math.round((Math.random() + 0.5) * 2000))
 
