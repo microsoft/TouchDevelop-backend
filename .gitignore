@@ -1,6 +1,5 @@
 *.swp
 node_modules/
-typings/
 built/
 remote-*
 storage-*
