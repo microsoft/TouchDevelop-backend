@@ -1,4 +1,4 @@
-$.ready(function () {
+(function a() {
     var url = "https://uhf.microsoft.com/" + navigator.language + "/shell/api/mscc?sitename=touchdevelopweb&domain=touchdevelop.com&mscc_eudomain=true";
     console.log('mscc url:' + url);
     $.getScript(url, function (info) {
@@ -20,4 +20,4 @@ $.ready(function () {
             console.error(e);
         }
     });
-});
+})();
