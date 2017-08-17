@@ -1,7 +1,7 @@
 (function a() {
     var url = "https://uhf.microsoft.com/" + navigator.language + "/shell/api/mscc?sitename=touchdevelopweb&domain=touchdevelop.com&mscc_eudomain=true";
     console.log('mscc url:' + url);
-    $.getScript(url, function (info) {
+    $.getJSON(url, function (info) {
         try {
             if (!info || !info.IsConsentRequired) return undefined;
 
@@ -15,7 +15,7 @@
             var d = $('<div class="mscc"></div>');
             d.html(info.Markup);
             $(document.body).append(d);
-            info.Js.forEach(function (js) { $.load(js) });
+            info.Js.forEach(function (js) { $.getScript(js) });
         } catch (e) {
             console.error(e);
         }
