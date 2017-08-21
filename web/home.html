@@ -1,507 +1,496 @@
-{% extends "_layouts/default.html" %}
-{% set title = "Microsoft Touch Develop - create apps everywhere, on all your devices!" %}
-{% set description = "Create apps everywhere &mdash; on all your devices! Keyboard optional. Share your programs with other people. Download the free app for Windows Phone, try the Web App in your browser!" %}
+{% extends "_layouts/default.html" %} {% set title = "Microsoft Touch Develop - create apps everywhere, on all your devices!"
+%} {% set description = "Create apps everywhere &mdash; on all your devices! Keyboard optional. Share your programs with
+other people. Download the free app for Windows Phone, try the Web App in your browser!" %} {% block headAdd %}
+<style>
+    .light {
+        font-family: "Segoe UI Light", "Segoe UI", sans-serif;
+        font-weight: 100;
+    }
 
-{% block headAdd %}
-    <style>
-        .light {
-            font-family: "Segoe UI Light", "Segoe UI", sans-serif;
-            font-weight: 100;
-        }
-        .top-buffer { 
-            padding-top:1.5em; 
-            margin-top:1.5em; 
-            padding-bottom:1.5em;
-            margin-bottom: 60px;
-        }
-        div.green-bar {
-            background: #eee;
-        }
-        .win-logo {
-            text-align: right;
-            margin-top: 15px;
+    .top-buffer {
+        padding-top: 1.5em;
+        margin-top: 1.5em;
+        padding-bottom: 1.5em;
+        margin-bottom: 60px;
+    }
+
+    div.green-bar {
+        background: #eee;
+    }
+
+    .win-logo {
+        text-align: right;
+        margin-top: 15px;
+    }
+
+    .win-logo img {
+        height: 80px;
+    }
+
+    .screenshot {
+        margin-right: 4px;
+        margin-bottom: 4px;
+        background-color: lightgray;
+    }
+
+    .sitemap {
+        text-align: center;
+    }
+
+    .sitemap-header,
+    .sitemap-entry {
+        display: block;
+        margin-bottom: 3px;
+        color: #333 !important;
+    }
+
+    a.sitemap-entry {
+        font-size: 16px;
+    }
+
+    a.sitemap-header {
+        font-weight: bold;
+    }
+
+    .progressBar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 0.3em;
+        overflow: hidden;
+    }
+
+    .progressDot {
+        background: purple;
+        width: 0.3em;
+        height: 0.3em;
+        position: absolute;
+        animation: moveProgressDot 3s infinite;
+        /*CSSpref*/
+        -ms-animation: moveProgressDot 3s infinite;
+        -webkit-animation: moveProgressDot 3s infinite;
+        -moz-animation: moveProgressDot 3s infinite;
+        transform: translate(-11em, 0);
+        /*CSSpref*/
+        -ms-transform: translate(-11em, 0);
+        -webkit-transform: translate(-11em, 0);
+        -moz-transform: translate(-11em, 0);
+    }
+
+    .progressDot-0 {
+        left: 7em;
+        animation-delay: 0.9s;
+        /*CSSpref*/
+        -ms-animation-delay: 0.9s;
+        -webkit-animation-delay: 0.9s;
+        -moz-animation-delay: 0.9s;
+    }
+
+    .progressDot-1 {
+        left: 8em;
+        animation-delay: 0.6s;
+        /*CSSpref*/
+        -ms-animation-delay: 0.6s;
+        -webkit-animation-delay: 0.6s;
+        -moz-animation-delay: 0.6s;
+    }
+
+    .progressDot-2 {
+        left: 9em;
+        animation-delay: 0.3s;
+        /*CSSpref*/
+        -ms-animation-delay: 0.3s;
+        -webkit-animation-delay: 0.3s;
+        -moz-animation-delay: 0.3s;
+    }
+
+    .progressDot-3 {
+        left: 10em;
+        animation-delay: 0s;
+        /*CSSpref*/
+        -ms-animation-delay: 0s;
+        -webkit-animation-delay: 0s;
+        -moz-animation-delay: 0s;
+    }
+
+    @keyframes moveProgressDot {
+        0% {
+            transform: translate(-11em, 0);
         }
 
-        .win-logo img {
-            height: 80px;
+        35% {
+            transform: translate(0, 0);
         }
 
-        .screenshot {
-            margin-right: 4px;
-            margin-bottom:4px;
-            background-color:lightgray;
+        65% {
+            transform: translate(0, 0);
         }
 
-        .sitemap {
-            text-align: center;
+        100% {
+            transform: translate(20em, 0);
         }
+    }
+    /*CSSpref*/
 
-        .sitemap-header,
-        .sitemap-entry {
-            display: block;
-            margin-bottom: 3px;
-            color: #333 !important;
-        }
-
-        a.sitemap-entry {
-            font-size: 16px;
-        }
-
-        a.sitemap-header {
-            font-weight: bold;
-        }
-
-        .progressBar {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 0.3em;
-            overflow: hidden;
-        }
-
-        .progressDot {
-            background: purple;
-            width: 0.3em;
-            height: 0.3em;
-            position: absolute;
-            animation: moveProgressDot 3s infinite; /*CSSpref*/
-            -ms-animation: moveProgressDot 3s infinite;
-            -webkit-animation: moveProgressDot 3s infinite;
-            -moz-animation: moveProgressDot 3s infinite;
-            transform: translate(-11em, 0); /*CSSpref*/
+    @-ms-keyframes moveProgressDot {
+        0% {
             -ms-transform: translate(-11em, 0);
+        }
+
+        35% {
+            -ms-transform: translate(0, 0);
+        }
+
+        65% {
+            -ms-transform: translate(0, 0);
+        }
+
+        100% {
+            -ms-transform: translate(20em, 0);
+        }
+    }
+
+    @-webkit-keyframes moveProgressDot {
+        0% {
             -webkit-transform: translate(-11em, 0);
+        }
+
+        35% {
+            -webkit-transform: translate(0, 0);
+        }
+
+        65% {
+            -webkit-transform: translate(0, 0);
+        }
+
+        100% {
+            -webkit-transform: translate(20em, 0);
+        }
+    }
+
+    @-moz-keyframes moveProgressDot {
+        0% {
             -moz-transform: translate(-11em, 0);
         }
 
-        .progressDot-0 {
-            left: 7em;
-            animation-delay: 0.9s; /*CSSpref*/
-            -ms-animation-delay: 0.9s;
-            -webkit-animation-delay: 0.9s;
-            -moz-animation-delay: 0.9s;
+        35% {
+            -moz-transform: translate(0, 0);
         }
 
-        .progressDot-1 {
-            left: 8em;
-            animation-delay: 0.6s; /*CSSpref*/
-            -ms-animation-delay: 0.6s;
-            -webkit-animation-delay: 0.6s;
-            -moz-animation-delay: 0.6s;
+        65% {
+            -moz-transform: translate(0, 0);
         }
 
-        .progressDot-2 {
-            left: 9em;
-            animation-delay: 0.3s; /*CSSpref*/
-            -ms-animation-delay: 0.3s;
-            -webkit-animation-delay: 0.3s;
-            -moz-animation-delay: 0.3s;
+        100% {
+            -moz-transform: translate(20em, 0);
         }
-
-        .progressDot-3 {
-            left: 10em;
-            animation-delay: 0s; /*CSSpref*/
-            -ms-animation-delay: 0s;
-            -webkit-animation-delay: 0s;
-            -moz-animation-delay: 0s;
-        }
-
-        @keyframes moveProgressDot {
-            0% {
-                transform: translate(-11em, 0);
-            }
-
-            35% {
-                transform: translate(0, 0);
-            }
-
-            65% {
-                transform: translate(0, 0);
-            }
-
-            100% {
-                transform: translate(20em, 0);
-            }
-        }
-        /*CSSpref*/
-
-        @-ms-keyframes moveProgressDot {
-            0% {
-                -ms-transform: translate(-11em, 0);
-            }
-
-            35% {
-                -ms-transform: translate(0, 0);
-            }
-
-            65% {
-                -ms-transform: translate(0, 0);
-            }
-
-            100% {
-                -ms-transform: translate(20em, 0);
-            }
-        }
-
-        @-webkit-keyframes moveProgressDot {
-            0% {
-                -webkit-transform: translate(-11em, 0);
-            }
-
-            35% {
-                -webkit-transform: translate(0, 0);
-            }
-
-            65% {
-                -webkit-transform: translate(0, 0);
-            }
-
-            100% {
-                -webkit-transform: translate(20em, 0);
-            }
-        }
-
-        @-moz-keyframes moveProgressDot {
-            0% {
-                -moz-transform: translate(-11em, 0);
-            }
-
-            35% {
-                -moz-transform: translate(0, 0);
-            }
-
-            65% {
-                -moz-transform: translate(0, 0);
-            }
-
-            100% {
-                -moz-transform: translate(20em, 0);
-            }
-        }
-
-
-
-.symbol { 
- font-family: "Segoe UI Symbol", inherit; 
-}
-@media screen {
-    body {
-      padding-top: 50px;
     }
-}
-img.logo, img.avatar { 
- margin-top: -8px; height:32px;
-}
-img.checker {
-background-image: url(/static/images/checker.png);
-background-repeat: repeat;
-}
-a.navbar-brand {
-  font-size: 25px;
-}
 
-.tech-img > img {
-  width: 100%;
-}
 
-.tech-img {
- text-align:center;
-}
 
-.partner {
-  display: inline-block;
-  width: 45%;
-  margin: 2%;
-  position:relative;
-}
-.partner img {
-  width: 100%;
-}
+    .symbol {
+        font-family: "Segoe UI Symbol", inherit;
+    }
 
-.jumbotron h1 {
-  margin-top: 50px;
-}
+    @media screen {
+        body {
+            padding-top: 50px;
+        }
+    }
 
-@media (max-width: 767px) {
-  .tech-img > img {
-    width: 50%;
-  }
-  .tech-box {
-    margin-bottom: 50px;
-  }
-  .partner {
-    width: 80%;
-    margin: 10%;
-  }
-}
+    img.logo,
+    img.avatar {
+        margin-top: -8px;
+        height: 32px;
+    }
 
-@media (min-width: 768px) {
-  .tech-box {
-    min-height: 280px;
-  }
-}
+    img.checker {
+        background-image: url(/static/images/checker.png);
+        background-repeat: repeat;
+    }
 
-.jumbotron .container {
-  position: relative;
-}
+    a.navbar-brand {
+        font-size: 25px;
+    }
 
-.jumbotron {
-  margin-bottom: 60px;
-}
+    .tech-img>img {
+        width: 100%;
+    }
 
-.jumbotron .container > img {
-  float: left;
-  max-width: 400px;
-  max-height: 300px;
-  margin: 25px 30px 40px 0px;
-}
+    .tech-img {
+        text-align: center;
+    }
 
-.btn-more {
-  display: inline-block;
-  float: right;
-  margin: 10px 0;
-}
+    .partner {
+        display: inline-block;
+        width: 45%;
+        margin: 2%;
+        position: relative;
+    }
 
-    </style>
-{% endblock %}
+    .partner img {
+        width: 100%;
+    }
 
-{% block body %}
-    <div class='jumbotron'>
-      <div class='container'>
-                <img class='visible-md visible-lg' src="/static/images/mwpv.png" />
+    .jumbotron h1 {
+        margin-top: 50px;
+    }
 
-                <div class='content'>
-                <h1>Touch Develop
-                </h1>
-                <p>
-                    Create <strong>your apps</strong> on your <strong>phone</strong>, <strong>tablet</strong> or <strong>laptop</strong>.
-                </p>
-                <p>
-                    <small>
+    @media (max-width: 767px) {
+        .tech-img>img {
+            width: 50%;
+        }
+        .tech-box {
+            margin-bottom: 50px;
+        }
+        .partner {
+            width: 80%;
+            margin: 10%;
+        }
+    }
+
+    @media (min-width: 768px) {
+        .tech-box {
+            min-height: 280px;
+        }
+    }
+
+    .jumbotron .container {
+        position: relative;
+    }
+
+    .jumbotron {
+        margin-bottom: 60px;
+    }
+
+    .jumbotron .container>img {
+        float: left;
+        max-width: 400px;
+        max-height: 300px;
+        margin: 25px 30px 40px 0px;
+    }
+
+    .btn-more {
+        display: inline-block;
+        float: right;
+        margin: 10px 0;
+    }
+</style>
+{% endblock %} {% block body %}
+<div class='jumbotron'>
+    <div class='container'>
+        <img class='visible-md visible-lg' src="/static/images/mwpv.png" />
+
+        <div class='content'>
+            <h1>Touch Develop
+            </h1>
+            <p>
+                Create <strong>your apps</strong> on your <strong>phone</strong>, <strong>tablet</strong> or <strong>laptop</strong>.
+            </p>
+            <p>
+                <small>
         Works on <b>iOS</b>, <b>Android</b>, <b>Windows</b>, <b>Mac</b> or <b>Linux</b>.
                     </small>
-                </p>
-                <p class="text-right">
-                    <a href="/app/" class="btn btn-success btn-lg">Launch Touch Develop</a>
-                </p>
+            </p>
+            <p class="text-right">
+                <a href="/app/" class="btn btn-success btn-lg">Launch Touch Develop</a>
+            </p>
 
-                <div style='max-width: 60%; position: absolute; top: -20px; right: 0px; color: #aaa; font-size: 14px'>                
+            <div style='max-width: 60%; position: absolute; top: -20px; right: 0px; color: #aaa; font-size: 14px'>
                 Made with ♥ at<br/>
-                <img style='width:100%; margin-left:2px; margin-top: 3px;' src='/static/images/wlmemodx.png' alt='Microsoft'/>
-                </div>
+                <img style='width:100%; margin-left:2px; margin-top: 3px;' src='/static/images/wlmemodx.png' alt='Microsoft' />
+            </div>
 
-                </div>
-      </div>
+        </div>
     </div>
+</div>
 
-    <div class="row top-buffer green-bar">
+<div class="row top-buffer green-bar">
     <div class='container'>
-            <div class="col-md-8 col-xs-12">
-                <h2>Moving to Microsoft MakeCode...</h2>
-                <div>
-                    Taking the learnings of Touch Develop and the BBC micro:bit, 
-                    the team decided to rebuild a new editor better suited for computer science education and physical computing in schools...
-                    Microsoft MakeCode.
+        <div class="col-md-4 col-xs-12">
+            <img src="/static/images/makecodemc.jpg" class="img-responsive" />
+        </div>
+        <div class="col-md-8 col-xs-12">
+            <h2>Moving to Microsoft MakeCode...</h2>
+            <div>
+                Taking the learnings of Touch Develop and the BBC micro:bit, the team decided to rebuild a new editor better suited for computer
+                science education and physical computing in schools... Microsoft MakeCode.
                 <a class="btn-more btn btn-default" href="https://makecode.com">Go To MakeCode!</a>
-                </div>
             </div>
         </div>
     </div>
+</div>
 
-    <div class='container'>
-        <div class="row">
-            <div class="col-md-8 col-xs-12">
-                <h2>Teach Creative Coding!</h2>
-                <p>
-                <b>Creative Coding Through Games And Apps</b> is a first semester introduction to computer science course built with Touch Develop!                
-                Includes day-by-day plans for implementing the curriculum as a <b>6, 9, 12, or 18-week instructor-led course</b>.
-                <a class="btn-more btn btn-success" href="/ccga">learn more</a>
-                </p>
-            </div>
-            <div class="col-md-4 col-xs-12">
-                <img src="/static/images/gkcw.png" class="img-responsive" />
-            </div>
-        </div>
-    </div>
-
-    <div class="row top-buffer green-bar">
-    <div class='container'>
-            <div class="col-md-4 col-xs-12">
-                <img src="/static/images/cxld.png" class="img-responsive" />
-            </div>
-            <div class="col-md-8 col-xs-12">
-                <h2>Touch Develop and the BBC micro:bit</h2>
-                The Touch Develop team is proud to be part of the BBC micro:bit project. 
-                The micro:bit is a small wearable and programmable mbed-based device that visibly features a 5x5 LED display, accelerometer, compass, buttons, I/O pins, Micro USB plug, Bluetooth Low Energy antenna, ARM Cortex-M0 processor, and battery plug.
-                Taking the learnings from Touch Develop, we have rebuild a new experience with Microsoft MakeCode.
-                <div>
-                <a class="btn-more btn btn-default" href="https://makecode.microbit.org">MakeCode editor</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class='container'>
-        <div class='row top-buffer'>
-            <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
-               <img src="/static/images/avpewfrs.png" alt='editing modes' />
-            </div>
-
-            <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
-                <h2>From beginners to experts</h2>
-                <p>
-                    From Drag and Drop blocks to curly braces, our editor adapts to your skills and allows you to grow 
-                    at your own pace. Touch Develop features 3 skill levels: beginner, coder, and expert, that provide
-                    a seamless transition for learners.
-
-                    <a class="btn-more btn btn-default" href="/docs/gettingstarted">getting started</a>
-                </p>
-            </div>
-
-            <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
-               <img src="/static/images/html5.png" alt='html5' />
-            </div>
-
-            <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
-               <h2>Program on any device</h2>
-               <p>
-                    Touch Develop runs in Internet Explorer, Chrome, Firefox and Safari
-on <strong>Windows, Windows Phone, Mac OS, Linux, iPad, iPhone, Chromebook or Android</strong>.
-No installation required, it just works.
-
-                    <a class="btn-more btn btn-success" href="/app/">try it out!</a>
-               </p>
-            </div>
-
-            <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
-               <img src="/static/images/uwzvapre.png" alt='tap there' />
-            </div>
-
-            <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
-               <h2>Interactive tutorials</h2>
-               <p>
-                 <b>100%-guided tutorials for beginners</b>. Create your first app in minutes
-                 with no human guidance even if you have never programmed before. 
-                    <a class="btn-more btn btn-success" href="/hoc">take tutorial</a>
-               </p>
-               <p>
-                 The tutorials are <b>easy to create</b> by educators.
-                 Just create a script, and then describe what each line does!
-                    <a class="btn-more btn btn-default" href="/docs/creatinginteractivetutorials">create tutorial</a>
-               </p>
-            </div>
-
-            <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
-               <img src="/static/images/izmtgprs.png" alt='Hour of Code robot' />
-            </div>
-
-            <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
-                <h2>Hour of Code™</h2>
-                <p>
-                    Learn to code with our <b>interactive tutorials</b>. Take an Hour Of Code with Touch Develop!
-                    <a class="btn-more btn btn-success" href="/hoc">Start Hour Of Code™</a>
-                </p>
-
-
-                <p style='clear:both;font-size:0.75em; line-height:150%; opacity:0.75'>
-                    The 'Hour of Code'™ is a nationwide initiative by <a href="http://csedweek.org">Computer Science Education Week</a> and <a href="http://code.org">Code.org</a> to introduce millions of students to one hour of computer science and computer programming.
-                </p>
-            </div>
-          </div>
-         </div>
-
-    <div class='row top-buffer green-bar'>
-        <div class="container">
-            <div class='col-xs-12 col-md-5'>
-                <h1>Share your code
-                </h1>
-                <h3 id="stats"></h3>
-                <h3></h3>
-                <p>Publishing a script (program) to Touch Develop cloud takes just two taps.
-                Sharing a link to a user’s script (so that family and friends can run it) is
-                just one more tap away. All scripts are published in source form and can be
-                freely modified by other users, while retaining a link to the original work.
-                </p>
-                <div class='text-right'>
-                    <a class='btn btn-default' href="/app/#list:showcase-scripts">showcase scripts</a>
-                </div>
-            </div>
-            <div class='col-xs-12 col-md-7'>
-                <div class='screenshot-list'>
-                    <span id="screenshots"></span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class='top-buffer green-bar'>
-     <div class='container'>
-      <div class='row'>
-        <div class='col-xs-12 col-md-6'>
-              <img class='img-responsive' src="/static/images/sftkyutq.png" />
-        </div>
-        <div class='col-xs-12 col-md-6'>
-            <h1>Expert mode.</h1>
+<div class='container'>
+    <div class="row">
+        <div class="col-md-8 col-xs-12">
+            <h2>Teach Creative Coding!</h2>
             <p>
-              Touch Develop’s editor can be operated with touch or keyboard. In
-              the pro mode it provides intelligent code completion, copy&amp;paste,
-              refactorings (rename, extract function, parametrize, simplify by
-              variable extraction, and many more), automatic replication of
-              scripts on all user’s devices, source control with diffs and
-              intelligent merging, a debugger, a profiler, script updates, and
-              many more. Most of these are appropriately limited when in the
-              block or classic mode.
+                <b>Creative Coding Through Games And Apps</b> is a first semester introduction to computer science course
+                built with Touch Develop! Includes day-by-day plans for implementing the curriculum as a <b>6, 9, 12, or 18-week instructor-led course</b>.
+                <a class="btn-more btn btn-success" href="/ccga">learn more</a>
             </p>
         </div>
-      </div>
-     </div>
+        <div class="col-md-4 col-xs-12">
+            <img src="/static/images/gkcw.png" class="img-responsive" />
+        </div>
     </div>
+</div>
 
+<div class="row top-buffer green-bar">
+    <div class='container'>
+        <div class="col-md-4 col-xs-12">
+            <img src="/static/images/cxld.png" class="img-responsive" />
+        </div>
+        <div class="col-md-8 col-xs-12">
+            <h2>Touch Develop and the BBC micro:bit</h2>
+            <p>
+                The Touch Develop team is proud to be part of the BBC micro:bit project. The micro:bit is a small wearable and programmable
+                mbed-based device that visibly features a 5x5 LED display, accelerometer, compass, buttons, I/O pins, Micro
+                USB plug, Bluetooth Low Energy antenna, ARM Cortex-M0 processor, and battery plug. Taking the learnings from
+                Touch Develop, we have rebuild a new experience with Microsoft MakeCode.
+
+                <a class="btn-more btn btn-default" href="https://makecode.microbit.org">MakeCode editor</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class='container'>
+    <div class='row top-buffer'>
+        <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
+            <img src="/static/images/avpewfrs.png" alt='editing modes' />
+        </div>
+
+        <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
+            <h2>From beginners to experts</h2>
+            <p>
+                From Drag and Drop blocks to curly braces, our editor adapts to your skills and allows you to grow at your own pace. Touch
+                Develop features 3 skill levels: beginner, coder, and expert, that provide a seamless transition for learners.
+
+                <a class="btn-more btn btn-default" href="/docs/gettingstarted">getting started</a>
+            </p>
+        </div>
+
+        <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
+            <img src="/static/images/html5.png" alt='html5' />
+        </div>
+
+        <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
+            <h2>Program on any device</h2>
+            <p>
+                Touch Develop runs in Internet Explorer, Chrome, Firefox and Safari on <strong>Windows, Windows Phone, Mac OS, Linux, iPad, iPhone, Chromebook or Android</strong>.
+                No installation required, it just works.
+
+                <a class="btn-more btn btn-success" href="/app/">try it out!</a>
+            </p>
+        </div>
+
+        <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
+            <img src="/static/images/uwzvapre.png" alt='tap there' />
+        </div>
+
+        <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
+            <h2>Interactive tutorials</h2>
+            <p>
+                <b>100%-guided tutorials for beginners</b>. Create your first app in minutes with no human guidance even
+                if you have never programmed before.
+                <a class="btn-more btn btn-success" href="/hoc">take tutorial</a>
+            </p>
+            <p>
+                The tutorials are <b>easy to create</b> by educators. Just create a script, and then describe what each line
+                does!
+                <a class="btn-more btn btn-default" href="/docs/creatinginteractivetutorials">create tutorial</a>
+            </p>
+        </div>
+
+        <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
+            <img src="/static/images/izmtgprs.png" alt='Hour of Code robot' />
+        </div>
+
+        <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
+            <h2>Hour of Code™</h2>
+            <p>
+                Learn to code with our <b>interactive tutorials</b>. Take an Hour Of Code with Touch Develop!
+                <a class="btn-more btn btn-success" href="/hoc">Start Hour Of Code™</a>
+            </p>
+
+
+            <p style='clear:both;font-size:0.75em; line-height:150%; opacity:0.75'>
+                The 'Hour of Code'™ is a nationwide initiative by <a href="http://csedweek.org">Computer Science Education Week</a>                and <a href="http://code.org">Code.org</a> to introduce millions of students to one hour of computer science
+                and computer programming.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class='row top-buffer green-bar'>
+    <div class="container">
+        <div class='col-xs-12 col-md-5'>
+            <h1>Share your code
+            </h1>
+            <h3 id="stats"></h3>
+            <h3></h3>
+            <p>Publishing a script (program) to Touch Develop cloud takes just two taps. Sharing a link to a user’s script (so
+                that family and friends can run it) is just one more tap away. All scripts are published in source form and
+                can be freely modified by other users, while retaining a link to the original work.
+            </p>
+            <div class='text-right'>
+                <a class='btn btn-default' href="/app/#list:showcase-scripts">showcase scripts</a>
+            </div>
+        </div>
+        <div class='col-xs-12 col-md-7'>
+            <div class='screenshot-list'>
+                <span id="screenshots"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class='container'>
+    <div class='row'>
+
+        <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
+            <img src="/static/images/cvme.png" alt='GitHub' />
+        </div>
+
+        <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
+            <h2>Open Source on GitHub</h2>
+            <p>You can fork it there, submit pull requests with bug-fixes or new features, submit and comment on issues in the
+                bug-tracker, and check on latest activity.</p>
+            <div class='text-right'>
+                <a class='btn btn-default' href="https://github.com/Microsoft/TouchDevelop">GitHub Repo</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class='top-buffer green-bar'>
     <div class='container'>
         <div class='row'>
 
-            <div class='col-xs-12 col-sm-3 col-md-2 tech-img'>
-              <img src="/static/images/cvme.png" alt='GitHub' />
+            <div class='col-xs-12 col-md-6'>
+                <h1>About Touch Develop</h1>
+                <p>
+                    Touch Develop has been under active development since 2009 at Microsoft Research in Redmond.
+                </p>
+
+                <p>
+                    Tutorials and documentation automatically translated courtesy to <a href="http://www.microsoft.com/translator/">Microsoft Translator</a>.</p>
+            </div>
+            <div class='col-xs-12 col-md-6'>
+                <a class='partner' href="http://www.microsoft.com/translator/" style='font-size: 18px; color:#333'><img style='width: 70px; float:left;' src="https://www.microsoft.com/global/translator/PublishingImages/2_Shared/translatorLogo.png">
+                Translations by<br>Microsoft® Translator </a>
+                <a class='partner' href="https://research.microsoft.com"><img src="/static/images/wlmemodx.png" /></a>
             </div>
 
-            <div class='col-xs-12 col-sm-9 col-md-4 tech-box'>
-              <h2>Open Source on GitHub</h2>
-              <p>You can fork it there, submit pull requests with bug-fixes or
-              new features, submit and comment on issues in the bug-tracker, and
-              check on latest activity.</p>
-                <div class='text-right'>
-                    <a class='btn btn-default' href="https://github.com/Microsoft/TouchDevelop">GitHub Repo</a>
-                </div>
-           </div>
-    </div>
-    </div>
-
-    <div class='top-buffer green-bar'>
-     <div class='container'>
-      <div class='row'>
-
-        <div class='col-xs-12 col-md-6'>
-            <h1>About Touch Develop</h1>
-            <p>
-              Touch Develop has been under active development since 2009 at Microsoft Research in Redmond.
-            </p>
-
-            <p>
-            Tutorials and documentation automatically translated courtesy to <a href="http://www.microsoft.com/translator/">Microsoft Translator</a>.</p>
         </div>
-        <div class='col-xs-12 col-md-6'>
-            <a class='partner' href="http://www.microsoft.com/translator/" style='font-size: 18px; color:#333'><img style='width: 70px; float:left;' src="https://www.microsoft.com/global/translator/PublishingImages/2_Shared/translatorLogo.png">
-                Translations by<br>Microsoft® Translator </a>
-            <a class='partner' href="https://research.microsoft.com"><img src="/static/images/wlmemodx.png" /></a>
-        </div>
-
-      </div>
-     </div>
     </div>
+</div>
 
 
-    <div class='container'>
+<div class='container'>
     <div class='row top-buffer'>
         <div class='col-xs-6 col-md-3 col-lg-offset-2 col-lg-2'>
             <a class="sitemap-header" href="/">Touch Develop</a>
@@ -530,7 +519,7 @@ No installation required, it just works.
             <a class="sitemap-entry" href='http://twitter.com/TouchDevelop'>Twitter</a>
         </div>
     </div>
-    </div>
+</div>
 
-    <script src="/static/js/home.js" type="text/javascript"></script>
+<script src="/static/js/home.js" type="text/javascript"></script>
 {% endblock %}
