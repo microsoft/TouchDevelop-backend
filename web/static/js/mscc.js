@@ -13,7 +13,7 @@ $(document).ready(function () {
 
             var d = $('<div class="mscc"></div>');
             d.html(info.Markup);
-            $(document.body).append(d);
+            $(document.body).prepend(d);
             info.Js.forEach(function (js) { $.getScript(js) });
         } catch (e) {
             console.error(e);
