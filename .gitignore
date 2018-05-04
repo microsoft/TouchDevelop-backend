@@ -11,3 +11,6 @@ dockerbuild/yottaconfig.json
 localdir/
 script.json
 mirror/
+package-lock.json
+tmp
+

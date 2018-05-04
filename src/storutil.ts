@@ -119,28 +119,58 @@ addCommand("blobs", "container [prefix [cont]]", "list blob containers", async (
     })
 });
 
+addCommand("size", "container [prefix [cont]]", "get blob container size", async (args) => {
+    let sz = 0
+    let cnt = 0
+    let loop = (cont:string) =>
+    blobClient.handle.listBlobsSegmentedWithPrefix(args[0], args[1] || "", cont, { maxResults: 1000 }, (err, res) => {
+        let n = ""
+        for (let t of res.entries) {            
+            cnt++
+            sz += parseInt(t.properties['content-length'])
+            n = t.name
+        }
+        console.log("Sz: " + sz + " / " + cnt + " at " + n)
+        let cont = res.continuationToken
+        if (cont) {
+            loop(cont)
+        }
+    })
+    loop(args[2])
+});
 
-addCommand("mirror", "container [prefix [cont]]", "list blob containers", async (args) => {
-    let dir = "mirror"
+
+addCommand("mirror", "container [prefix [cont]]", "copy blob containers", async (args) => {
+    let dir = "e:/mirror"
     if (!fs.existsSync(dir))
         fs.mkdirSync(dir)
     let container = blobClient.getContainer(args[0])
-    blobClient.handle.listBlobsSegmentedWithPrefix(args[0], args[1] || "", args[2], { maxResults: 100 }, async (err, res) => {
+    let loop = cont2 =>
+    blobClient.handle.listBlobsSegmentedWithPrefix(args[0], args[1] || "", cont2, { maxResults: 30 }, async (err, res) => {
         if (err) {
             console.log(err.message)
             return
         }
+        let tasks = []
         for (let t of res.entries) {
-            let res = await container.getBlobToBufferAsync(t.name)
-            let fn = dir + "/" + t.name
-            fs.writeFileSync(fn, res.buffer())
-            console.log("wrote:", fn)
+            tasks.push(async () => {
+                let res = await container.getBlobToBufferAsync(t.name)
+                let fn = dir + "/" + t.name
+                fs.writeFileSync(fn, res.buffer())
+                console.log("wrote:", fn)    
+            })
         }
+        for (let t of tasks) {
+            await t
+        }
+
         let cont = res.continuationToken
         if (cont) {
             console.log("continuation:", cont);
+            loop(cont)
         }
     })
+    loop(null)
 });
 
 const idLength = 20
